@@ -204,6 +204,17 @@
 				'fields.enemyPet': 'Przeciwnik Pet',
 				'fields.your': 'Twój',
 				'fields.yourPet': 'Twój Pet',
+				'war.exclude.alreadyExcluded': 'Ten bohater jest już wykluczony',
+				'war.exclude.confirmClear': 'Czy na pewno wyczyścić wszystkich wykluczonych?',
+				'war.exclude.cleared': 'Lista wykluczonych wyczyszczona',
+				'war.exclude.excludedFrom': '🚫 {name} wykluczony z planera',
+				'war.exclude.empty': 'Brak wykluczonych',
+				'kreator.hide.alreadyHidden': 'Ten bohater jest już ukryty',
+				'kreator.hide.confirmClear': 'Czy na pewno wyczyścić wszystkich ukrytych?',
+				'kreator.hide.cleared': 'Lista ukrytych wyczyszczona',
+				'kreator.hide.hiddenFrom': '🚫 {name} ukryty w tagach',
+				'kreator.hide.empty': 'Brak ukrytych',
+				'common.remove': 'Usuń',
                 'badge.base': 'BAZA', 'badge.user': 'DODANA'
             },
             en: {
@@ -345,6 +356,17 @@
 				'fields.enemyPet': 'Enemy Pet',
 				'fields.your': 'Your',
 				'fields.yourPet': 'Your Pet',
+				'war.exclude.alreadyExcluded': 'This hero is already excluded',
+				'war.exclude.confirmClear': 'Clear all excluded heroes?',
+				'war.exclude.cleared': 'Excluded list cleared',
+				'war.exclude.excludedFrom': '🚫 {name} excluded from planner',
+				'war.exclude.empty': 'No excluded',
+				'kreator.hide.alreadyHidden': 'This hero is already hidden',
+				'kreator.hide.confirmClear': 'Clear all hidden?',
+				'kreator.hide.cleared': 'Hidden list cleared',
+				'kreator.hide.hiddenFrom': '🚫 {name} hidden from tags',
+				'kreator.hide.empty': 'None hidden',
+				'common.remove': 'Remove',
                 'badge.base': 'BASE', 'badge.user': 'ADDED'
             }
         };
@@ -362,6 +384,18 @@
         const $ = id => document.getElementById(id);
         const normalize = str => (str || '').trim().toLowerCase();
         const getPetName = p => typeof p === 'string' ? p : p.name;
+
+        // Helpery menedżerów wykluczeń (search / war / kreator)
+        const findCanonicalHeroName = name => {
+            const n = normalize(name);
+            const hero = heroes.find(h => normalize(h.name) === n);
+            return hero ? hero.name : name;
+        };
+        const isHeroInList = (list, name) => {
+            const n = normalize(name);
+            return list.some(h => normalize(h) === n);
+        };
+        const persistList = (key, list) => localStorage.setItem(key, JSON.stringify(list));
 		
 		// Hashowanie SHA-256
 		async function hashPassword(password) {
@@ -1613,51 +1647,48 @@
 
 		function addExcludedHero(name) {
 			if (!name) return;
-			
-			const hero = heroes.find(h => h.name.toLowerCase() === name.toLowerCase());
-			const properName = hero ? hero.name : name;
-			
-			if (excludedHeroes.some(h => h.toLowerCase() === properName.toLowerCase())) {
+
+			const properName = findCanonicalHeroName(name);
+
+			if (isHeroInList(excludedHeroes, properName)) {
 				showToast(t('excluded.alreadyExcluded'), true);
 				return;
 			}
-			
+
 			excludedHeroes.push(properName);
-			localStorage.setItem('souls_excluded_heroes', JSON.stringify(excludedHeroes));
-			
+			persistList('souls_excluded_heroes', excludedHeroes);
+
 			renderExcludedHeroes();
 			showToast(`🚫 ${t('excluded.added')}: ${properName}`);
-			
+
 			const input = $('excluded-input');
 			if (input) input.value = '';
-			
-			// Odśwież bazę danych
+
 			filterDatabase();
 		}
 
 		function removeExcludedHero(name) {
-			excludedHeroes = excludedHeroes.filter(h => h.toLowerCase() !== name.toLowerCase());
-			localStorage.setItem('souls_excluded_heroes', JSON.stringify(excludedHeroes));
-			
+			const n = normalize(name);
+			excludedHeroes = excludedHeroes.filter(h => normalize(h) !== n);
+			persistList('souls_excluded_heroes', excludedHeroes);
+
 			renderExcludedHeroes();
 			showToast(`✅ ${t('excluded.removed')}: ${name}`);
-			
-			// Odśwież bazę danych
+
 			filterDatabase();
 		}
 
 		function clearExcludedHeroes() {
 			if (excludedHeroes.length === 0) return;
-			
+
 			if (!confirm(t('excluded.confirmClear'))) return;
-			
+
 			excludedHeroes = [];
-			localStorage.setItem('souls_excluded_heroes', JSON.stringify(excludedHeroes));
-			
+			persistList('souls_excluded_heroes', excludedHeroes);
+
 			renderExcludedHeroes();
 			showToast(t('excluded.cleared'));
-			
-			// Odśwież bazę danych
+
 			filterDatabase();
 		}
 
@@ -3980,39 +4011,37 @@
 		
 		function addWarExcludedHero(heroName) {
 			if (!heroName) return;
-			
-			const normalizedName = normalize(heroName);
-			const hero = heroes.find(h => normalize(h.name) === normalizedName);
-			const finalName = hero ? hero.name : heroName;
-			
-			if (warExcludedHeroes.some(h => normalize(h) === normalizedName)) {
-				showToast('Ten bohater jest już wykluczony', true);
+
+			const finalName = findCanonicalHeroName(heroName);
+
+			if (isHeroInList(warExcludedHeroes, finalName)) {
+				showToast(t('war.exclude.alreadyExcluded'), true);
 				return;
 			}
-			
+
 			warExcludedHeroes.push(finalName);
-			localStorage.setItem('souls_war_excluded_heroes', JSON.stringify(warExcludedHeroes));
+			persistList('souls_war_excluded_heroes', warExcludedHeroes);
 			renderWarExcludedChips();
 			updateWarExcludedCount();
-			showToast(`🚫 ${finalName} wykluczony z planera`);
+			showToast(t('war.exclude.excludedFrom', { name: finalName }));
 		}
-		
+
 		function removeWarExcludedHero(heroName) {
-			const normalizedName = normalize(heroName);
-			warExcludedHeroes = warExcludedHeroes.filter(h => normalize(h) !== normalizedName);
-			localStorage.setItem('souls_war_excluded_heroes', JSON.stringify(warExcludedHeroes));
+			const n = normalize(heroName);
+			warExcludedHeroes = warExcludedHeroes.filter(h => normalize(h) !== n);
+			persistList('souls_war_excluded_heroes', warExcludedHeroes);
 			renderWarExcludedChips();
 			updateWarExcludedCount();
 		}
-		
+
 		function clearWarExcludedHeroes() {
 			if (!warExcludedHeroes.length) return;
-			if (!confirm('Czy na pewno wyczyścić wszystkich wykluczonych?')) return;
+			if (!confirm(t('war.exclude.confirmClear'))) return;
 			warExcludedHeroes = [];
-			localStorage.setItem('souls_war_excluded_heroes', JSON.stringify(warExcludedHeroes));
+			persistList('souls_war_excluded_heroes', warExcludedHeroes);
 			renderWarExcludedChips();
 			updateWarExcludedCount();
-			showToast('Lista wykluczonych wyczyszczona');
+			showToast(t('war.exclude.cleared'));
 		}
 		
 		function renderWarExcludedChips() {
@@ -4021,14 +4050,14 @@
 			if (!container) return;
 			
 			if (!warExcludedHeroes.length) {
-				container.innerHTML = '<span id="war-excluded-empty" style="color: var(--text-muted); font-size: 0.75rem; font-style: italic; width: 100%; text-align: center;">Brak wykluczonych</span>';
+				container.innerHTML = `<span id="war-excluded-empty" style="color: var(--text-muted); font-size: 0.75rem; font-style: italic; width: 100%; text-align: center;">${t('war.exclude.empty')}</span>`;
 				return;
 			}
-			
+
 			container.innerHTML = warExcludedHeroes.map(hero => `
 				<span class="excluded-chip" style="display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; background: rgba(244, 67, 54, 0.2); border: 1px solid rgba(244, 67, 54, 0.4); border-radius: 12px; font-size: 0.75rem; color: #f44336;">
 					${hero}
-					<button onclick="removeWarExcludedHero('${hero.replace(/'/g, "\\'")}')" style="background: none; border: none; color: #f44336; cursor: pointer; font-size: 0.8rem; padding: 0 2px; opacity: 0.7;" title="Usuń">✕</button>
+					<button onclick="removeWarExcludedHero('${hero.replace(/'/g, "\\'")}')" style="background: none; border: none; color: #f44336; cursor: pointer; font-size: 0.8rem; padding: 0 2px; opacity: 0.7;" title="${t('common.remove')}">✕</button>
 				</span>
 			`).join('');
 		}
@@ -4082,42 +4111,40 @@
 		
 		function addKreatorExcludedHero(heroName) {
 			if (!heroName) return;
-			
-			const normalizedName = normalize(heroName);
-			const hero = heroes.find(h => normalize(h.name) === normalizedName);
-			const finalName = hero ? hero.name : heroName;
-			
-			if (kreatorExcludedHeroes.some(h => normalize(h) === normalizedName)) {
-				showToast('Ten bohater jest już ukryty', true);
+
+			const finalName = findCanonicalHeroName(heroName);
+
+			if (isHeroInList(kreatorExcludedHeroes, finalName)) {
+				showToast(t('kreator.hide.alreadyHidden'), true);
 				return;
 			}
-			
+
 			kreatorExcludedHeroes.push(finalName);
-			localStorage.setItem('souls_kreator_excluded_heroes', JSON.stringify(kreatorExcludedHeroes));
+			persistList('souls_kreator_excluded_heroes', kreatorExcludedHeroes);
 			renderKreatorExcludedChips();
 			updateKreatorExcludedCount();
-			generateKreatorTags(); // Regeneruj tagi
-			showToast(`🚫 ${finalName} ukryty w tagach`);
+			generateKreatorTags();
+			showToast(t('kreator.hide.hiddenFrom', { name: finalName }));
 		}
-		
+
 		function removeKreatorExcludedHero(heroName) {
-			const normalizedName = normalize(heroName);
-			kreatorExcludedHeroes = kreatorExcludedHeroes.filter(h => normalize(h) !== normalizedName);
-			localStorage.setItem('souls_kreator_excluded_heroes', JSON.stringify(kreatorExcludedHeroes));
+			const n = normalize(heroName);
+			kreatorExcludedHeroes = kreatorExcludedHeroes.filter(h => normalize(h) !== n);
+			persistList('souls_kreator_excluded_heroes', kreatorExcludedHeroes);
 			renderKreatorExcludedChips();
 			updateKreatorExcludedCount();
-			generateKreatorTags(); // Regeneruj tagi
+			generateKreatorTags();
 		}
-		
+
 		function clearKreatorExcludedHeroes() {
 			if (!kreatorExcludedHeroes.length) return;
-			if (!confirm('Czy na pewno wyczyścić wszystkich ukrytych?')) return;
+			if (!confirm(t('kreator.hide.confirmClear'))) return;
 			kreatorExcludedHeroes = [];
-			localStorage.setItem('souls_kreator_excluded_heroes', JSON.stringify(kreatorExcludedHeroes));
+			persistList('souls_kreator_excluded_heroes', kreatorExcludedHeroes);
 			renderKreatorExcludedChips();
 			updateKreatorExcludedCount();
-			generateKreatorTags(); // Regeneruj tagi
-			showToast('Lista ukrytych wyczyszczona');
+			generateKreatorTags();
+			showToast(t('kreator.hide.cleared'));
 		}
 		
 		function renderKreatorExcludedChips() {
@@ -4125,14 +4152,14 @@
 			if (!container) return;
 			
 			if (!kreatorExcludedHeroes.length) {
-				container.innerHTML = '<span id="kreator-excluded-empty" style="color: var(--text-muted); font-size: 0.75rem; font-style: italic; width: 100%; text-align: center;">Brak ukrytych</span>';
+				container.innerHTML = `<span id="kreator-excluded-empty" style="color: var(--text-muted); font-size: 0.75rem; font-style: italic; width: 100%; text-align: center;">${t('kreator.hide.empty')}</span>`;
 				return;
 			}
-			
+
 			container.innerHTML = kreatorExcludedHeroes.map(hero => `
 				<span class="excluded-chip" style="display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; background: rgba(244, 67, 54, 0.2); border: 1px solid rgba(244, 67, 54, 0.4); border-radius: 12px; font-size: 0.75rem; color: #f44336;">
 					${hero}
-					<button onclick="removeKreatorExcludedHero('${hero.replace(/'/g, "\\'")}')" style="background: none; border: none; color: #f44336; cursor: pointer; font-size: 0.8rem; padding: 0 2px; opacity: 0.7;" title="Usuń">✕</button>
+					<button onclick="removeKreatorExcludedHero('${hero.replace(/'/g, "\\'")}')" style="background: none; border: none; color: #f44336; cursor: pointer; font-size: 0.8rem; padding: 0 2px; opacity: 0.7;" title="${t('common.remove')}">✕</button>
 				</span>
 			`).join('');
 		}
