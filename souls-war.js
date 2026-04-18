@@ -25,6 +25,15 @@
             },
         };
 
+        // Migracja: 4 klucze preferencji UI bez prefiksu → souls_* (jednorazowo przy starcie)
+        ['addFormSectionsReversed', 'enemyRowsReversed', 'searchRowsReversed', 'addFormStacked'].forEach(oldKey => {
+            const raw = localStorage.getItem(oldKey);
+            if (raw !== null && localStorage.getItem('souls_' + oldKey) === null) {
+                localStorage.setItem('souls_' + oldKey, raw);
+                localStorage.removeItem(oldKey);
+            }
+        });
+
         let db, formationsRef, heroesRef, petsRef;
         let allFormations = [];
         let isOnline = false, isAdmin = false;
@@ -87,6 +96,7 @@
                 'search.emptyState': 'Wpisz postacie przeciwnika i kliknij "Szukaj"', 'search.results': 'Wyniki', 'search.found': 'Znaleziono', 'search.noResults': 'Nie znaleziono pasujących formacji',
                 'search.enemy': 'Przeciwnik', 'search.missing': 'Brak', 'search.allSlotsFull': 'Wszystkie pola zajęte!', 'search.petSlotFull': 'Pole Pet już zajęte!',
                 'search.enterAtLeastOne': 'Wpisz przynajmniej jedną postać!', 'search.selected': 'Wybrano',
+                'search.dataLoading': '⏳ Czekam na dane z bazy…',
                 'database.title': 'Pełna baza formacji', 'database.statsAll': 'Wszystkich', 'database.statsBase': 'Bazowych', 'database.statsUser': 'Dodanych',
                 'database.filterAll': 'Wszystkie', 'database.filterBase': 'Bazowe', 'database.filterUser': 'Dodane', 'database.filterFavorites': 'Ulubione',
                 'database.searchPlaceholder': '🔍 Szukaj...', 'database.noFormations': 'Brak formacji',
@@ -239,6 +249,7 @@
                 'search.emptyState': 'Enter enemy heroes and click "Search"', 'search.results': 'Results', 'search.found': 'Found', 'search.noResults': 'No matching formations found',
                 'search.enemy': 'Enemy', 'search.missing': 'Missing', 'search.allSlotsFull': 'All slots are full!', 'search.petSlotFull': 'Pet slot is full!',
                 'search.enterAtLeastOne': 'Enter at least one hero!', 'search.selected': 'Selected',
+                'search.dataLoading': '⏳ Waiting for database…',
                 'database.title': 'Full formation database', 'database.statsAll': 'Total', 'database.statsBase': 'Base', 'database.statsUser': 'Added',
                 'database.filterAll': 'All', 'database.filterBase': 'Base', 'database.filterUser': 'Added', 'database.filterFavorites': 'Favorites',
                 'database.searchPlaceholder': '🔍 Search...', 'database.noFormations': 'No formations',
@@ -561,7 +572,7 @@
         
         // Załaduj preferencję przy starcie
         function loadSectionOrderPreference() {
-            const reversed = storage.getBool('addFormSectionsReversed');
+            const reversed = storage.getBool('souls_addFormSectionsReversed');
             const container = $('add-form-sections');
             if (container && reversed) {
                 container.classList.add('reversed');
@@ -577,7 +588,7 @@
             
             // Zapisz preferencję
             const isReversed = container.classList.contains('reversed');
-            localStorage.setItem('addFormSectionsReversed', isReversed);
+            localStorage.setItem('souls_addFormSectionsReversed', isReversed);
             
             // Pokaż informację
             const msg = isReversed 
@@ -589,7 +600,7 @@
 		// Odwrócenie kolejności rzędów w sekcji przeciwnika
 		function loadEnemyRowsPreference() {
 			// Domyślnie true (6-7-8 na górze), chyba że użytkownik wybrał inaczej
-			const reversed = storage.getBool('enemyRowsReversed', true);
+			const reversed = storage.getBool('souls_enemyRowsReversed', true);
 			const container = $('enemy-rows-container');
 			const btn = $('btn-flip-enemy-rows');
 			if (container && reversed) {
@@ -609,7 +620,7 @@
 			btn?.classList.toggle('active');
 			
 			const isReversed = container.classList.contains('reversed');
-			localStorage.setItem('enemyRowsReversed', isReversed);
+			localStorage.setItem('souls_enemyRowsReversed', isReversed);
 			
 			const msg = isReversed 
 				? t('layout.top678')
@@ -620,7 +631,7 @@
 		// Odwrócenie kolejności rzędów w wyszukiwarce
 		function loadSearchRowsPreference() {
 			// Domyślnie true (6-7-8 na górze)
-			const reversed = storage.getBool('searchRowsReversed', true);
+			const reversed = storage.getBool('souls_searchRowsReversed', true);
 			const container = $('search-rows-container');
 			const btn = $('btn-flip-search-rows');
 			if (container && reversed) {
@@ -640,7 +651,7 @@
 			btn?.classList.toggle('active');
 			
 			const isReversed = container.classList.contains('reversed');
-			localStorage.setItem('searchRowsReversed', isReversed);
+			localStorage.setItem('souls_searchRowsReversed', isReversed);
 			
 			const msg = isReversed 
 				? t('layout.top678')
@@ -650,7 +661,7 @@
 
 		// Zwraca pola wyszukiwarki w kolejności wizualnej
 		function getSearchFieldsInOrder() {
-			const reversed = storage.getBool('searchRowsReversed', true);
+			const reversed = storage.getBool('souls_searchRowsReversed', true);
 
 			if (reversed) {
 				return [
@@ -666,7 +677,7 @@
 
 		// Przełączanie układu: obok siebie vs góra-dół
 		function loadFormLayoutPreference() {
-			const stacked = storage.getBool('addFormStacked');
+			const stacked = storage.getBool('souls_addFormStacked');
 			const container = $('add-form-sections');
 			const btn = $('btn-layout-toggle');
 			const text = $('layout-toggle-text');
@@ -693,7 +704,7 @@
 			btn?.classList.toggle('active');
 			
 			const isStacked = container.classList.contains('stacked');
-			localStorage.setItem('addFormStacked', isStacked);
+			localStorage.setItem('souls_addFormStacked', isStacked);
 			
 			if (text) {
 				text.textContent = isStacked 
@@ -1402,15 +1413,14 @@
 			const searchPet = normalize($('search-pet').value);
 			
 			if (!searchHeroes.length && !searchPet) { showToast(t('search.enterAtLeastOne'), true); return; }
-			
+			if (!allFormations.length) { showToast(t('search.dataLoading'), true); return; }
+
+			const query = { heroes: searchHeroes, pet: searchPet || null };
 			const results = allFormations.map(f => {
-				const enemyHeroes = f.enemy.filter(h => h).map(normalize);
-				const enemyPet = normalize(f.enemyPet);
-				const matchedHeroes = searchHeroes.filter(sh => enemyHeroes.some(eh => heroMatchScore(sh, eh) > 0));
-				const petMatched = searchPet && heroMatchScore(searchPet, enemyPet) > 0;
-				const score = matchedHeroes.length + (petMatched ? 1 : 0);
-				
-				return score > 0 ? { formation: f, matchedHeroes, petMatched, score, maxScore: searchHeroes.length + (searchPet ? 1 : 0) } : null;
+				const r = scoreFormation(f, query);
+				return r.score > 0
+					? { formation: f, matchedHeroes: r.matchedHeroes, petMatched: r.petMatched, score: r.score, maxScore: r.maxScore }
+					: null;
 			}).filter(Boolean).sort((a, b) => b.score - a.score);
 			
 			displayResults(results, searchHeroes);
@@ -1591,7 +1601,7 @@
 
 		// Zwraca pola przeciwnika w kolejności wizualnej (uwzględnia odwrócenie rzędów)
 		function getEnemyFieldsInOrder() {
-			const reversed = storage.getBool('enemyRowsReversed', true);
+			const reversed = storage.getBool('souls_enemyRowsReversed', true);
 
 			if (reversed) {
 				// 6-7-8 na górze → kolejność: 6,7,8 → 4,5 → 1,2,3 → Pet
@@ -3278,7 +3288,7 @@
 				closeEditModal();
 				
 				// Odśwież podgląd jeśli jest otwarty
-				if ($('lookup-id').value == editingFormationId) {
+				if (Number($('lookup-id').value) === editingFormationId) {
 					showFormation(editingFormationId);
 				}
 				// Odśwież listę w bazie danych
@@ -3836,65 +3846,70 @@
             return 0;
         }
 
-        function findMatchingFormations(enemyTeam, minMatch = 1) {
-            const results = [];
-            
-            allFormations.forEach(f => {
-                const enemyHeroes = f.enemy.map(h => h ? normalize(h) : '');
-                const enemyPet = normalize(f.enemyPet);
-                
-                // Licz dopasowania z uwzględnieniem pozycji
-                let matchedHeroes = [];
-                let positionBonus = 0;
-                
-                // Sprawdź każdego bohatera z wyszukiwania
-                enemyTeam.heroes.forEach((searchHero, searchIdx) => {
-                    if (!searchHero) return;
-                    
-                    let matched = false;
-                    
-                    enemyHeroes.forEach((formationHero, formationIdx) => {
-                        if (!formationHero) return;
-                        
-                        const matchScore = heroMatchScore(searchHero, formationHero);
-                        if (matchScore > 0) {
-                            matched = true;
-                            // Bonus za tę samą pozycję (używamy heroesRaw dla pozycji)
-                            if (enemyTeam.heroesRaw && enemyTeam.heroesRaw[searchIdx]) {
-                                const searchPosIdx = enemyTeam.heroesRaw.findIndex((h, i) => h && normalize(h) === searchHero);
-                                if (searchPosIdx === formationIdx) {
-                                    positionBonus += 0.3; // bonus za dopasowanie pozycji
-                                }
-                            }
+        // Wspólny scoring formacji — używany przez searchFormations i findMatchingFormations.
+        // query: { heroes (compact normalized), heroesRaw? (8-slot z pozycjami), pet? (normalized) }
+        // opts.withPositionBonus: +0.3 za każdego bohatera trafionego na tym samym indeksie slotu
+        function scoreFormation(formation, query, opts = {}) {
+            const enemyHeroes = formation.enemy.map(h => h ? normalize(h) : '');
+            const enemyPet = normalize(formation.enemyPet);
+            const withPositionBonus = !!opts.withPositionBonus;
+
+            const matchedHeroes = [];
+            let positionBonus = 0;
+
+            query.heroes.forEach(searchHero => {
+                if (!searchHero) return;
+                let matched = false;
+
+                enemyHeroes.forEach((formationHero, formationIdx) => {
+                    if (!formationHero) return;
+                    if (heroMatchScore(searchHero, formationHero) > 0) {
+                        matched = true;
+                        if (withPositionBonus && query.heroesRaw) {
+                            const rawIdx = query.heroesRaw.findIndex(h => h && normalize(h) === searchHero);
+                            if (rawIdx === formationIdx) positionBonus += 0.3;
                         }
-                    });
-                    
-                    if (matched) {
-                        matchedHeroes.push(searchHero);
                     }
                 });
-                
-                // Pet matching z minimalną długością
-                const petMatched = enemyTeam.pet && enemyPet && 
-                    heroMatchScore(enemyTeam.pet, enemyPet) > 0;
-                
-                const baseScore = matchedHeroes.length + (petMatched ? 1 : 0);
-                const score = baseScore + positionBonus; // score z bonusem pozycji
-                const maxScore = enemyTeam.heroes.length + (enemyTeam.pet ? 1 : 0);
-                
-                if (baseScore >= minMatch) {
+
+                if (matched) matchedHeroes.push(searchHero);
+            });
+
+            const petMatched = !!(query.pet && heroMatchScore(query.pet, enemyPet) > 0);
+            const baseScore = matchedHeroes.length + (petMatched ? 1 : 0);
+            const maxScore = query.heroes.length + (query.pet ? 1 : 0);
+
+            return {
+                score: baseScore + positionBonus,
+                baseScore,
+                positionBonus,
+                matchedHeroes,
+                petMatched,
+                maxScore,
+            };
+        }
+
+        function findMatchingFormations(enemyTeam, minMatch = 1) {
+            const query = {
+                heroes: enemyTeam.heroes,
+                heroesRaw: enemyTeam.heroesRaw,
+                pet: enemyTeam.pet,
+            };
+            const results = [];
+            allFormations.forEach(f => {
+                const r = scoreFormation(f, query, { withPositionBonus: true });
+                if (r.baseScore >= minMatch) {
                     results.push({
                         formation: f,
-                        score,
-                        baseScore, // wynik bez bonusu (do wyświetlania)
-                        maxScore,
-                        matchedHeroes,
-                        petMatched,
-                        positionBonus
+                        score: r.score,
+                        baseScore: r.baseScore,
+                        maxScore: r.maxScore,
+                        matchedHeroes: r.matchedHeroes,
+                        petMatched: r.petMatched,
+                        positionBonus: r.positionBonus,
                     });
                 }
             });
-            
             return results.sort((a, b) => b.score - a.score);
         }
         
