@@ -163,6 +163,47 @@
 				'war.legendConflict': 'Konflikt (użyty wielokrotnie)',
 				'war.selectCombo': 'Wybierz kombinację z planera wojny',
 				'war.history': 'Historia planera',
+				'common.historyCleared': 'Historia wyczyszczona',
+				'excluded.alreadyExcluded': 'Bohater już wykluczony!',
+				'excluded.added': 'Wykluczono',
+				'excluded.removed': 'Usunięto z wykluczonych',
+				'excluded.confirmClear': 'Wyczyścić wszystkich wykluczonych?',
+				'excluded.cleared': '🗑️ Wyczyszczono wykluczonych',
+				'excluded.hiddenInResults': '{n} ukrytych z powodu wykluczonych bohaterów',
+				'excluded.hiddenCountLabel': 'ukrytych (wykluczone)',
+				'search.foundInComment': 'Znaleziono w komentarzu',
+				'search.historyConfirmClear': 'Wyczyścić całą historię wyszukiwań?',
+				'search.loadedFromHistory': 'Wczytano z historii',
+				'search.clickFieldFirst': 'Najpierw kliknij w pole!',
+				'search.fieldIsPet': 'To pole jest na Peta!',
+				'search.selectPetField': 'Wybierz pole Pet!',
+				'war.historyConfirmClear': 'Wyczyścić całą historię planera?',
+				'war.max3': 'Maksymalnie 3 składy!',
+				'war.min2': 'Zaznacz minimum 2 składy!',
+				'war.selectPlanFirst': 'Najpierw wybierz plan wojny',
+				'preview.confirmClearViewed': 'Wyczyścić historię przeglądanych?',
+				'preview.viewedCleared': '🗑️ Historia wyczyszczona',
+				'preview.otherCounters': 'Inne kontry na tego przeciwnika',
+				'preview.noOtherCounters': 'Brak innych kontr',
+				'preview.prev': 'Poprzedni',
+				'preview.next': 'Następny',
+				'preview.show': 'POKAŻ',
+				'clipboard.formationCopied': '📋 Skład skopiowany do schowka!',
+				'clipboard.teamCopied': '📋 Skład skopiowany!',
+				'clipboard.copyFailed': '❌ Błąd kopiowania',
+				'clipboard.linkCopied': '🔗 Link skopiowany!',
+				'ordering.yourTeamFirst': 'Kolejność: Najpierw twój skład',
+				'ordering.enemyFirst': 'Kolejność: Najpierw przeciwnik',
+				'layout.top678': 'Układ: 6-7-8 na górze',
+				'layout.top123': 'Układ: 1-2-3 na górze',
+				'layout.sideBySide': 'Obok siebie',
+				'layout.stacked': 'Góra-dół',
+				'layout.sideBySideLabel': 'Układ: Obok siebie',
+				'layout.stackedLabel': 'Układ: Góra-dół',
+				'fields.enemy': 'Przeciwnik',
+				'fields.enemyPet': 'Przeciwnik Pet',
+				'fields.your': 'Twój',
+				'fields.yourPet': 'Twój Pet',
                 'badge.base': 'BAZA', 'badge.user': 'DODANA'
             },
             en: {
@@ -263,11 +304,56 @@
 				'war.legendConflict': 'Conflict (used multiple times)',
 				'war.selectCombo': 'Select a combination from war planner',
 				'war.history': 'Planner history',
+				'common.historyCleared': 'History cleared',
+				'excluded.alreadyExcluded': 'Hero already excluded!',
+				'excluded.added': 'Excluded',
+				'excluded.removed': 'Removed from excluded',
+				'excluded.confirmClear': 'Clear all excluded heroes?',
+				'excluded.cleared': '🗑️ Cleared excluded',
+				'excluded.hiddenInResults': '{n} hidden due to excluded heroes',
+				'excluded.hiddenCountLabel': 'hidden (excluded)',
+				'search.foundInComment': 'Found in comment',
+				'search.historyConfirmClear': 'Clear all search history?',
+				'search.loadedFromHistory': 'Loaded from history',
+				'search.clickFieldFirst': 'Click a field first!',
+				'search.fieldIsPet': 'This field is for Pet!',
+				'search.selectPetField': 'Select a Pet field!',
+				'war.historyConfirmClear': 'Clear all planner history?',
+				'war.max3': 'Maximum 3 formations!',
+				'war.min2': 'Select at least 2 formations!',
+				'war.selectPlanFirst': 'Select war plan first',
+				'preview.confirmClearViewed': 'Clear viewing history?',
+				'preview.viewedCleared': '🗑️ History cleared',
+				'preview.otherCounters': 'Other counters for this enemy',
+				'preview.noOtherCounters': 'No other counters',
+				'preview.prev': 'Previous',
+				'preview.next': 'Next',
+				'preview.show': 'SHOW',
+				'clipboard.formationCopied': '📋 Formation copied to clipboard!',
+				'clipboard.teamCopied': '📋 Team copied!',
+				'clipboard.copyFailed': '❌ Copy failed',
+				'clipboard.linkCopied': '🔗 Link copied!',
+				'ordering.yourTeamFirst': 'Order: Your team first',
+				'ordering.enemyFirst': 'Order: Enemy first',
+				'layout.top678': 'Layout: 6-7-8 on top',
+				'layout.top123': 'Layout: 1-2-3 on top',
+				'layout.sideBySide': 'Side by side',
+				'layout.stacked': 'Stacked',
+				'layout.sideBySideLabel': 'Layout: Side by side',
+				'layout.stackedLabel': 'Layout: Stacked (top-bottom)',
+				'fields.enemy': 'Enemy',
+				'fields.enemyPet': 'Enemy Pet',
+				'fields.your': 'Your',
+				'fields.yourPet': 'Your Pet',
                 'badge.base': 'BASE', 'badge.user': 'ADDED'
             }
         };
         
-        const t = key => translations[currentLang][key] || translations['pl'][key] || key;
+        const t = (key, params) => {
+            let str = translations[currentLang][key] || translations['pl'][key] || key;
+            if (params) Object.entries(params).forEach(([k, v]) => str = str.replaceAll(`{${k}}`, v));
+            return str;
+        };
         
         // =====================================================
         // FUNKCJE POMOCNICZE
@@ -448,8 +534,8 @@
             
             // Pokaż informację
             const msg = isReversed 
-                ? (currentLang === 'en' ? 'Order: Your team first' : 'Kolejność: Najpierw twój skład')
-                : (currentLang === 'en' ? 'Order: Enemy first' : 'Kolejność: Najpierw przeciwnik');
+                ? t('ordering.yourTeamFirst')
+                : t('ordering.enemyFirst');
             showToast(msg);
         }
 		
@@ -480,8 +566,8 @@
 			localStorage.setItem('enemyRowsReversed', isReversed);
 			
 			const msg = isReversed 
-				? (currentLang === 'en' ? 'Layout: 6-7-8 on top' : 'Układ: 6-7-8 na górze')
-				: (currentLang === 'en' ? 'Layout: 1-2-3 on top' : 'Układ: 1-2-3 na górze');
+				? t('layout.top678')
+				: t('layout.top123');
 			showToast(msg);
 		}
 		
@@ -512,8 +598,8 @@
 			localStorage.setItem('searchRowsReversed', isReversed);
 			
 			const msg = isReversed 
-				? (currentLang === 'en' ? 'Layout: 6-7-8 on top' : 'Układ: 6-7-8 na górze')
-				: (currentLang === 'en' ? 'Layout: 1-2-3 on top' : 'Układ: 1-2-3 na górze');
+				? t('layout.top678')
+				: t('layout.top123');
 			showToast(msg);
 		}
 
@@ -548,8 +634,8 @@
 			}
 			if (text) {
 				text.textContent = stacked 
-					? (currentLang === 'en' ? 'Side by side' : 'Obok siebie') 
-					: (currentLang === 'en' ? 'Stacked' : 'Góra-dół');
+					? t('layout.sideBySide')
+					: t('layout.stacked');
 			}
 		}
 
@@ -567,13 +653,13 @@
 			
 			if (text) {
 				text.textContent = isStacked 
-					? (currentLang === 'en' ? 'Side by side' : 'Obok siebie') 
-					: (currentLang === 'en' ? 'Stacked' : 'Góra-dół');
+					? t('layout.sideBySide')
+					: t('layout.stacked');
 			}
 			
 			const msg = isStacked 
-				? (currentLang === 'en' ? 'Layout: Stacked (top-bottom)' : 'Układ: Góra-dół')
-				: (currentLang === 'en' ? 'Layout: Side by side' : 'Układ: Obok siebie');
+				? t('layout.stackedLabel')
+				: t('layout.sideBySideLabel');
 			showToast(msg);
 		}
         
@@ -953,7 +1039,7 @@
                     return;
                 }
             }
-            showToast('Wszystkie pola są zajęte!', true);
+            showToast(t('search.allSlotsFull'), true);
         }
         
         function addPetToWar(petName) {
@@ -1091,7 +1177,7 @@
                     return;
                 }
             }
-            showToast('Wszystkie pola są zajęte!', true);
+            showToast(t('search.allSlotsFull'), true);
         }
         
         function addPetToKreator(petName) {
@@ -1532,7 +1618,7 @@
 			const properName = hero ? hero.name : name;
 			
 			if (excludedHeroes.some(h => h.toLowerCase() === properName.toLowerCase())) {
-				showToast(currentLang === 'pl' ? 'Bohater już wykluczony!' : 'Hero already excluded!', true);
+				showToast(t('excluded.alreadyExcluded'), true);
 				return;
 			}
 			
@@ -1540,7 +1626,7 @@
 			localStorage.setItem('souls_excluded_heroes', JSON.stringify(excludedHeroes));
 			
 			renderExcludedHeroes();
-			showToast(`🚫 ${currentLang === 'pl' ? 'Wykluczono' : 'Excluded'}: ${properName}`);
+			showToast(`🚫 ${t('excluded.added')}: ${properName}`);
 			
 			const input = $('excluded-input');
 			if (input) input.value = '';
@@ -1554,7 +1640,7 @@
 			localStorage.setItem('souls_excluded_heroes', JSON.stringify(excludedHeroes));
 			
 			renderExcludedHeroes();
-			showToast(`✅ ${currentLang === 'pl' ? 'Usunięto z wykluczonych' : 'Removed from excluded'}: ${name}`);
+			showToast(`✅ ${t('excluded.removed')}: ${name}`);
 			
 			// Odśwież bazę danych
 			filterDatabase();
@@ -1563,13 +1649,13 @@
 		function clearExcludedHeroes() {
 			if (excludedHeroes.length === 0) return;
 			
-			if (!confirm(currentLang === 'pl' ? 'Wyczyścić wszystkich wykluczonych?' : 'Clear all excluded heroes?')) return;
+			if (!confirm(t('excluded.confirmClear'))) return;
 			
 			excludedHeroes = [];
 			localStorage.setItem('souls_excluded_heroes', JSON.stringify(excludedHeroes));
 			
 			renderExcludedHeroes();
-			showToast(currentLang === 'pl' ? '🗑️ Wyczyszczono wykluczonych' : '🗑️ Cleared excluded');
+			showToast(t('excluded.cleared'));
 			
 			// Odśwież bazę danych
 			filterDatabase();
@@ -1674,7 +1760,7 @@
 			</div>`;
 			
 			if (!displayedResults.length) {
-				html += `<div class="empty-state"><p>${t('search.noResults')}</p><p style="font-size:0.8rem;color:var(--text-muted);margin-top:10px;">${currentLang === 'pl' ? `${hiddenCount} ukrytych z powodu wykluczonych bohaterów` : `${hiddenCount} hidden due to excluded heroes`}</p></div>`;
+				html += `<div class="empty-state"><p>${t('search.noResults')}</p><p style="font-size:0.8rem;color:var(--text-muted);margin-top:10px;">${t('excluded.hiddenInResults', {n: hiddenCount})}</p></div>`;
 				$('results-section').innerHTML = html;
 				updateCompareButton();
 				return;
@@ -1692,7 +1778,7 @@
 				
 				// Info o dopasowaniu w komentarzu
 				const commentMatchInfo = r.commentMatched && r.matchedHeroes.length === 0 && !r.petMatched 
-					? `<div style="font-size:0.7rem;color:var(--accent-gold);margin-top:3px;">💬 ${currentLang === 'pl' ? 'Znaleziono w komentarzu' : 'Found in comment'}</div>` 
+					? `<div style="font-size:0.7rem;color:var(--accent-gold);margin-top:3px;">💬 ${t('search.foundInComment')}</div>`
 					: '';
 				
 				return `
@@ -1862,12 +1948,12 @@
 		}
 
 		function clearSearchHistory() {
-			if (!confirm(currentLang === 'pl' ? 'Wyczyścić całą historię wyszukiwań?' : 'Clear all search history?')) return;
+			if (!confirm(t('search.historyConfirmClear'))) return;
 			
 			searchHistory = [];
 			localStorage.setItem('souls_search_history', JSON.stringify(searchHistory));
 			renderSearchHistory();
-			showToast(currentLang === 'pl' ? 'Historia wyczyszczona' : 'History cleared');
+			showToast(t('common.historyCleared'));
 		}
 		
 		// =====================================================
@@ -2020,7 +2106,7 @@
 			updateWarAutosaveInfo();
 			
 			const timeAgo = getTimeAgo(new Date(entry.timestamp));
-			showToast(`📜 ${currentLang === 'pl' ? 'Wczytano z historii' : 'Loaded from history'} (${timeAgo})`);
+			showToast(`📜 ${t('search.loadedFromHistory')} (${timeAgo})`);
 		}
 
 		function removeWarHistoryItem(idx) {
@@ -2031,12 +2117,12 @@
 		}
 
 		function clearWarHistory() {
-			if (!confirm(currentLang === 'pl' ? 'Wyczyścić całą historię planera?' : 'Clear all planner history?')) return;
+			if (!confirm(t('war.historyConfirmClear'))) return;
 			
 			warSearchHistory = [];
 			localStorage.setItem('souls_war_history', JSON.stringify(warSearchHistory));
 			renderWarHistory();
-			showToast(currentLang === 'pl' ? 'Historia wyczyszczona' : 'History cleared');
+			showToast(t('common.historyCleared'));
 		}
 		
 		// =====================================================
@@ -2050,7 +2136,7 @@
 			if (checkbox.checked) {
 				if (selectedForCompare.length >= 3) {
 					checkbox.checked = false;
-					showToast(currentLang === 'pl' ? 'Maksymalnie 3 składy!' : 'Maximum 3 formations!', true);
+					showToast(t('war.max3'), true);
 					return;
 				}
 				selectedForCompare.push(id);
@@ -2077,7 +2163,7 @@
 
 		function openCompareModal() {
 			if (selectedForCompare.length < 2) {
-				showToast(currentLang === 'pl' ? 'Zaznacz minimum 2 składy!' : 'Select at least 2 formations!', true);
+				showToast(t('war.min2'), true);
 				return;
 			}
 			
@@ -2269,16 +2355,16 @@
         // =====================================================
         
         function addTagToActiveField(value, type) {
-            if (!activeAddField) { showToast(currentLang === 'pl' ? 'Najpierw kliknij w pole!' : 'Click a field first!', true); return; }
+            if (!activeAddField) { showToast(t('search.clickFieldFirst'), true); return; }
             
             const input = $(activeAddField);
             if (!input) return;
             
             const isPetField = activeAddField.includes('Pet');
-            const isHeroTag = !['Gladis','Nasrune','Romanelle','Tianum','Hamm','Spooky','Mystet','Bloombell','Silbren','Vailo','Estelle','Banavi','Moko'].includes(value);
+            const isHeroTag = !pets.includes(value);
             
-            if (isPetField && isHeroTag) { showToast(currentLang === 'pl' ? 'To pole jest na Peta!' : 'This field is for Pet!', true); return; }
-            if (!isPetField && !isHeroTag) { showToast(currentLang === 'pl' ? 'Wybierz pole Pet!' : 'Select a Pet field!', true); return; }
+            if (isPetField && isHeroTag) { showToast(t('search.fieldIsPet'), true); return; }
+            if (!isPetField && !isHeroTag) { showToast(t('search.selectPetField'), true); return; }
             
             const isMySection = activeAddField.includes('add-my');
             const sectionFields = isPetField ? [isMySection ? 'add-myPet' : 'add-enemyPet'] : 
@@ -2315,10 +2401,10 @@
 									let fieldName = fieldId;
 									if (fieldId.startsWith('enemy')) {
 										const num = fieldId.replace('enemy', '').replace('Pet', '');
-										fieldName = currentLang === 'en' ? (fieldId.includes('Pet') ? 'Enemy Pet' : 'Enemy ' + num) : (fieldId.includes('Pet') ? 'Przeciwnik Pet' : 'Przeciwnik ' + num);
+										fieldName = fieldId.includes('Pet') ? t('fields.enemyPet') : `${t('fields.enemy')} ${num}`;
 									} else if (fieldId.startsWith('my')) {
 										const num = fieldId.replace('my', '').replace('Pet', '');
-										fieldName = currentLang === 'en' ? (fieldId.includes('Pet') ? 'Your Pet' : 'Your ' + num) : (fieldId.includes('Pet') ? 'Twój Pet' : 'Twój ' + num);
+										fieldName = fieldId.includes('Pet') ? t('fields.yourPet') : `${t('fields.your')} ${num}`;
 									}
 									nameEl.textContent = fieldName;
 								}
@@ -2370,8 +2456,8 @@
                     counter.style.cssText = 'display:block;width:100%;margin-bottom:15px;';
                     $('add-form-tags-container')?.parentNode.insertBefore(counter, $('add-form-tags-container'));
                 }
-                const yourLabel = currentLang === 'en' ? 'Your team' : 'Twój skład';
-                const enemyLabel = currentLang === 'en' ? 'Enemy' : 'Przeciwnik';
+                const yourLabel = t('add.yourTeam');
+                const enemyLabel = t('fields.enemy');
                 counter.innerHTML = `⚔️ ${yourLabel}: <strong>${myTotal}</strong>/6 &nbsp;│&nbsp; 👹 ${enemyLabel}: <strong>${enemyTotal}</strong>/6`;
             } else counter?.remove();
         }
@@ -2642,7 +2728,7 @@
 			// Pokaż info o ukrytych
 			let headerInfo = '';
 			if (hiddenCount > 0) {
-				headerInfo = `<div style="text-align:center;font-size:0.75rem;color:#f44336;margin-bottom:10px;">🚫 ${hiddenCount} ${currentLang === 'pl' ? 'ukrytych (wykluczone)' : 'hidden (excluded)'}</div>`;
+				headerInfo = `<div style="text-align:center;font-size:0.75rem;color:#f44336;margin-bottom:10px;">🚫 ${hiddenCount} ${t('excluded.hiddenCountLabel')}</div>`;
 			}
 			
 			$('database-list').innerHTML = headerInfo + (formations.length ? formations.map(f => {
@@ -2812,11 +2898,11 @@
 		}
         
         function clearRecentlyViewed() {
-            if (!confirm(currentLang === 'pl' ? 'Wyczyścić historię przeglądanych?' : 'Clear viewing history?')) return;
+            if (!confirm(t('preview.confirmClearViewed'))) return;
             recentlyViewed = [];
             localStorage.setItem('souls_recently_viewed', JSON.stringify(recentlyViewed));
             renderRecentlyViewed();
-            showToast(currentLang === 'pl' ? '🗑️ Historia wyczyszczona' : '🗑️ History cleared');
+            showToast(t('preview.viewedCleared'));
         }
 		
 		function toggleRecentlyViewed() {
@@ -2834,8 +2920,8 @@
 		function buildSimilarFormations(formation) {
 			const similar = findSimilarFormations(formation);
 			
-			const headerText = currentLang === 'pl' ? 'Inne kontry na tego przeciwnika' : 'Other counters for this enemy';
-			const emptyText = currentLang === 'pl' ? 'Brak innych kontr' : 'No other counters';
+			const headerText = t('preview.otherCounters');
+			const emptyText = t('preview.noOtherCounters');
 			
 			return `
 				<div class="similar-formations-section">
@@ -2887,9 +2973,9 @@
 			
 			const hasPrev = idx > 0;
 			const hasNext = idx < total - 1;
-			const prevLabel = currentLang === 'pl' ? 'Poprzedni' : 'Previous';
-			const nextLabel = currentLang === 'pl' ? 'Następny' : 'Next';
-			const showLabel = currentLang === 'pl' ? 'POKAŻ' : 'SHOW';
+			const prevLabel = t('preview.prev');
+			const nextLabel = t('preview.next');
+			const showLabel = t('preview.show');
 			
 			return `
 				<div class="formation-nav">
@@ -2947,7 +3033,7 @@
         function exportWarPlanAsText() {
             const combo = window.currentWarCombo;
             if (!combo || !combo.formations) {
-                showToast(currentLang === 'pl' ? 'Najpierw wybierz plan wojny' : 'Select war plan first', true);
+                showToast(t('war.selectPlanFirst'), true);
                 return;
             }
             
@@ -2965,7 +3051,7 @@
             
             // Kopiuj do schowka
             navigator.clipboard.writeText(text.trim()).then(() => {
-                showToast(currentLang === 'pl' ? '📋 Skład skopiowany do schowka!' : '📋 Formation copied to clipboard!');
+                showToast(t('clipboard.formationCopied'));
             }).catch(() => {
                 const textarea = document.createElement('textarea');
                 textarea.value = text.trim();
@@ -2973,7 +3059,7 @@
                 textarea.select();
                 document.execCommand('copy');
                 document.body.removeChild(textarea);
-                showToast(currentLang === 'pl' ? '📋 Skład skopiowany do schowka!' : '📋 Formation copied to clipboard!');
+                showToast(t('clipboard.formationCopied'));
             });
         }
         
@@ -5593,9 +5679,9 @@
 			const text = `${myHeroes}${pet}`;
 			
 			navigator.clipboard.writeText(text).then(() => {
-				showToast(currentLang === 'pl' ? '📋 Skład skopiowany!' : '📋 Team copied!');
+				showToast(t('clipboard.teamCopied'));
 			}).catch(() => {
-				showToast(currentLang === 'pl' ? '❌ Błąd kopiowania' : '❌ Copy failed', true);
+				showToast(t('clipboard.copyFailed'), true);
 			});
 		}
 
@@ -5790,7 +5876,7 @@
 		function copyFormationLink(id) {
 			const url = `${window.location.origin}${window.location.pathname}?formation=${id}`;
 			navigator.clipboard.writeText(url).then(() => {
-				showToast(currentLang === 'pl' ? '🔗 Link skopiowany!' : '🔗 Link copied!');
+				showToast(t('clipboard.linkCopied'));
 			}).catch(() => {
 				// Fallback dla starszych przeglądarek
 				const input = document.createElement('input');
@@ -5799,7 +5885,7 @@
 				input.select();
 				document.execCommand('copy');
 				document.body.removeChild(input);
-				showToast(currentLang === 'pl' ? '🔗 Link skopiowany!' : '🔗 Link copied!');
+				showToast(t('clipboard.linkCopied'));
 			});
 		}
         
@@ -5914,10 +6000,10 @@
                             let fieldName = fieldId;
                             if (fieldId.startsWith('enemy')) {
                                 const num = fieldId.replace('enemy', '').replace('Pet', '');
-                                fieldName = currentLang === 'en' ? (fieldId.includes('Pet') ? 'Enemy Pet' : 'Enemy ' + num) : (fieldId.includes('Pet') ? 'Przeciwnik Pet' : 'Przeciwnik ' + num);
+                                fieldName = fieldId.includes('Pet') ? t('fields.enemyPet') : `${t('fields.enemy')} ${num}`;
                             } else if (fieldId.startsWith('my')) {
                                 const num = fieldId.replace('my', '').replace('Pet', '');
-                                fieldName = currentLang === 'en' ? (fieldId.includes('Pet') ? 'Your Pet' : 'Your ' + num) : (fieldId.includes('Pet') ? 'Twój Pet' : 'Twój ' + num);
+                                fieldName = fieldId.includes('Pet') ? t('fields.yourPet') : `${t('fields.your')} ${num}`;
                             }
                             nameEl.textContent = fieldName;
                             indicator.classList.add('show');
