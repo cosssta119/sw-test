@@ -11,23 +11,37 @@
             appId: "1:700986594564:web:114ff3c81a42edb1d2ac51"
         };
         
+        // Opakowanie localStorage dla wartości JSON (arrays/objects).
+        // Stringi/boole zostawiamy surowe — tam wrapper nic nie daje.
+        const storage = {
+            getJson: (key, fallback = null) => {
+                const raw = localStorage.getItem(key);
+                return raw === null ? fallback : JSON.parse(raw);
+            },
+            setJson: (key, val) => localStorage.setItem(key, JSON.stringify(val)),
+            getBool: (key, fallback = false) => {
+                const raw = localStorage.getItem(key);
+                return raw === null ? fallback : raw === 'true';
+            },
+        };
+
         let db, formationsRef, heroesRef, petsRef;
         let allFormations = [];
         let isOnline = false, isAdmin = false;
         let headerClickCount = 0, headerClickTimer = null;
-        let favorites = JSON.parse(localStorage.getItem('souls_favorites') || '[]');
+        let favorites = storage.getJson('souls_favorites', []);
         let currentLang = localStorage.getItem('souls_lang') || 'pl';
         let currentDbFilter = 'all';
 		let currentDbSort = 'date-desc';
         let quickSelectTarget = null, activeAddField = null, activeSearchField = null, editingFormationId = null;
 		let currentTheme = localStorage.getItem('souls_theme') || 'dark';
 		let isGuildAuthenticated = false;
-		let searchHistory = JSON.parse(localStorage.getItem('souls_search_history') || '[]');
-		let warSearchHistory = JSON.parse(localStorage.getItem('souls_war_history') || '[]');
+		let searchHistory = storage.getJson('souls_search_history', []);
+		let warSearchHistory = storage.getJson('souls_war_history', []);
 		let selectedForCompare = [];
-		let excludedHeroes = JSON.parse(localStorage.getItem('souls_excluded_heroes') || '[]');
-		let hideExcludedResults = localStorage.getItem('souls_hide_excluded') !== 'false'; // domyślnie true
-		let pinnedCombos = JSON.parse(localStorage.getItem('souls_pinned_combos') || '[]');
+		let excludedHeroes = storage.getJson('souls_excluded_heroes', []);
+		let hideExcludedResults = storage.getBool('souls_hide_excluded', true);
+		let pinnedCombos = storage.getJson('souls_pinned_combos', []);
 		let currentFormation = null;
 		
 		// Nawigacja między formacjami w podglądzie
@@ -35,7 +49,7 @@
 		let navCurrentIndex = -1; // Aktualny indeks w liście nawigacji
 		
 		// Ostatnio przeglądane formacje
-		let recentlyViewed = JSON.parse(localStorage.getItem('souls_recently_viewed') || '[]');
+		let recentlyViewed = storage.getJson('souls_recently_viewed', []);
 		const MAX_RECENTLY_VIEWED = 10;
 
 		// ========== KONFIGURACJA ZABEZPIECZEŃ ==========
@@ -395,7 +409,6 @@
             const n = normalize(name);
             return list.some(h => normalize(h) === n);
         };
-        const persistList = (key, list) => localStorage.setItem(key, JSON.stringify(list));
 		
 		// Hashowanie SHA-256
 		async function hashPassword(password) {
@@ -548,7 +561,7 @@
         
         // Załaduj preferencję przy starcie
         function loadSectionOrderPreference() {
-            const reversed = localStorage.getItem('addFormSectionsReversed') === 'true';
+            const reversed = storage.getBool('addFormSectionsReversed');
             const container = $('add-form-sections');
             if (container && reversed) {
                 container.classList.add('reversed');
@@ -575,9 +588,8 @@
 		
 		// Odwrócenie kolejności rzędów w sekcji przeciwnika
 		function loadEnemyRowsPreference() {
-			const saved = localStorage.getItem('enemyRowsReversed');
 			// Domyślnie true (6-7-8 na górze), chyba że użytkownik wybrał inaczej
-			const reversed = saved === null ? true : saved === 'true';
+			const reversed = storage.getBool('enemyRowsReversed', true);
 			const container = $('enemy-rows-container');
 			const btn = $('btn-flip-enemy-rows');
 			if (container && reversed) {
@@ -607,9 +619,8 @@
 		
 		// Odwrócenie kolejności rzędów w wyszukiwarce
 		function loadSearchRowsPreference() {
-			const saved = localStorage.getItem('searchRowsReversed');
 			// Domyślnie true (6-7-8 na górze)
-			const reversed = saved === null ? true : saved === 'true';
+			const reversed = storage.getBool('searchRowsReversed', true);
 			const container = $('search-rows-container');
 			const btn = $('btn-flip-search-rows');
 			if (container && reversed) {
@@ -639,9 +650,8 @@
 
 		// Zwraca pola wyszukiwarki w kolejności wizualnej
 		function getSearchFieldsInOrder() {
-			const saved = localStorage.getItem('searchRowsReversed');
-			const reversed = saved === null ? true : saved === 'true';
-			
+			const reversed = storage.getBool('searchRowsReversed', true);
+
 			if (reversed) {
 				return [
 					'search-pos6', 'search-pos7', 'search-pos8',
@@ -656,7 +666,7 @@
 
 		// Przełączanie układu: obok siebie vs góra-dół
 		function loadFormLayoutPreference() {
-			const stacked = localStorage.getItem('addFormStacked') === 'true';
+			const stacked = storage.getBool('addFormStacked');
 			const container = $('add-form-sections');
 			const btn = $('btn-layout-toggle');
 			const text = $('layout-toggle-text');
@@ -815,7 +825,7 @@
         
         // Domyślna kolejność ras (konfigurowalna)
         const DEFAULT_RACE_ORDER = ['Human', 'Fire', 'Elf', 'Undead', 'Dark', 'Light'];
-        let RACE_ORDER = JSON.parse(localStorage.getItem('souls_race_order') || 'null') || [...DEFAULT_RACE_ORDER];
+        let RACE_ORDER = storage.getJson('souls_race_order', null) || [...DEFAULT_RACE_ORDER];
         const RACE_EMOJI = { Dark: '🌑', Light: '☀️', Human: '👤', Fire: '🔥', Elf: '🌿', Undead: '💀' };
         
         // Funkcje zarządzania kolejnością ras
@@ -845,7 +855,7 @@
         }
         
         function saveRaceOrder() {
-            localStorage.setItem('souls_race_order', JSON.stringify(RACE_ORDER));
+            storage.setJson('souls_race_order', RACE_ORDER);
         }
         
         function refreshAllTags() {
@@ -973,7 +983,7 @@
         }
         
         // Wykluczeni bohaterowie w Kreatorze (definiowane wcześnie, bo generateKreatorTags używa tego)
-        let kreatorExcludedHeroes = JSON.parse(localStorage.getItem('souls_kreator_excluded_heroes') || '[]');
+        let kreatorExcludedHeroes = storage.getJson('souls_kreator_excluded_heroes', []);
         
         function generateKreatorTags() {
             const container = $('kreator-quick-tags-container');
@@ -1581,9 +1591,8 @@
 
 		// Zwraca pola przeciwnika w kolejności wizualnej (uwzględnia odwrócenie rzędów)
 		function getEnemyFieldsInOrder() {
-			const isReversed = localStorage.getItem('enemyRowsReversed');
-			const reversed = isReversed === null ? true : isReversed === 'true';
-			
+			const reversed = storage.getBool('enemyRowsReversed', true);
+
 			if (reversed) {
 				// 6-7-8 na górze → kolejność: 6,7,8 → 4,5 → 1,2,3 → Pet
 				return [
@@ -1601,28 +1610,11 @@
 		// =====================================================
 		// WYKLUCZANIE BOHATERÓW
 		// =====================================================
-		function toggleExcludedSection() {
-			const content = $('excluded-content');
-			const icon = $('excluded-toggle-icon');
-			
-			content.classList.toggle('show');
-			icon.classList.toggle('expanded');
-		}
-		
-		function toggleWarExcludedSection() {
-			const content = $('war-excluded-content');
-			const icon = $('war-excluded-toggle-icon');
-			
-			content.classList.toggle('show');
-			icon.classList.toggle('expanded');
-		}
-		
-		function toggleKreatorExcludedSection() {
-			const content = $('kreator-excluded-content');
-			const icon = $('kreator-excluded-toggle-icon');
-			
-			content.classList.toggle('show');
-			icon.classList.toggle('expanded');
+		// prefix: '' (search), 'war', 'kreator'
+		function toggleExcludedSection(prefix = '') {
+			const p = prefix ? prefix + '-' : '';
+			$(`${p}excluded-content`).classList.toggle('show');
+			$(`${p}excluded-toggle-icon`).classList.toggle('expanded');
 		}
 
 		function renderExcludedHeroes() {
@@ -1656,7 +1648,7 @@
 			}
 
 			excludedHeroes.push(properName);
-			persistList('souls_excluded_heroes', excludedHeroes);
+			storage.setJson('souls_excluded_heroes', excludedHeroes);
 
 			renderExcludedHeroes();
 			showToast(`🚫 ${t('excluded.added')}: ${properName}`);
@@ -1670,7 +1662,7 @@
 		function removeExcludedHero(name) {
 			const n = normalize(name);
 			excludedHeroes = excludedHeroes.filter(h => normalize(h) !== n);
-			persistList('souls_excluded_heroes', excludedHeroes);
+			storage.setJson('souls_excluded_heroes', excludedHeroes);
 
 			renderExcludedHeroes();
 			showToast(`✅ ${t('excluded.removed')}: ${name}`);
@@ -1684,7 +1676,7 @@
 			if (!confirm(t('excluded.confirmClear'))) return;
 
 			excludedHeroes = [];
-			persistList('souls_excluded_heroes', excludedHeroes);
+			storage.setJson('souls_excluded_heroes', excludedHeroes);
 
 			renderExcludedHeroes();
 			showToast(t('excluded.cleared'));
@@ -1907,7 +1899,7 @@
 				searchHistory = searchHistory.slice(0, 10);
 			}
 			
-			localStorage.setItem('souls_search_history', JSON.stringify(searchHistory));
+			storage.setJson('souls_search_history', searchHistory);
 		}
 
 		function renderSearchHistory() {
@@ -1973,7 +1965,7 @@
 
 		function removeSearchHistoryItem(idx) {
 			searchHistory.splice(idx, 1);
-			localStorage.setItem('souls_search_history', JSON.stringify(searchHistory));
+			storage.setJson('souls_search_history', searchHistory);
 			renderSearchHistory();
 			showToast(t('common.formationDeleted'));
 		}
@@ -1982,7 +1974,7 @@
 			if (!confirm(t('search.historyConfirmClear'))) return;
 			
 			searchHistory = [];
-			localStorage.setItem('souls_search_history', JSON.stringify(searchHistory));
+			storage.setJson('souls_search_history', searchHistory);
 			renderSearchHistory();
 			showToast(t('common.historyCleared'));
 		}
@@ -2054,7 +2046,7 @@
 				warSearchHistory = warSearchHistory.slice(0, 15);
 			}
 			
-			localStorage.setItem('souls_war_history', JSON.stringify(warSearchHistory));
+			storage.setJson('souls_war_history', warSearchHistory);
 		}
 
 		function renderWarHistory() {
@@ -2142,7 +2134,7 @@
 
 		function removeWarHistoryItem(idx) {
 			warSearchHistory.splice(idx, 1);
-			localStorage.setItem('souls_war_history', JSON.stringify(warSearchHistory));
+			storage.setJson('souls_war_history', warSearchHistory);
 			renderWarHistory();
 			showToast(t('common.formationDeleted'));
 		}
@@ -2151,7 +2143,7 @@
 			if (!confirm(t('war.historyConfirmClear'))) return;
 			
 			warSearchHistory = [];
-			localStorage.setItem('souls_war_history', JSON.stringify(warSearchHistory));
+			storage.setJson('souls_war_history', warSearchHistory);
 			renderWarHistory();
 			showToast(t('common.historyCleared'));
 		}
@@ -2796,7 +2788,7 @@
             const idx = favorites.indexOf(id);
             if (idx > -1) favorites.splice(idx, 1);
             else favorites.push(id);
-            localStorage.setItem('souls_favorites', JSON.stringify(favorites));
+            storage.setJson('souls_favorites', favorites);
             showToast(t(idx > -1 ? 'common.removedFromFavorites' : 'common.addedToFavorites'));
             filterDatabase();
         }
@@ -2895,7 +2887,7 @@
             }
             
             // Zapisz
-            localStorage.setItem('souls_recently_viewed', JSON.stringify(recentlyViewed));
+            storage.setJson('souls_recently_viewed', recentlyViewed);
             
             // Odśwież widok
             renderRecentlyViewed();
@@ -2921,7 +2913,7 @@
 			`).join('');
 			
 			// Przywróć stan rozwinięcia
-			const wasExpanded = localStorage.getItem('souls_rv_expanded') === 'true';
+			const wasExpanded = storage.getBool('souls_rv_expanded');
 			if (wasExpanded) {
 				container.classList.add('show');
 				$('rv-toggle-icon')?.classList.add('expanded');
@@ -2931,7 +2923,7 @@
         function clearRecentlyViewed() {
             if (!confirm(t('preview.confirmClearViewed'))) return;
             recentlyViewed = [];
-            localStorage.setItem('souls_recently_viewed', JSON.stringify(recentlyViewed));
+            storage.setJson('souls_recently_viewed', recentlyViewed);
             renderRecentlyViewed();
             showToast(t('preview.viewedCleared'));
         }
@@ -3969,8 +3961,8 @@
 		}
 
 		// ===== WYKLUCZANIE BOHATERÓW W PLANERZE WOJNY =====
-		let warExcludedHeroes = JSON.parse(localStorage.getItem('souls_war_excluded_heroes') || '[]');
-		let warHideExcluded = localStorage.getItem('souls_war_hide_excluded') !== 'false'; // domyślnie true
+		let warExcludedHeroes = storage.getJson('souls_war_excluded_heroes', []);
+		let warHideExcluded = storage.getBool('souls_war_hide_excluded', true);
 		
 		function initWarExcluded() {
 			renderWarExcludedChips();
@@ -4020,7 +4012,7 @@
 			}
 
 			warExcludedHeroes.push(finalName);
-			persistList('souls_war_excluded_heroes', warExcludedHeroes);
+			storage.setJson('souls_war_excluded_heroes', warExcludedHeroes);
 			renderWarExcludedChips();
 			updateWarExcludedCount();
 			showToast(t('war.exclude.excludedFrom', { name: finalName }));
@@ -4029,7 +4021,7 @@
 		function removeWarExcludedHero(heroName) {
 			const n = normalize(heroName);
 			warExcludedHeroes = warExcludedHeroes.filter(h => normalize(h) !== n);
-			persistList('souls_war_excluded_heroes', warExcludedHeroes);
+			storage.setJson('souls_war_excluded_heroes', warExcludedHeroes);
 			renderWarExcludedChips();
 			updateWarExcludedCount();
 		}
@@ -4038,7 +4030,7 @@
 			if (!warExcludedHeroes.length) return;
 			if (!confirm(t('war.exclude.confirmClear'))) return;
 			warExcludedHeroes = [];
-			persistList('souls_war_excluded_heroes', warExcludedHeroes);
+			storage.setJson('souls_war_excluded_heroes', warExcludedHeroes);
 			renderWarExcludedChips();
 			updateWarExcludedCount();
 			showToast(t('war.exclude.cleared'));
@@ -4120,7 +4112,7 @@
 			}
 
 			kreatorExcludedHeroes.push(finalName);
-			persistList('souls_kreator_excluded_heroes', kreatorExcludedHeroes);
+			storage.setJson('souls_kreator_excluded_heroes', kreatorExcludedHeroes);
 			renderKreatorExcludedChips();
 			updateKreatorExcludedCount();
 			generateKreatorTags();
@@ -4130,7 +4122,7 @@
 		function removeKreatorExcludedHero(heroName) {
 			const n = normalize(heroName);
 			kreatorExcludedHeroes = kreatorExcludedHeroes.filter(h => normalize(h) !== n);
-			persistList('souls_kreator_excluded_heroes', kreatorExcludedHeroes);
+			storage.setJson('souls_kreator_excluded_heroes', kreatorExcludedHeroes);
 			renderKreatorExcludedChips();
 			updateKreatorExcludedCount();
 			generateKreatorTags();
@@ -4140,7 +4132,7 @@
 			if (!kreatorExcludedHeroes.length) return;
 			if (!confirm(t('kreator.hide.confirmClear'))) return;
 			kreatorExcludedHeroes = [];
-			persistList('souls_kreator_excluded_heroes', kreatorExcludedHeroes);
+			storage.setJson('souls_kreator_excluded_heroes', kreatorExcludedHeroes);
 			renderKreatorExcludedChips();
 			updateKreatorExcludedCount();
 			generateKreatorTags();
@@ -4520,7 +4512,7 @@
 			
 			pinnedCombos.unshift(pinned);
 			if (pinnedCombos.length > 20) pinnedCombos = pinnedCombos.slice(0, 20);
-			localStorage.setItem('souls_pinned_combos', JSON.stringify(pinnedCombos));
+			storage.setJson('souls_pinned_combos', pinnedCombos);
 			
 			renderPinnedCombos();
 			showToast('📌 Skład przypięty!');
@@ -4685,7 +4677,7 @@
 			
 			pinnedCombos.unshift(pinned);
 			if (pinnedCombos.length > 20) pinnedCombos = pinnedCombos.slice(0, 20);
-			localStorage.setItem('souls_pinned_combos', JSON.stringify(pinnedCombos));
+			storage.setJson('souls_pinned_combos', pinnedCombos);
 			
 			renderPinnedCombos();
 			showToast('📌 Skład przypięty!');
@@ -4695,7 +4687,7 @@
 			if (!confirm('Czy na pewno chcesz odpiąć ten skład?')) return;
 			
 			pinnedCombos = pinnedCombos.filter(p => p.id !== id);
-			localStorage.setItem('souls_pinned_combos', JSON.stringify(pinnedCombos));
+			storage.setJson('souls_pinned_combos', pinnedCombos);
 			
 			renderPinnedCombos();
 			showToast('Skład odpięty');
@@ -4799,7 +4791,7 @@
 			if (!confirm('Czy na pewno chcesz usunąć WSZYSTKIE przypięte składy?')) return;
 			
 			pinnedCombos = [];
-			localStorage.setItem('souls_pinned_combos', JSON.stringify(pinnedCombos));
+			storage.setJson('souls_pinned_combos', pinnedCombos);
 			renderPinnedCombos();
 			showToast('Wszystkie pinezki usunięte');
 		}
@@ -4826,7 +4818,7 @@
 			// Zapisz tylko jeśli jest cokolwiek wypełnione
 			const hasData = data.enemies.some(e => e.heroes.some(h => h) || e.pet);
 			if (hasData) {
-				localStorage.setItem('souls_war_planner', JSON.stringify(data));
+				storage.setJson('souls_war_planner', data);
 				updateWarAutosaveInfo();
 			}
 		}
@@ -4929,7 +4921,7 @@
 		// =====================================================
 		
 		let kreatorCount = 3;
-		let kreatorSaved = JSON.parse(localStorage.getItem('souls_kreator_saved') || '[]');
+		let kreatorSaved = storage.getJson('souls_kreator_saved', []);
 		
 		function setKreatorCount(count) {
 			kreatorCount = count;
@@ -5032,7 +5024,7 @@
 			kreatorSaved.unshift(saved);
 			if (kreatorSaved.length > 20) kreatorSaved = kreatorSaved.slice(0, 20);
 			
-			localStorage.setItem('souls_kreator_saved', JSON.stringify(kreatorSaved));
+			storage.setJson('souls_kreator_saved', kreatorSaved);
 			renderKreatorSaved();
 			showToast('💾 Skład zapisany!');
 		}
@@ -5070,7 +5062,7 @@
 			if (!confirm('Usunąć ten zapis?')) return;
 			
 			kreatorSaved = kreatorSaved.filter(s => s.id !== id);
-			localStorage.setItem('souls_kreator_saved', JSON.stringify(kreatorSaved));
+			storage.setJson('souls_kreator_saved', kreatorSaved);
 			renderKreatorSaved();
 			showToast('Usunięto');
 		}
@@ -5080,7 +5072,7 @@
 			if (!confirm('Usunąć WSZYSTKIE zapisane składy?')) return;
 			
 			kreatorSaved = [];
-			localStorage.setItem('souls_kreator_saved', JSON.stringify(kreatorSaved));
+			storage.setJson('souls_kreator_saved', kreatorSaved);
 			renderKreatorSaved();
 			showToast('Wszystkie zapisy usunięte');
 		}
