@@ -63,10 +63,10 @@ Dwa hashe SHA-256 haseł siedzą w kodzie klienta (`GUILD_PASSWORD_HASH`, `ADMIN
 
 ### Algorytmy scoringu (nieoczywiste elementy)
 
-Istnieją dwie osobne ścieżki wyszukiwania:
+Scoring formacji jest wspólny — `scoreFormation(formation, query, { withPositionBonus })` zwraca `{ score, baseScore, positionBonus, matchedHeroes, petMatched, maxScore }`. Wołają go:
 
-1. **`searchFormations()`** — widoczna dla użytkownika zakładka Szukaj. Prosty score: `liczba trafionych bohaterów + (pet trafiony ? 1 : 0)`, sortowane malejąco.
-2. **`findMatchingFormations(enemyTeam, minMatch)`** — używane przez Planer Wojny. Dodaje **+0.3 bonusu za pozycję** za każdego bohatera trafionego na tym samym indeksie slotu.
+1. **`searchFormations()`** — zakładka Szukaj. `withPositionBonus: false`. Pokazuje wyniki ze `score > 0`, sortowanie malejąco.
+2. **`findMatchingFormations(enemyTeam, minMatch)`** — Planer Wojny. `withPositionBonus: true` → **+0.3 za każdego bohatera trafionego na tym samym indeksie slotu**. `enemyTeam` musi mieć `heroesRaw` (8-slot z pozycjami) — bonus idzie przez `findIndex` po tej tablicy.
 
 Ranking kombinacji w Planerze Wojny używa `countHeroConflicts` (wykrywanie wspólnych bohaterów między 3 wybranymi kontrami) i aplikuje karę **`konflikty^1.5 × 8`** do zsumowanego score — to formuła wymieniona w README. Jeśli zmieniasz stałe position-bonus lub conflict-penalty, zaktualizuj też README.
 
@@ -80,9 +80,11 @@ Cały stan lokalny siedzi w `localStorage` pod prefiksem `souls_`:
 - `souls_search_history`, `souls_war_history`, `souls_recently_viewed`
 - `souls_excluded_heroes`, `souls_hide_excluded`, `souls_pinned_combos`
 - `souls_race_order`, `souls_kreator_excluded_heroes`
-- Różne preferencje UI: `enemyRowsReversed`, `searchRowsReversed`, `addFormSectionsReversed`, `addFormStacked`
+- Preferencje UI: `souls_enemyRowsReversed`, `souls_searchRowsReversed`, `souls_addFormSectionsReversed`, `souls_addFormStacked` (camelCase zachowany, tylko prefiks dodany)
 
-Gdy dodajesz nową persystowaną preferencję, zachowaj prefiks `souls_` dla danych aplikacji, żeby przyszła logika bulk-clear mogła je znaleźć.
+Czytanie/zapis JSON i bool idzie przez helper `storage` na górze `souls-war.js` (`storage.getJson/setJson/getBool`); używaj go zamiast surowego `localStorage.getItem/setItem`, żeby nowa persystencja była spójna. Gdy dodajesz nową persystowaną preferencję, zachowaj prefiks `souls_`.
+
+Na górze `souls-war.js` siedzi jednorazowa IIFE migrująca 4 klucze preferencji UI z wersji bez prefiksu do `souls_*`. Jeśli w przyszłości wprowadzasz podobny rename kluczy, dopisz je do tej migracji zamiast rozbijać po kodzie.
 
 ### i18n
 
