@@ -1,8 +1,38 @@
 		@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Nunito:wght@400;600;700&display=swap');
-		
+
+		/* ═══════════════════════════════════════════════════════════════
+		   SPIS TREŚCI
+		   ─────────────────────────────────────────────────────────────
+		    1. TOKENS            — zmienne kolorów, :root
+		    2. BASE              — reset, body, typography
+		    3. HEADER + NAV      — pasek górny, nawigacja dolna
+		    4. LAYOUT            — kontenery sekcji
+		    5. FORM PRIMITIVES   — inputy, autocomplete
+		    6. KOLORY RAS        — uniwersalne klasy
+		    7. GRID / SEARCH GRID
+		    8. HISTORIA (search + war)
+		    9. PRZYCISKI / FILTRY / WYNIKI
+		   10. QUICK TAGS / RACE ORDER
+		   11. QUICK SELECT MODAL
+		   12. PODGLĄD FORMACJI + NAWIGACJA
+		   13. BATTLE GRID + PETS + STRZAŁKI
+		   14. ADD FORM + EDIT MODAL + STATS
+		   15. DATABASE LIST + INFO BOX
+		   16. TOAST / LOADING / MODAL
+		   17. ADMIN PANEL + DUPLIKATY
+		   18. WAR PLANNER / KREATOR / WAR PREVIEW
+		   19. PORÓWNYWARKA
+		   20. WYKLUCZANIE BOHATERÓW
+		   21. MATCH INFO / OSTATNIO / PODOBNE / SEARCH OPTIONS
+		   22. SCROLLBAR
+		   23. LIGHT THEME — overrides [data-theme="light"]
+		   24. PINEZKI
+		   25. MEDIA QUERIES
+		   ═══════════════════════════════════════════════════════════════ */
+
 		* { box-sizing: border-box; margin: 0; padding: 0; }
-		
-		/* ===== ZMIENNE KOLORÓW ===== */
+
+		/* ═══ 1. TOKENS — ZMIENNE KOLORÓW ═══ */
 		:root {
 			--bg-dark: #0d0d0d;
 			--bg-card: #1a1a1a;
