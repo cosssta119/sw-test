@@ -422,6 +422,12 @@
         };
 		
 		// Hashowanie SHA-256
+
+        // ═══════════════════════════════════════════════════════════
+        // AUTH — hasła, login, logout, admin mode
+        // ═══════════════════════════════════════════════════════════
+
+		// Hashowanie SHA-256
 		async function hashPassword(password) {
 			const encoder = new TextEncoder();
 			const data = encoder.encode(password);
@@ -429,7 +435,7 @@
 			const hashArray = Array.from(new Uint8Array(hashBuffer));
 			return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 		}
-		
+
 		// Sprawdź czy użytkownik ma dostęp do gildii
 		async function checkGuildAccess() {
 			// Jeśli hasło wyłączone - zawsze przepuść
@@ -477,23 +483,76 @@
 			err.style.display = 'block';
 			setTimeout(() => err.style.display = 'none', 3000);
 		}
-				
-		// Formatuj datę do czytelnego formatu (z godziną jeśli != 00:00)
-		function formatDate(isoString) {
-			if (!isoString) return null;
-			const date = new Date(isoString);
-			const dateStr = date.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' });
-			
-			// Pokaż godzinę tylko jeśli nie jest 00:00
-			const hours = date.getHours();
-			const minutes = date.getMinutes();
-			if (hours === 0 && minutes === 0) {
-				return dateStr;
+
+        function headerClick() {
+            headerClickCount++;
+            clearTimeout(headerClickTimer);
+            if (headerClickCount >= 5) {
+                headerClickCount = 0;
+                isAdmin ? showToast(t('admin.alreadyLogged')) : $('admin-modal').classList.remove('hidden');
+            } else headerClickTimer = setTimeout(() => headerClickCount = 0, 2000);
+        }
+
+		async function tryAdminLogin() {
+			const password = $('admin-password').value;
+			if (!password) {
+				showToast('❌ ' + t('admin.wrongPassword'), true);
+				return;
 			}
-			const timeStr = date.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
-			return `${dateStr}, ${timeStr}`;
+			
+			const hash = await hashPassword(password);
+			
+			if (hash === ADMIN_PASSWORD_HASH) {
+				isAdmin = true;
+				localStorage.setItem('souls_admin', hash);
+				closeAdminModal();
+				enableAdminMode();
+				showToast('🔓 ' + t('admin.loggedIn'));
+			} else {
+				showToast('❌ ' + t('admin.wrongPassword'), true);
+				$('admin-password').value = '';
+			}
 		}
-        
+
+        function closeAdminModal() {
+            $('admin-modal').classList.add('hidden');
+            $('admin-password').value = '';
+        }
+
+		function enableAdminMode() {
+			isAdmin = true;
+			$('admin-badge').style.display = 'inline';
+			$('nav-admin').classList.add('show');
+			$('nav-settings').classList.add('show');
+			$('nav-war').classList.add('show');
+			// Pokaż opcję "formacja bazowa" w formularzu dodawania
+			const baseOption = $('add-base-option');
+			if (baseOption) baseOption.style.display = 'block';
+			renderHeroesList();
+			renderPetsList();
+			filterDatabase();
+		}
+
+		function adminLogout() {
+			isAdmin = false;
+			localStorage.removeItem('souls_admin');
+			$('admin-badge').style.display = 'none';
+			$('nav-admin').classList.remove('show');
+			$('nav-settings').classList.remove('show');
+			$('nav-war').classList.remove('show');
+			// Ukryj opcję "formacja bazowa" w formularzu dodawania
+			const baseOption = $('add-base-option');
+			if (baseOption) baseOption.style.display = 'none';
+			switchTab('search');
+			filterDatabase();
+			showToast('🚪 ' + t('admin.loggedOut'));
+		}
+
+
+        // ═══════════════════════════════════════════════════════════
+        // UI CORE — theme, i18n, toast, online status, nawigacja tabów
+        // ═══════════════════════════════════════════════════════════
+
 		function initTheme() {
 			if (currentTheme === 'light') {
 				document.documentElement.setAttribute('data-theme', 'light');
@@ -528,238 +587,25 @@
 			}
 			btn.title = theme === 'light' ? 'Przełącz na tryb nocny' : 'Przełącz na tryb dzienny';
 		}
-		
-        // Pobierz wartości z wielu pól
-        function getFieldValues(prefix, count, suffix = '') {
-            const values = [];
-            for (let i = 1; i <= count; i++) {
-                const el = $(`${prefix}${i}${suffix}`);
-                if (el) values.push(el.value.trim());
-            }
-            return values;
-        }
-        
-        // Ustaw/wyczyść walidację inputa
-        function setValidation(input, isValid) {
-            if (isValid === null) {
-                input.classList.remove('invalid-hero', 'valid-hero');
-            } else {
-                input.classList.toggle('invalid-hero', !isValid);
-                input.classList.toggle('valid-hero', isValid);
-            }
-        }
-        
-        // Waliduj bohatera/peta
-        function validateInput(input) {
-            const val = input.value.trim().toLowerCase();
-            if (!val) { setValidation(input, null); return; }
-            
-            const type = input.dataset.type;
-            let isValid = false;
-            
-            if (type === 'hero') {
-                isValid = heroes.some(h => h.name.toLowerCase() === val);
-            } else if (type === 'pet') {
-                isValid = pets.some(p => getPetName(p).toLowerCase() === val);
-            }
-            
-            setValidation(input, isValid);
-        }
-		
-		// =====================================================
-        // ZAMIANA KOLEJNOŚCI SEKCJI W FORMULARZU DODAWANIA
-        // =====================================================
-        
-        // Załaduj preferencję przy starcie
-        function loadSectionOrderPreference() {
-            const reversed = storage.getBool('souls_addFormSectionsReversed');
-            const container = $('add-form-sections');
-            if (container && reversed) {
-                container.classList.add('reversed');
-            }
+
+        // TŁUMACZENIA
+        function setLanguage(lang) {
+            currentLang = lang;
+            localStorage.setItem('souls_lang', lang);
+            document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
+            document.querySelector(`.lang-btn[onclick="setLanguage('${lang}')"]`).classList.add('active');
+            applyTranslations();
+            filterDatabase();
+            generateQuickTags();
+            generateAddFormTags();
+            const lookupId = $('lookup-id').value;
+            if (lookupId && $('tab-view').classList.contains('active')) showFormation(parseInt(lookupId));
         }
 
-        // Zamień kolejność sekcji
-        function swapAddFormSections() {
-            const container = $('add-form-sections');
-            if (!container) return;
-            
-            container.classList.toggle('reversed');
-            
-            // Zapisz preferencję
-            const isReversed = container.classList.contains('reversed');
-            localStorage.setItem('souls_addFormSectionsReversed', isReversed);
-            
-            // Pokaż informację
-            const msg = isReversed 
-                ? t('ordering.yourTeamFirst')
-                : t('ordering.enemyFirst');
-            showToast(msg);
-        }
-		
-		// Odwrócenie kolejności rzędów w sekcji przeciwnika
-		function loadEnemyRowsPreference() {
-			// Domyślnie true (6-7-8 na górze), chyba że użytkownik wybrał inaczej
-			const reversed = storage.getBool('souls_enemyRowsReversed', true);
-			const container = $('enemy-rows-container');
-			const btn = $('btn-flip-enemy-rows');
-			if (container && reversed) {
-				container.classList.add('reversed');
-			}
-			if (btn && reversed) {
-				btn.classList.add('active');
-			}
-		}
-
-		function toggleEnemyRowsOrder() {
-			const container = $('enemy-rows-container');
-			const btn = $('btn-flip-enemy-rows');
-			if (!container) return;
-			
-			container.classList.toggle('reversed');
-			btn?.classList.toggle('active');
-			
-			const isReversed = container.classList.contains('reversed');
-			localStorage.setItem('souls_enemyRowsReversed', isReversed);
-			
-			const msg = isReversed 
-				? t('layout.top678')
-				: t('layout.top123');
-			showToast(msg);
-		}
-		
-		// Odwrócenie kolejności rzędów w wyszukiwarce
-		function loadSearchRowsPreference() {
-			// Domyślnie true (6-7-8 na górze)
-			const reversed = storage.getBool('souls_searchRowsReversed', true);
-			const container = $('search-rows-container');
-			const btn = $('btn-flip-search-rows');
-			if (container && reversed) {
-				container.classList.add('reversed');
-			}
-			if (btn && reversed) {
-				btn.classList.add('active');
-			}
-		}
-
-		function toggleSearchRowsOrder() {
-			const container = $('search-rows-container');
-			const btn = $('btn-flip-search-rows');
-			if (!container) return;
-			
-			container.classList.toggle('reversed');
-			btn?.classList.toggle('active');
-			
-			const isReversed = container.classList.contains('reversed');
-			localStorage.setItem('souls_searchRowsReversed', isReversed);
-			
-			const msg = isReversed 
-				? t('layout.top678')
-				: t('layout.top123');
-			showToast(msg);
-		}
-
-		// Zwraca pola wyszukiwarki w kolejności wizualnej
-		function getSearchFieldsInOrder() {
-			const reversed = storage.getBool('souls_searchRowsReversed', true);
-
-			if (reversed) {
-				return [
-					'search-pos6', 'search-pos7', 'search-pos8',
-					'search-pos4', 'search-pos5',
-					'search-pos1', 'search-pos2', 'search-pos3',
-					'search-pet'
-				];
-			} else {
-				return FORM_FIELD_CONFIG.search.fields;
-			}
-		}
-
-		// Przełączanie układu: obok siebie vs góra-dół
-		function loadFormLayoutPreference() {
-			const stacked = storage.getBool('souls_addFormStacked');
-			const container = $('add-form-sections');
-			const btn = $('btn-layout-toggle');
-			const text = $('layout-toggle-text');
-			if (container && stacked) {
-				container.classList.add('stacked');
-			}
-			if (btn && stacked) {
-				btn.classList.add('active');
-			}
-			if (text) {
-				text.textContent = stacked 
-					? t('layout.sideBySide')
-					: t('layout.stacked');
-			}
-		}
-
-		function toggleFormLayout() {
-			const container = $('add-form-sections');
-			const btn = $('btn-layout-toggle');
-			const text = $('layout-toggle-text');
-			if (!container) return;
-			
-			container.classList.toggle('stacked');
-			btn?.classList.toggle('active');
-			
-			const isStacked = container.classList.contains('stacked');
-			localStorage.setItem('souls_addFormStacked', isStacked);
-			
-			if (text) {
-				text.textContent = isStacked 
-					? t('layout.sideBySide')
-					: t('layout.stacked');
-			}
-			
-			const msg = isStacked 
-				? t('layout.stackedLabel')
-				: t('layout.sideBySideLabel');
-			showToast(msg);
-		}
-        
-        // FIREBASE
-        try {
-            firebase.initializeApp(firebaseConfig);
-            db = firebase.database();
-            formationsRef = db.ref('formations');
-            heroesRef = db.ref('heroes');
-            petsRef = db.ref('pets');
-            
-            formationsRef.on('value', snap => {
-                allFormations = snap.val() ? Object.values(snap.val()).sort((a, b) => a.id - b.id) : [];
-                updateUI();
-                $('loading').classList.add('hidden');
-                setOnlineStatus(true);
-            }, () => { setOnlineStatus(false); $('loading').classList.add('hidden'); });
-            
-            heroesRef.on('value', snap => {
-                if (snap.val()) {
-                    heroes = Object.values(snap.val()).sort((a, b) => a.name.localeCompare(b.name));
-                    if (isAdmin) renderHeroesList();
-                    // Regeneruj tagi po załadowaniu bohaterów z bazy
-                    generateWarTags();
-                    generateKreatorTags();
-                    generateAddFormTags();
-                }
-            });
-            
-            petsRef.on('value', snap => {
-                if (snap.val()) {
-                    pets = Object.values(snap.val()).map(getPetName).sort();
-                    if (isAdmin) renderPetsList();
-                    // Regeneruj tagi po załadowaniu petów z bazy
-                    generateWarTags();
-                    generateKreatorTags();
-                    generateAddFormTags();
-                }
-            });
-            
-            db.ref('.info/connected').on('value', snap => setOnlineStatus(snap.val() === true));
-        } catch (e) {
-            console.error('Firebase error:', e);
-            setOnlineStatus(false);
-            $('loading').classList.add('hidden');
+        function applyTranslations() {
+            document.querySelectorAll('[data-i18n]').forEach(el => el.textContent = t(el.getAttribute('data-i18n')));
+            document.querySelectorAll('[data-i18n-placeholder]').forEach(el => el.placeholder = t(el.getAttribute('data-i18n-placeholder')));
+            setOnlineStatus(isOnline);
         }
 
         // UI
@@ -770,7 +616,7 @@
             const info = $('connection-info');
             if (info) info.innerHTML = `<strong>${online ? '🟢' : '🔴'} ${t(online ? 'status.online' : 'status.offline')}:</strong> ${t(online ? 'settings.online' : 'settings.offline')}`;
         }
-        
+
         function updateUI() {
             $('total-count').textContent = allFormations.length;
             $('db-stat-total').textContent = allFormations.length;
@@ -782,14 +628,14 @@
             generateWarTags();
             generateKreatorTags();
         }
-        
+
         function showToast(msg, isError = false) {
             const toast = $('toast');
             toast.textContent = msg;
             toast.className = `toast show${isError ? ' error' : ''}`;
             setTimeout(() => toast.classList.remove('show'), 3000);
         }
-        
+
 		function switchTab(name) {
 			document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
 			document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
@@ -810,627 +656,338 @@
 			}
 		}
 
-        // TŁUMACZENIA
-        function setLanguage(lang) {
-            currentLang = lang;
-            localStorage.setItem('souls_lang', lang);
-            document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
-            document.querySelector(`.lang-btn[onclick="setLanguage('${lang}')"]`).classList.add('active');
-            applyTranslations();
-            filterDatabase();
-            generateQuickTags();
-            generateAddFormTags();
-            const lookupId = $('lookup-id').value;
-            if (lookupId && $('tab-view').classList.contains('active')) showFormation(parseInt(lookupId));
+		// Formatuj datę do czytelnego formatu (z godziną jeśli != 00:00)
+		function formatDate(isoString) {
+			if (!isoString) return null;
+			const date = new Date(isoString);
+			const dateStr = date.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' });
+			
+			// Pokaż godzinę tylko jeśli nie jest 00:00
+			const hours = date.getHours();
+			const minutes = date.getMinutes();
+			if (hours === 0 && minutes === 0) {
+				return dateStr;
+			}
+			const timeStr = date.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
+			return `${dateStr}, ${timeStr}`;
+		}
+
+
+        // ═══════════════════════════════════════════════════════════
+        // SHARED HELPERS — formularze, matching, autocomplete, field-nav
+        // ═══════════════════════════════════════════════════════════
+
+        // Pobierz wartości z wielu pól
+        function getFieldValues(prefix, count, suffix = '') {
+            const values = [];
+            for (let i = 1; i <= count; i++) {
+                const el = $(`${prefix}${i}${suffix}`);
+                if (el) values.push(el.value.trim());
+            }
+            return values;
         }
-        
-        function applyTranslations() {
-            document.querySelectorAll('[data-i18n]').forEach(el => el.textContent = t(el.getAttribute('data-i18n')));
-            document.querySelectorAll('[data-i18n-placeholder]').forEach(el => el.placeholder = t(el.getAttribute('data-i18n-placeholder')));
-            setOnlineStatus(isOnline);
-        }
-        
-        // =====================================================
-        // QUICK TAGS - UNIWERSALNA FUNKCJA
-        // =====================================================
-        
-        // Domyślna kolejność ras (konfigurowalna)
-        const DEFAULT_RACE_ORDER = ['Human', 'Fire', 'Elf', 'Undead', 'Dark', 'Light'];
-        let RACE_ORDER = storage.getJson('souls_race_order', null) || [...DEFAULT_RACE_ORDER];
-        const RACE_EMOJI = { Dark: '🌑', Light: '☀️', Human: '👤', Fire: '🔥', Elf: '🌿', Undead: '💀' };
-        
-        // Funkcje zarządzania kolejnością ras
-        function moveRaceUp(race) {
-            const idx = RACE_ORDER.indexOf(race);
-            if (idx > 0) {
-                [RACE_ORDER[idx - 1], RACE_ORDER[idx]] = [RACE_ORDER[idx], RACE_ORDER[idx - 1]];
-                saveRaceOrder();
-                refreshAllTags();
+
+        // Ustaw/wyczyść walidację inputa
+        function setValidation(input, isValid) {
+            if (isValid === null) {
+                input.classList.remove('invalid-hero', 'valid-hero');
+            } else {
+                input.classList.toggle('invalid-hero', !isValid);
+                input.classList.toggle('valid-hero', isValid);
             }
         }
-        
-        function moveRaceDown(race) {
-            const idx = RACE_ORDER.indexOf(race);
-            if (idx < RACE_ORDER.length - 1) {
-                [RACE_ORDER[idx], RACE_ORDER[idx + 1]] = [RACE_ORDER[idx + 1], RACE_ORDER[idx]];
-                saveRaceOrder();
-                refreshAllTags();
+
+        // Waliduj bohatera/peta
+        function validateInput(input) {
+            const val = input.value.trim().toLowerCase();
+            if (!val) { setValidation(input, null); return; }
+            
+            const type = input.dataset.type;
+            let isValid = false;
+            
+            if (type === 'hero') {
+                isValid = heroes.some(h => h.name.toLowerCase() === val);
+            } else if (type === 'pet') {
+                isValid = pets.some(p => getPetName(p).toLowerCase() === val);
             }
-        }
-        
-        function resetRaceOrder() {
-            RACE_ORDER = [...DEFAULT_RACE_ORDER];
-            saveRaceOrder();
-            refreshAllTags();
-            showToast('Przywrócono domyślną kolejność');
-        }
-        
-        function saveRaceOrder() {
-            storage.setJson('souls_race_order', RACE_ORDER);
-        }
-        
-        function refreshAllTags() {
-            // Zapamiętaj które panele konfiguracji są otwarte (po id kontenera-rodzica)
-            const openPanels = [];
-            document.querySelectorAll('.race-order-config.show').forEach(config => {
-                const parentContainer = config.parentElement;
-                if (parentContainer && parentContainer.id) {
-                    openPanels.push(parentContainer.id);
-                }
-            });
             
-            generateQuickTags();
-            generateAddFormTags();
-            generateWarTags();
-            generateKreatorTags();
-            
-            // Przywróć otwarte panele
-            openPanels.forEach(containerId => {
-                const container = $(containerId);
-                if (container) {
-                    const config = container.querySelector('.race-order-config');
-                    if (config) {
-                        config.classList.add('show');
-                        renderRaceOrderConfigIn(config);
+            setValidation(input, isValid);
+        }
+
+        // Funkcja pomocnicza do matchowania bohaterów z wagą
+        function heroMatchScore(search, target) {
+            if (!search || !target) return 0;
+            if (search === target) return 1.0;  // pełne dopasowanie
+            // Częściowe dopasowanie tylko dla min. 3 znaków
+            if (search.length >= 3 && target.startsWith(search)) return 0.9;
+            if (target.length >= 3 && search.startsWith(target)) return 0.9;
+            return 0;
+        }
+
+        // Wspólny scoring formacji — używany przez searchFormations i findMatchingFormations.
+        // query: { heroes (compact normalized), heroesRaw? (8-slot z pozycjami), pet? (normalized) }
+        // opts.withPositionBonus: +0.3 za każdego bohatera trafionego na tym samym indeksie slotu
+        function scoreFormation(formation, query, opts = {}) {
+            const enemyHeroes = formation.enemy.map(h => h ? normalize(h) : '');
+            const enemyPet = normalize(formation.enemyPet);
+            const withPositionBonus = !!opts.withPositionBonus;
+
+            const matchedHeroes = [];
+            let positionBonus = 0;
+
+            query.heroes.forEach(searchHero => {
+                if (!searchHero) return;
+                let matched = false;
+
+                enemyHeroes.forEach((formationHero, formationIdx) => {
+                    if (!formationHero) return;
+                    if (heroMatchScore(searchHero, formationHero) > 0) {
+                        matched = true;
+                        if (withPositionBonus && query.heroesRaw) {
+                            const rawIdx = query.heroesRaw.findIndex(h => h && normalize(h) === searchHero);
+                            if (rawIdx === formationIdx) positionBonus += 0.3;
+                        }
                     }
-                }
-            });
-        }
-        
-		function buildTagsHTML(raceGroups, petsData, clickHandler, petClickHandler, showCounts = false) {
-			let html = `<div class="quick-tags-expand-all">
-				<button class="expand-all-btn" onclick="toggleAllTags(this.closest('.search-form-tags, .add-form-tags, .war-form-tags, .kreator-form-tags'))">▼ ${t('quickTags.expandAll')}</button>
-				<button class="race-order-toggle" onclick="toggleRaceOrderConfig(this)" title="Zmień kolejność ras">⚙️</button>
-			</div>
-			<div class="race-order-config"></div>`;
-			
-			RACE_ORDER.forEach(race => {
-				if (raceGroups[race]?.length) {
-					html += `<div class="quick-tags-section"><div class="quick-tags-header" onclick="toggleQuickTagSection(this)"><span class="toggle-icon">▶</span>${RACE_EMOJI[race]} ${race} (${raceGroups[race].length})</div><div class="quick-tags-content"><div class="quick-tags">${raceGroups[race].map(h => `<span class="quick-tag tag-${race.toLowerCase()}" onclick="${clickHandler}('${h.name || h}', event)"${showCounts && h.count ? ` title="${h.count}x"` : ''}>${h.name || h}</span>`).join('')}</div></div></div>`;
-				}
-			});
-			
-			if (petsData?.length) {
-				html += `<div class="quick-tags-section"><div class="quick-tags-header" onclick="toggleQuickTagSection(this)"><span class="toggle-icon">▶</span>🐾 ${t('quickTags.pets')} (${petsData.length})</div><div class="quick-tags-content"><div class="quick-tags">${petsData.map(p => `<span class="quick-tag tag-pet" onclick="${petClickHandler}('${p.name || p}')"${showCounts && p.count ? ` title="${p.count}x"` : ''}>${p.name || p}</span>`).join('')}</div></div></div>`;
-			}
-			
-			return html;
-		}
-		
-		function toggleRaceOrderConfig(btn) {
-			const container = btn.closest('.search-form-tags, .add-form-tags, .war-form-tags, .kreator-form-tags');
-			const config = container?.querySelector('.race-order-config');
-			if (config) {
-				config.classList.toggle('show');
-				if (config.classList.contains('show')) {
-					renderRaceOrderConfigIn(config);
-				}
-			}
-		}
-		
-		function renderRaceOrderConfigIn(container) {
-			container.innerHTML = RACE_ORDER.map((race, idx) => `
-				<div class="race-order-item">
-					<span class="race-order-label">${RACE_EMOJI[race]} ${race}</span>
-					<div class="race-order-buttons">
-						<button class="btn btn-tiny" onclick="moveRaceUp('${race}')" ${idx === 0 ? 'disabled' : ''}>▲</button>
-						<button class="btn btn-tiny" onclick="moveRaceDown('${race}')" ${idx === RACE_ORDER.length - 1 ? 'disabled' : ''}>▼</button>
-					</div>
-				</div>
-			`).join('') + `
-				<div style="margin-top: 8px; text-align: center;">
-					<button class="btn btn-small btn-secondary" onclick="resetRaceOrder()">↺ Domyślna kolejność</button>
-				</div>
-			`;
-		}
-        
-        function generateQuickTags() {
-            if (!allFormations.length) return;
-            
-            const heroCounts = {}, petCounts = {};
-            const heroRaceMap = {};
-            heroes.forEach(h => heroRaceMap[h.name.toLowerCase()] = h.race);
-            
-            allFormations.forEach(f => {
-                f.enemy.filter(h => h).forEach(h => heroCounts[h] = (heroCounts[h] || 0) + 1);
-                if (f.enemyPet) petCounts[f.enemyPet] = (petCounts[f.enemyPet] || 0) + 1;
-            });
-            
-            const raceGroups = { Dark: [], Light: [], Human: [], Fire: [], Elf: [], Undead: [] };
-            Object.entries(heroCounts).forEach(([name, count]) => {
-                const race = heroRaceMap[name.toLowerCase()];
-                if (race && raceGroups[race]) raceGroups[race].push({ name, count });
-            });
-            RACE_ORDER.forEach(r => raceGroups[r].sort((a, b) => a.name.localeCompare(b.name)));
-            
-            const petsData = Object.entries(petCounts).sort((a, b) => a[0].localeCompare(b[0])).map(([name, count]) => ({ name, count }));
-            
-            $('quick-tags-container').innerHTML = buildTagsHTML(raceGroups, petsData, 'addToSearch', 'addPetToSearch', true);
-            updateSearchTagsSelection();
-        }
-        
-        function generateAddFormTags() {
-            const container = $('add-form-tags-container');
-            if (!container) return;
-            
-            const raceGroups = { Dark: [], Light: [], Human: [], Fire: [], Elf: [], Undead: [] };
-            heroes.forEach(h => raceGroups[h.race]?.push(h.name));
-            RACE_ORDER.forEach(r => raceGroups[r].sort((a, b) => a.localeCompare(b)));
-            
-            container.innerHTML = buildTagsHTML(raceGroups, pets, "addTagToActiveField", "addTagToActiveField");
-            updateAddFormTagsSelection();
-        }
-        
-        function generateWarTags() {
-            const container = $('war-quick-tags-container');
-            if (!container) return;
-            
-            const raceGroups = { Dark: [], Light: [], Human: [], Fire: [], Elf: [], Undead: [] };
-            heroes.forEach(h => raceGroups[h.race]?.push(h.name));
-            RACE_ORDER.forEach(r => raceGroups[r].sort((a, b) => a.localeCompare(b)));
-            
-            // Dla wojny - własna funkcja addToWar
-            container.innerHTML = buildTagsHTML(raceGroups, pets, "addToWar", "addPetToWar", false);
-        }
-        
-        // Wykluczeni bohaterowie w Kreatorze (definiowane wcześnie, bo generateKreatorTags używa tego)
-        let kreatorExcludedHeroes = storage.getJson('souls_kreator_excluded_heroes', []);
-        
-        function generateKreatorTags() {
-            const container = $('kreator-quick-tags-container');
-            if (!container) return;
-            
-            // Filtruj wykluczonych bohaterów
-            const excludedNormalized = (kreatorExcludedHeroes || []).map(h => normalize(h));
-            const filteredHeroes = heroes.filter(h => !excludedNormalized.includes(normalize(h.name)));
-            
-            const raceGroups = { Dark: [], Light: [], Human: [], Fire: [], Elf: [], Undead: [] };
-            filteredHeroes.forEach(h => raceGroups[h.race]?.push(h.name));
-            RACE_ORDER.forEach(r => raceGroups[r].sort((a, b) => a.localeCompare(b)));
-            
-            // Dla kreatora - własna funkcja addToKreator
-            let html = buildTagsHTML(raceGroups, pets, "addToKreator", "addPetToKreator", false);
-            container.innerHTML = html;
-            
-            // Rozwiń wszystkie tagi
-            setTimeout(() => {
-                container.querySelectorAll('.quick-tags-header').forEach(h => {
-                    h.classList.add('expanded');
-                    h.nextElementSibling.classList.add('show');
                 });
-                const btn = container.querySelector('.expand-all-btn');
-                if (btn) btn.textContent = `▲ ${t('quickTags.collapseAll')}`;
-            }, 100);
-        }
-        
-        // ===== TAGI DLA WOJNY =====
-        let activeWarField = null;
-        
-        function addToWar(heroName, event) {
-            // Ctrl+klik = wyklucz bohatera z wyników
-            if (event && event.ctrlKey) {
-                addWarExcludedHero(heroName);
-                return;
-            }
-            
-            // Znajdź wszystkie pola wroga na zakładce Wojna
-            const allFields = [];
-            for (let e = 1; e <= 3; e++) {
-                for (let h = 1; h <= 8; h++) {
-                    allFields.push(`war-e${e}-h${h}`);
-                }
-            }
-            
-            // Sprawdź czy już jest - jeśli tak, usuń (toggle)
-            for (const fieldId of allFields) {
-                const input = $(fieldId);
-                if (input && input.value.trim().toLowerCase() === heroName.toLowerCase()) {
-                    input.value = '';
-                    input.classList.remove('hero-race-dark', 'hero-race-light', 'hero-race-human', 
-                        'hero-race-fire', 'hero-race-elf', 'hero-race-undead');
-                    updateWarTagsSelection();
-                    return;
-                }
-            }
-            
-            // Funkcja wpisująca do pola i przeskakująca dalej
-            function fillFieldAndJump(fieldId) {
-                const input = $(fieldId);
-                if (!input) return false;
-                input.value = heroName;
-                updateInputHeroColor(input, false);
-                updateWarTagsSelection();
-                const nextField = getNextEmptyWarField(fieldId);
-                if (nextField) {
-                    setTimeout(() => {
-                        $(nextField)?.focus();
-                        activeWarField = nextField;
-                    }, 10);
-                }
-                return true;
-            }
-            
-            // Jeśli jest aktywne pole
-            if (activeWarField) {
-                const activeInput = $(activeWarField);
-                // Jeśli aktywne pole jest puste - wpisz tam
-                if (activeInput && !activeInput.value.trim()) {
-                    fillFieldAndJump(activeWarField);
-                    return;
-                }
-                // Jeśli aktywne pole jest zajęte - znajdź następne puste PO nim
-                const nextEmpty = getNextEmptyWarField(activeWarField);
-                if (nextEmpty) {
-                    fillFieldAndJump(nextEmpty);
-                    return;
-                }
-            }
-            
-            // Brak aktywnego pola lub wszystkie po nim zajęte - szukaj od początku
-            for (const fieldId of allFields) {
-                const input = $(fieldId);
-                if (input && !input.value.trim()) {
-                    fillFieldAndJump(fieldId);
-                    return;
-                }
-            }
-            showToast(t('search.allSlotsFull'), true);
-        }
-        
-        function addPetToWar(petName) {
-            const petFields = ['war-e1-pet', 'war-e2-pet', 'war-e3-pet'];
-            
-            // Toggle - jeśli już jest, usuń
-            for (const fieldId of petFields) {
-                const input = $(fieldId);
-                if (input && input.value.trim().toLowerCase() === petName.toLowerCase()) {
-                    input.value = '';
-                    input.classList.remove('hero-race-pet');
-                    updateWarTagsSelection();
-                    return;
-                }
-            }
-            
-            // Dodaj do pierwszego wolnego pola pet
-            for (const fieldId of petFields) {
-                const input = $(fieldId);
-                if (input && !input.value.trim()) {
-                    input.value = petName;
-                    input.classList.add('hero-race-pet');
-                    updateWarTagsSelection();
-                    return;
-                }
-            }
-            showToast('Wszystkie pola Pet są zajęte!', true);
-        }
-        
-        function getNextEmptyWarField(currentFieldId) {
-            const allFields = [];
-            for (let e = 1; e <= 3; e++) {
-                for (let h = 1; h <= 8; h++) {
-                    allFields.push(`war-e${e}-h${h}`);
-                }
-            }
-            const currentIdx = allFields.indexOf(currentFieldId);
-            for (let i = currentIdx + 1; i < allFields.length; i++) {
-                const input = $(allFields[i]);
-                if (input && !input.value.trim()) return allFields[i];
-            }
-            return null;
-        }
-        
-        function updateWarTagsSelection() {
-            const container = $('war-quick-tags-container');
-            if (!container) return;
-            
-            // Zbierz wszystkie wartości z pól
-            const values = new Set();
-            for (let e = 1; e <= 3; e++) {
-                for (let h = 1; h <= 8; h++) {
-                    const val = $(`war-e${e}-h${h}`)?.value.trim().toLowerCase();
-                    if (val) values.add(val);
-                }
-                const pet = $(`war-e${e}-pet`)?.value.trim().toLowerCase();
-                if (pet) values.add(pet);
-            }
-            
-            // Zaznacz tagi
-            container.querySelectorAll('.quick-tag').forEach(tag => {
-                const tagValue = tag.textContent.trim().toLowerCase();
-                tag.classList.toggle('selected', values.has(tagValue));
+
+                if (matched) matchedHeroes.push(searchHero);
             });
+
+            const petMatched = !!(query.pet && heroMatchScore(query.pet, enemyPet) > 0);
+            const baseScore = matchedHeroes.length + (petMatched ? 1 : 0);
+            const maxScore = query.heroes.length + (query.pet ? 1 : 0);
+
+            return {
+                score: baseScore + positionBonus,
+                baseScore,
+                positionBonus,
+                matchedHeroes,
+                petMatched,
+                maxScore,
+            };
         }
-        
-        // ===== TAGI DLA KREATORA =====
-        let activeKreatorField = null;
-        
-        function addToKreator(heroName, event) {
-            // Ctrl+klik = ukryj bohatera
-            if (event && event.ctrlKey) {
-                addKreatorExcludedHero(heroName);
-                return;
-            }
-            
-            // Znajdź wszystkie pola w kreatorze (tylko widoczne składy)
-            const allFields = [];
-            for (let s = 1; s <= kreatorCount; s++) {
-                for (let h = 1; h <= 8; h++) {
-                    allFields.push(`kreator-${s}-h${h}`);
-                }
-            }
-            
-            // Sprawdź czy już jest - jeśli tak, usuń (toggle)
-            for (const fieldId of allFields) {
-                const input = $(fieldId);
-                if (input && input.value.trim().toLowerCase() === heroName.toLowerCase()) {
-                    input.value = '';
-                    input.classList.remove('hero-race-dark', 'hero-race-light', 'hero-race-human', 
-                        'hero-race-fire', 'hero-race-elf', 'hero-race-undead');
-                    updateKreatorTagsSelection();
-                    return;
-                }
-            }
-            
-            // Funkcja wpisująca do pola i przeskakująca dalej
-            function fillFieldAndJump(fieldId) {
-                const input = $(fieldId);
-                if (!input) return false;
-                input.value = heroName;
-                updateInputHeroColor(input, false);
-                updateKreatorTagsSelection();
-                const nextField = getNextEmptyKreatorField(fieldId);
-                if (nextField) {
-                    setTimeout(() => {
-                        $(nextField)?.focus();
-                        activeKreatorField = nextField;
-                    }, 10);
-                }
-                return true;
-            }
-            
-            // Jeśli jest aktywne pole
-            if (activeKreatorField) {
-                const activeInput = $(activeKreatorField);
-                // Jeśli aktywne pole jest puste - wpisz tam
-                if (activeInput && !activeInput.value.trim()) {
-                    fillFieldAndJump(activeKreatorField);
-                    return;
-                }
-                // Jeśli aktywne pole jest zajęte - znajdź następne puste PO nim
-                const nextEmpty = getNextEmptyKreatorField(activeKreatorField);
-                if (nextEmpty) {
-                    fillFieldAndJump(nextEmpty);
-                    return;
-                }
-            }
-            
-            // Brak aktywnego pola lub wszystkie po nim zajęte - szukaj od początku
-            for (const fieldId of allFields) {
-                const input = $(fieldId);
-                if (input && !input.value.trim()) {
-                    fillFieldAndJump(fieldId);
-                    return;
-                }
-            }
-            showToast(t('search.allSlotsFull'), true);
-        }
-        
-        function addPetToKreator(petName) {
-            const petFields = [];
-            for (let s = 1; s <= kreatorCount; s++) {
-                petFields.push(`kreator-${s}-pet`);
-            }
-            
-            // Toggle - jeśli już jest, usuń
-            for (const fieldId of petFields) {
-                const input = $(fieldId);
-                if (input && input.value.trim().toLowerCase() === petName.toLowerCase()) {
-                    input.value = '';
-                    input.classList.remove('hero-race-pet');
-                    updateKreatorTagsSelection();
-                    return;
-                }
-            }
-            
-            // Dodaj do pierwszego wolnego pola pet
-            for (const fieldId of petFields) {
-                const input = $(fieldId);
-                if (input && !input.value.trim()) {
-                    input.value = petName;
-                    input.classList.add('hero-race-pet');
-                    updateKreatorTagsSelection();
-                    return;
-                }
-            }
-            showToast('Wszystkie pola Pet są zajęte!', true);
-        }
-        
-        function getNextEmptyKreatorField(currentFieldId) {
-            const allFields = [];
-            for (let s = 1; s <= kreatorCount; s++) {
-                for (let h = 1; h <= 8; h++) {
-                    allFields.push(`kreator-${s}-h${h}`);
-                }
-            }
-            const currentIdx = allFields.indexOf(currentFieldId);
-            for (let i = currentIdx + 1; i < allFields.length; i++) {
-                const input = $(allFields[i]);
-                if (input && !input.value.trim()) return allFields[i];
-            }
-            return null;
-        }
-        
-        function updateKreatorTagsSelection() {
-            const container = $('kreator-quick-tags-container');
-            if (!container) return;
-            
-            // Zbierz wszystkie wartości z pól
-            const values = new Set();
-            for (let s = 1; s <= kreatorCount; s++) {
-                for (let h = 1; h <= 8; h++) {
-                    const val = $(`kreator-${s}-h${h}`)?.value.trim().toLowerCase();
-                    if (val) values.add(val);
-                }
-                const pet = $(`kreator-${s}-pet`)?.value.trim().toLowerCase();
-                if (pet) values.add(pet);
-            }
-            
-            // Zaznacz tagi
-            container.querySelectorAll('.quick-tag').forEach(tag => {
-                const tagValue = tag.textContent.trim().toLowerCase();
-                tag.classList.toggle('selected', values.has(tagValue));
-            });
-        }
-        
-        function toggleQuickTagSection(header) {
-            header.classList.toggle('expanded');
-            header.nextElementSibling.classList.toggle('show');
-        }
-        
-        function toggleAllTags(container) {
-            const sections = container.querySelectorAll('.quick-tags-section');
-            const btn = container.querySelector('.expand-all-btn');
-            const allExpanded = container.querySelectorAll('.quick-tags-header.expanded').length === sections.length;
-            
-            sections.forEach(s => {
-                s.querySelector('.quick-tags-header').classList.toggle('expanded', !allExpanded);
-                s.querySelector('.quick-tags-content').classList.toggle('show', !allExpanded);
-            });
-            btn.textContent = allExpanded ? `▼ ${t('quickTags.expandAll')}` : `▲ ${t('quickTags.collapseAll')}`;
-        }
-        
-        // =====================================================
-        // WYSZUKIWARKA
-        // =====================================================
-		function addToSearch(heroName, event) {
-			// Ctrl+klik = dodaj do wykluczonych
-			if (event && event.ctrlKey) {
-				addExcludedHero(heroName);
+
+		// Funkcja debounce - opóźnia wykonanie
+		function debounce(func, wait) {
+			let timeout;
+			return function(...args) {
+				clearTimeout(timeout);
+				timeout = setTimeout(() => func.apply(this, args), wait);
+			};
+		}
+
+		function getTimeAgo(date) {
+			const now = new Date();
+			const diff = Math.floor((now - date) / 1000); // sekundy
+			
+			if (diff < 60) return 'przed chwilą';
+			if (diff < 3600) return `${Math.floor(diff / 60)} min temu`;
+			if (diff < 86400) return `${Math.floor(diff / 3600)} godz. temu`;
+			if (diff < 604800) return `${Math.floor(diff / 86400)} dni temu`;
+			return date.toLocaleDateString('pl-PL');
+		}
+
+		// Aktualizuj kolor inputa na podstawie rasy bohatera
+		function updateInputHeroColor(input, isPet = false) {
+			// Usuń wszystkie klasy kolorów
+			input.classList.remove('hero-race-dark', 'hero-race-light', 'hero-race-human', 
+				'hero-race-fire', 'hero-race-elf', 'hero-race-undead', 'hero-race-pet');
+			
+			const value = input.value.trim();
+			if (!value) return;
+			
+			if (isPet) {
+				// Dla petów - zawsze złoty kolor
+				input.classList.add('hero-race-pet');
 				return;
 			}
 			
-			// Sprawdź czy już jest - jeśli tak, usuń (toggle)
-			for (let i = 1; i <= 8; i++) {
-				const input = $(`search-pos${i}`);
-				if (input.value.trim().toLowerCase() === heroName.toLowerCase()) {
-					input.value = '';
-					updateSearchTagsSelection();
-					updateSearchCounter();
-					return;
-				}
+			// Znajdź bohatera i jego rasę
+			const hero = heroes.find(h => normalize(h.name) === normalize(value));
+			if (hero && hero.race) {
+				const raceClass = `hero-race-${hero.race.toLowerCase()}`;
+				input.classList.add(raceClass);
 			}
-			
-			// Jeśli jest aktywne pole, dodaj tam
-			if (activeSearchField) {
-				const activeInput = $(activeSearchField);
-				if (activeInput && activeInput.id.startsWith('search-pos')) {
-					activeInput.value = heroName;
-					updateSearchTagsSelection();
-					updateSearchCounter();
-					return;
-				}
-			}
-			
-			// W przeciwnym razie dodaj do pierwszego wolnego
-			for (let i = 1; i <= 8; i++) {
-				const input = $(`search-pos${i}`);
-				if (!input.value.trim()) {
-					input.value = heroName;
-					updateSearchTagsSelection();
-					updateSearchCounter();
-					return;
-				}
-			}
-			showToast(t('search.allSlotsFull'), true);
 		}
-        
-		function addPetToSearch(petName) {
-			const petInput = $('search-pet');
-			
-			// Toggle - jeśli ten sam pet, usuń
-			if (petInput.value.trim().toLowerCase() === petName.toLowerCase()) {
-				petInput.value = '';
-			} 
-			// Jeśli pole pet jest aktywne LUB puste, wpisz
-			else if (activeSearchField === 'search-pet' || !petInput.value.trim()) {
-				petInput.value = petName;
-			} 
-			else {
-				showToast(t('search.petSlotFull'), true);
-				return;
-			}
-			updateSearchTagsSelection();
-			updateSearchCounter();
-		}
-        
-        function updateSearchCounter() {
-            let count = getFieldValues('search-pos', 8).filter(v => v).length;
-            if ($('search-pet').value.trim()) count++;
-            
-            let counter = $('search-counter');
-            if (count > 0) {
-                if (!counter) {
-                    counter = document.createElement('div');
-                    counter.id = 'search-counter';
-                    counter.className = 'search-counter';
-                    $('quick-tags-container').parentNode.insertBefore(counter, $('quick-tags-container').nextSibling);
-                }
-                counter.innerHTML = `${t('search.selected')}: <strong>${count}</strong> / 6`;
-            } else counter?.remove();
-        }
-        
-        function updateSearchTagsSelection() {
-            const values = [...getFieldValues('search-pos', 8), $('search-pet')?.value.trim()].filter(v => v).map(normalize);
-            document.querySelectorAll('#quick-tags-container .quick-tag').forEach(tag => {
-                tag.classList.toggle('selected', values.includes(tag.textContent.toLowerCase()));
-            });
-        }
-        
-		function searchFormations() {
-			saveSearchToHistory();
-			
-			const searchHeroes = getFieldValues('search-pos', 8).filter(v => v).map(normalize);
-			const searchPet = normalize($('search-pet').value);
-			
-			if (!searchHeroes.length && !searchPet) { showToast(t('search.enterAtLeastOne'), true); return; }
-			if (!allFormations.length) { showToast(t('search.dataLoading'), true); return; }
 
-			const query = { heroes: searchHeroes, pet: searchPet || null };
-			const results = allFormations.map(f => {
-				const r = scoreFormation(f, query);
-				return r.score > 0
-					? { formation: f, matchedHeroes: r.matchedHeroes, petMatched: r.petMatched, score: r.score, maxScore: r.maxScore }
-					: null;
-			}).filter(Boolean).sort((a, b) => b.score - a.score);
-			
-			displayResults(results, searchHeroes);
-		}
-        
-		// =====================================================
-		// AUTO-PRZESKAKIWANIE I SKRÓTY KLAWISZOWE - UNIWERSALNE
-		// =====================================================
+		function setupAutocomplete() {
+			document.querySelectorAll('input[data-type]').forEach(input => {
+				const list = $('list-' + input.id);
+				const type = input.dataset.type;
 
-		// Konfiguracja pól dla każdej sekcji
+				const isWarField = input.id.startsWith('war-');
+				const isEditField = input.id.startsWith('edit-') && !['edit-name', 'edit-comment', 'edit-id'].includes(input.id);
+				let dynamicList = null;
+				
+				if (isWarField && !list) {
+					dynamicList = document.createElement('div');
+					dynamicList.className = 'autocomplete-list';
+					dynamicList.id = 'list-' + input.id;
+					input.parentNode.style.position = 'relative';
+					input.parentNode.appendChild(dynamicList);
+				}
+				
+				const targetList = list || dynamicList;
+				if (!targetList) return;
+				
+				// Zmienna do śledzenia zaznaczonego elementu
+				let selectedIndex = -1;
+				
+				function updateSelection() {
+					const items = targetList.querySelectorAll('.autocomplete-item');
+					items.forEach((item, idx) => {
+						item.classList.toggle('selected', idx === selectedIndex);
+					});
+					// Scroll do widoczności
+					if (selectedIndex >= 0 && items[selectedIndex]) {
+						items[selectedIndex].scrollIntoView({ block: 'nearest' });
+					}
+				}
+				
+				function selectItem(value) {
+					input.value = value;
+					targetList.classList.remove('show');
+					selectedIndex = -1;
+					
+					// Obsługa pól wykluczeń - automatyczne dodanie
+					if (input.id === 'war-excluded-input') {
+						addWarExcludedHero(value);
+						input.value = '';
+						return;
+					}
+					if (input.id === 'kreator-excluded-input') {
+						addKreatorExcludedHero(value);
+						input.value = '';
+						return;
+					}
+					
+					// Aktualizuj kolor inputa dla War Planner i Kreator
+					if (input.id.startsWith('war-') || input.id.startsWith('kreator-')) {
+						const isPet = input.id.includes('-pet');
+						updateInputHeroColor(input, isPet);
+					}
+					
+					// Walidacja dla formularza dodawania
+					if (input.id.startsWith('add-') && !['add-name', 'add-comment'].includes(input.id)) {
+						setValidation(input, true);
+					}
+					updateAddFormTagsSelection();
+					updateSearchTagsSelection();
+					updateWarTagsSelection();
+					updateKreatorTagsSelection();
+					
+					// 🆕 UNIWERSALNE AUTO-PRZESKAKIWANIE
+					const sectionKey = getFieldSection(input.id);
+					if (sectionKey) {
+						const nextFieldId = getNextEmptyField(input.id);
+						if (nextFieldId) {
+							setTimeout(() => {
+								const nextField = $(nextFieldId);
+								if (nextField) {
+									nextField.focus();
+									// Aktualizuj aktywne pole w zależności od sekcji
+									if (input.id.startsWith('add-')) {
+										activeAddField = nextFieldId;
+									}
+									if (input.id.startsWith('kreator-')) {
+										activeKreatorField = nextFieldId;
+									}
+									if (input.id.startsWith('war-')) {
+										activeWarField = nextFieldId;
+									}
+								}
+							}, 50);
+						}
+					}
+				}
+				
+				input.addEventListener('input', () => {
+					selectedIndex = -1; // Reset selection on input
+					
+					if (input.id.startsWith('add-') && !['add-name', 'add-comment'].includes(input.id)) {
+						validateInput(input);
+						updateAddFormTagsSelection();
+					}
+					if (input.id.startsWith('search-')) updateSearchTagsSelection();
+					if (input.id.startsWith('war-')) {
+						updateWarTagsSelection();
+						updateInputHeroColor(input, input.id.includes('-pet'));
+					}
+					if (input.id.startsWith('kreator-')) {
+						updateKreatorTagsSelection();
+						updateInputHeroColor(input, input.id.includes('-pet'));
+					}
+					
+					const val = input.value.toLowerCase();
+					if (val.length < 1) { targetList.classList.remove('show'); return; }
+					
+					const items = type === 'pet' ? pets : heroes;
+					const filtered = type === 'pet' ? items.filter(p => p.toLowerCase().startsWith(val)).slice(0, 6) :
+						items.filter(h => h.name.toLowerCase().startsWith(val)).slice(0, 6);
+					
+					if (!filtered.length) { targetList.classList.remove('show'); return; }
+					
+					targetList.innerHTML = filtered.map(item => type === 'pet' ?
+						`<div class="autocomplete-item" data-value="${item}">${item}</div>` :
+						`<div class="autocomplete-item race-${item.race.toLowerCase()}" data-value="${item.name}">${item.name} <span class="race">(${item.race})</span></div>`
+					).join('');
+					
+					targetList.classList.add('show');
+					
+					// Kliknięcie w element
+					targetList.querySelectorAll('.autocomplete-item').forEach((item, idx) => {
+						item.addEventListener('click', () => selectItem(item.dataset.value));
+						item.addEventListener('mouseenter', () => {
+							selectedIndex = idx;
+							updateSelection();
+						});
+					});
+				});
+				
+				// Obsługa klawiszy
+				input.addEventListener('keydown', e => {
+					const items = targetList.querySelectorAll('.autocomplete-item');
+					const isListVisible = targetList.classList.contains('show') && items.length > 0;
+					
+					if (e.key === 'ArrowDown') {
+						if (isListVisible) {
+							e.preventDefault();
+							selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
+							updateSelection();
+						}
+					} else if (e.key === 'ArrowUp') {
+						if (isListVisible) {
+							e.preventDefault();
+							selectedIndex = Math.max(selectedIndex - 1, 0);
+							updateSelection();
+						}
+					} else if (e.key === 'Enter') {
+						if (isListVisible && selectedIndex >= 0 && items[selectedIndex]) {
+							e.preventDefault();
+							e.stopPropagation();
+							selectItem(items[selectedIndex].dataset.value);
+						}
+						// Jeśli nic nie zaznaczone, pozwól na domyślne zachowanie (np. szukaj)
+					} else if (e.key === 'Escape') {
+						targetList.classList.remove('show');
+						selectedIndex = -1;
+					} else if (e.key === 'Tab') {
+						// Tab też wybiera jeśli coś zaznaczone
+						if (isListVisible && selectedIndex >= 0 && items[selectedIndex]) {
+							selectItem(items[selectedIndex].dataset.value);
+						}
+					}
+				});
+				
+				input.addEventListener('blur', () => setTimeout(() => {
+					targetList.classList.remove('show');
+					selectedIndex = -1;
+					if (input.id.startsWith('search-')) updateSearchTagsSelection();
+					if (input.id.startsWith('add-') && !['add-name', 'add-comment'].includes(input.id)) updateAddFormTagsSelection();
+				}, 200));
+			});
+		}
+
 		const FORM_FIELD_CONFIG = {
 			// Wyszukiwarka
 			search: {
@@ -1494,6 +1051,12 @@
 				tabId: 'tab-kreator'
 			}
 		};
+
+		// =====================================================
+		// AUTO-PRZESKAKIWANIE I SKRÓTY KLAWISZOWE - UNIWERSALNE
+		// =====================================================
+
+		// Konfiguracja pól dla każdej sekcji
 
 		// Określ sekcję na podstawie ID pola
 		function getFieldSection(fieldId) {
@@ -1599,24 +1162,457 @@
 			return fields;
 		}
 
-		// Zwraca pola przeciwnika w kolejności wizualnej (uwzględnia odwrócenie rzędów)
-		function getEnemyFieldsInOrder() {
-			const reversed = storage.getBool('souls_enemyRowsReversed', true);
 
-			if (reversed) {
-				// 6-7-8 na górze → kolejność: 6,7,8 → 4,5 → 1,2,3 → Pet
-				return [
-					'add-enemy6', 'add-enemy7', 'add-enemy8',
-					'add-enemy4', 'add-enemy5',
-					'add-enemy1', 'add-enemy2', 'add-enemy3',
-					'add-enemyPet'
-				];
-			} else {
-				// 1-2-3 na górze → standardowa kolejność
-				return FORM_FIELD_CONFIG['add-enemy'].fields;
+        // ═══════════════════════════════════════════════════════════
+        // RACE ORDER + QUICK TAGS
+        // ═══════════════════════════════════════════════════════════
+
+        // =====================================================
+        // QUICK TAGS - UNIWERSALNA FUNKCJA
+        // =====================================================
+        
+        // Domyślna kolejność ras (konfigurowalna)
+        const DEFAULT_RACE_ORDER = ['Human', 'Fire', 'Elf', 'Undead', 'Dark', 'Light'];
+        let RACE_ORDER = storage.getJson('souls_race_order', null) || [...DEFAULT_RACE_ORDER];
+        const RACE_EMOJI = { Dark: '🌑', Light: '☀️', Human: '👤', Fire: '🔥', Elf: '🌿', Undead: '💀' };
+
+        // Funkcje zarządzania kolejnością ras
+        function moveRaceUp(race) {
+            const idx = RACE_ORDER.indexOf(race);
+            if (idx > 0) {
+                [RACE_ORDER[idx - 1], RACE_ORDER[idx]] = [RACE_ORDER[idx], RACE_ORDER[idx - 1]];
+                saveRaceOrder();
+                refreshAllTags();
+            }
+        }
+
+        function moveRaceDown(race) {
+            const idx = RACE_ORDER.indexOf(race);
+            if (idx < RACE_ORDER.length - 1) {
+                [RACE_ORDER[idx], RACE_ORDER[idx + 1]] = [RACE_ORDER[idx + 1], RACE_ORDER[idx]];
+                saveRaceOrder();
+                refreshAllTags();
+            }
+        }
+
+        function resetRaceOrder() {
+            RACE_ORDER = [...DEFAULT_RACE_ORDER];
+            saveRaceOrder();
+            refreshAllTags();
+            showToast('Przywrócono domyślną kolejność');
+        }
+
+        function saveRaceOrder() {
+            storage.setJson('souls_race_order', RACE_ORDER);
+        }
+
+        function refreshAllTags() {
+            // Zapamiętaj które panele konfiguracji są otwarte (po id kontenera-rodzica)
+            const openPanels = [];
+            document.querySelectorAll('.race-order-config.show').forEach(config => {
+                const parentContainer = config.parentElement;
+                if (parentContainer && parentContainer.id) {
+                    openPanels.push(parentContainer.id);
+                }
+            });
+            
+            generateQuickTags();
+            generateAddFormTags();
+            generateWarTags();
+            generateKreatorTags();
+            
+            // Przywróć otwarte panele
+            openPanels.forEach(containerId => {
+                const container = $(containerId);
+                if (container) {
+                    const config = container.querySelector('.race-order-config');
+                    if (config) {
+                        config.classList.add('show');
+                        renderRaceOrderConfigIn(config);
+                    }
+                }
+            });
+        }
+
+		function buildTagsHTML(raceGroups, petsData, clickHandler, petClickHandler, showCounts = false) {
+			let html = `<div class="quick-tags-expand-all">
+				<button class="expand-all-btn" onclick="toggleAllTags(this.closest('.search-form-tags, .add-form-tags, .war-form-tags, .kreator-form-tags'))">▼ ${t('quickTags.expandAll')}</button>
+				<button class="race-order-toggle" onclick="toggleRaceOrderConfig(this)" title="Zmień kolejność ras">⚙️</button>
+			</div>
+			<div class="race-order-config"></div>`;
+			
+			RACE_ORDER.forEach(race => {
+				if (raceGroups[race]?.length) {
+					html += `<div class="quick-tags-section"><div class="quick-tags-header" onclick="toggleQuickTagSection(this)"><span class="toggle-icon">▶</span>${RACE_EMOJI[race]} ${race} (${raceGroups[race].length})</div><div class="quick-tags-content"><div class="quick-tags">${raceGroups[race].map(h => `<span class="quick-tag tag-${race.toLowerCase()}" onclick="${clickHandler}('${h.name || h}', event)"${showCounts && h.count ? ` title="${h.count}x"` : ''}>${h.name || h}</span>`).join('')}</div></div></div>`;
+				}
+			});
+			
+			if (petsData?.length) {
+				html += `<div class="quick-tags-section"><div class="quick-tags-header" onclick="toggleQuickTagSection(this)"><span class="toggle-icon">▶</span>🐾 ${t('quickTags.pets')} (${petsData.length})</div><div class="quick-tags-content"><div class="quick-tags">${petsData.map(p => `<span class="quick-tag tag-pet" onclick="${petClickHandler}('${p.name || p}')"${showCounts && p.count ? ` title="${p.count}x"` : ''}>${p.name || p}</span>`).join('')}</div></div></div>`;
+			}
+			
+			return html;
+		}
+
+		function toggleRaceOrderConfig(btn) {
+			const container = btn.closest('.search-form-tags, .add-form-tags, .war-form-tags, .kreator-form-tags');
+			const config = container?.querySelector('.race-order-config');
+			if (config) {
+				config.classList.toggle('show');
+				if (config.classList.contains('show')) {
+					renderRaceOrderConfigIn(config);
+				}
 			}
 		}
-		
+
+		function renderRaceOrderConfigIn(container) {
+			container.innerHTML = RACE_ORDER.map((race, idx) => `
+				<div class="race-order-item">
+					<span class="race-order-label">${RACE_EMOJI[race]} ${race}</span>
+					<div class="race-order-buttons">
+						<button class="btn btn-tiny" onclick="moveRaceUp('${race}')" ${idx === 0 ? 'disabled' : ''}>▲</button>
+						<button class="btn btn-tiny" onclick="moveRaceDown('${race}')" ${idx === RACE_ORDER.length - 1 ? 'disabled' : ''}>▼</button>
+					</div>
+				</div>
+			`).join('') + `
+				<div style="margin-top: 8px; text-align: center;">
+					<button class="btn btn-small btn-secondary" onclick="resetRaceOrder()">↺ Domyślna kolejność</button>
+				</div>
+			`;
+		}
+
+        function generateQuickTags() {
+            if (!allFormations.length) return;
+            
+            const heroCounts = {}, petCounts = {};
+            const heroRaceMap = {};
+            heroes.forEach(h => heroRaceMap[h.name.toLowerCase()] = h.race);
+            
+            allFormations.forEach(f => {
+                f.enemy.filter(h => h).forEach(h => heroCounts[h] = (heroCounts[h] || 0) + 1);
+                if (f.enemyPet) petCounts[f.enemyPet] = (petCounts[f.enemyPet] || 0) + 1;
+            });
+            
+            const raceGroups = { Dark: [], Light: [], Human: [], Fire: [], Elf: [], Undead: [] };
+            Object.entries(heroCounts).forEach(([name, count]) => {
+                const race = heroRaceMap[name.toLowerCase()];
+                if (race && raceGroups[race]) raceGroups[race].push({ name, count });
+            });
+            RACE_ORDER.forEach(r => raceGroups[r].sort((a, b) => a.name.localeCompare(b.name)));
+            
+            const petsData = Object.entries(petCounts).sort((a, b) => a[0].localeCompare(b[0])).map(([name, count]) => ({ name, count }));
+            
+            $('quick-tags-container').innerHTML = buildTagsHTML(raceGroups, petsData, 'addToSearch', 'addPetToSearch', true);
+            updateSearchTagsSelection();
+        }
+
+        function generateAddFormTags() {
+            const container = $('add-form-tags-container');
+            if (!container) return;
+            
+            const raceGroups = { Dark: [], Light: [], Human: [], Fire: [], Elf: [], Undead: [] };
+            heroes.forEach(h => raceGroups[h.race]?.push(h.name));
+            RACE_ORDER.forEach(r => raceGroups[r].sort((a, b) => a.localeCompare(b)));
+            
+            container.innerHTML = buildTagsHTML(raceGroups, pets, "addTagToActiveField", "addTagToActiveField");
+            updateAddFormTagsSelection();
+        }
+
+        function generateWarTags() {
+            const container = $('war-quick-tags-container');
+            if (!container) return;
+            
+            const raceGroups = { Dark: [], Light: [], Human: [], Fire: [], Elf: [], Undead: [] };
+            heroes.forEach(h => raceGroups[h.race]?.push(h.name));
+            RACE_ORDER.forEach(r => raceGroups[r].sort((a, b) => a.localeCompare(b)));
+            
+            // Dla wojny - własna funkcja addToWar
+            container.innerHTML = buildTagsHTML(raceGroups, pets, "addToWar", "addPetToWar", false);
+        }
+
+        // Wykluczeni bohaterowie w Kreatorze (definiowane wcześnie, bo generateKreatorTags używa tego)
+        let kreatorExcludedHeroes = storage.getJson('souls_kreator_excluded_heroes', []);
+
+        function generateKreatorTags() {
+            const container = $('kreator-quick-tags-container');
+            if (!container) return;
+            
+            // Filtruj wykluczonych bohaterów
+            const excludedNormalized = (kreatorExcludedHeroes || []).map(h => normalize(h));
+            const filteredHeroes = heroes.filter(h => !excludedNormalized.includes(normalize(h.name)));
+            
+            const raceGroups = { Dark: [], Light: [], Human: [], Fire: [], Elf: [], Undead: [] };
+            filteredHeroes.forEach(h => raceGroups[h.race]?.push(h.name));
+            RACE_ORDER.forEach(r => raceGroups[r].sort((a, b) => a.localeCompare(b)));
+            
+            // Dla kreatora - własna funkcja addToKreator
+            let html = buildTagsHTML(raceGroups, pets, "addToKreator", "addPetToKreator", false);
+            container.innerHTML = html;
+            
+            // Rozwiń wszystkie tagi
+            setTimeout(() => {
+                container.querySelectorAll('.quick-tags-header').forEach(h => {
+                    h.classList.add('expanded');
+                    h.nextElementSibling.classList.add('show');
+                });
+                const btn = container.querySelector('.expand-all-btn');
+                if (btn) btn.textContent = `▲ ${t('quickTags.collapseAll')}`;
+            }, 100);
+        }
+
+        function toggleQuickTagSection(header) {
+            header.classList.toggle('expanded');
+            header.nextElementSibling.classList.toggle('show');
+        }
+
+        function toggleAllTags(container) {
+            const sections = container.querySelectorAll('.quick-tags-section');
+            const btn = container.querySelector('.expand-all-btn');
+            const allExpanded = container.querySelectorAll('.quick-tags-header.expanded').length === sections.length;
+            
+            sections.forEach(s => {
+                s.querySelector('.quick-tags-header').classList.toggle('expanded', !allExpanded);
+                s.querySelector('.quick-tags-content').classList.toggle('show', !allExpanded);
+            });
+            btn.textContent = allExpanded ? `▼ ${t('quickTags.expandAll')}` : `▲ ${t('quickTags.collapseAll')}`;
+        }
+
+
+        // ═══════════════════════════════════════════════════════════
+        // TAB: SEARCH — wyszukiwarka, wykluczeni, historia
+        // ═══════════════════════════════════════════════════════════
+
+		// Odwrócenie kolejności rzędów w wyszukiwarce
+		function loadSearchRowsPreference() {
+			// Domyślnie true (6-7-8 na górze)
+			const reversed = storage.getBool('souls_searchRowsReversed', true);
+			const container = $('search-rows-container');
+			const btn = $('btn-flip-search-rows');
+			if (container && reversed) {
+				container.classList.add('reversed');
+			}
+			if (btn && reversed) {
+				btn.classList.add('active');
+			}
+		}
+
+		function toggleSearchRowsOrder() {
+			const container = $('search-rows-container');
+			const btn = $('btn-flip-search-rows');
+			if (!container) return;
+			
+			container.classList.toggle('reversed');
+			btn?.classList.toggle('active');
+			
+			const isReversed = container.classList.contains('reversed');
+			localStorage.setItem('souls_searchRowsReversed', isReversed);
+			
+			const msg = isReversed 
+				? t('layout.top678')
+				: t('layout.top123');
+			showToast(msg);
+		}
+
+		// Zwraca pola wyszukiwarki w kolejności wizualnej
+		function getSearchFieldsInOrder() {
+			const reversed = storage.getBool('souls_searchRowsReversed', true);
+
+			if (reversed) {
+				return [
+					'search-pos6', 'search-pos7', 'search-pos8',
+					'search-pos4', 'search-pos5',
+					'search-pos1', 'search-pos2', 'search-pos3',
+					'search-pet'
+				];
+			} else {
+				return FORM_FIELD_CONFIG.search.fields;
+			}
+		}
+
+        // =====================================================
+        // WYSZUKIWARKA
+        // =====================================================
+		function addToSearch(heroName, event) {
+			// Ctrl+klik = dodaj do wykluczonych
+			if (event && event.ctrlKey) {
+				addExcludedHero(heroName);
+				return;
+			}
+			
+			// Sprawdź czy już jest - jeśli tak, usuń (toggle)
+			for (let i = 1; i <= 8; i++) {
+				const input = $(`search-pos${i}`);
+				if (input.value.trim().toLowerCase() === heroName.toLowerCase()) {
+					input.value = '';
+					updateSearchTagsSelection();
+					updateSearchCounter();
+					return;
+				}
+			}
+			
+			// Jeśli jest aktywne pole, dodaj tam
+			if (activeSearchField) {
+				const activeInput = $(activeSearchField);
+				if (activeInput && activeInput.id.startsWith('search-pos')) {
+					activeInput.value = heroName;
+					updateSearchTagsSelection();
+					updateSearchCounter();
+					return;
+				}
+			}
+			
+			// W przeciwnym razie dodaj do pierwszego wolnego
+			for (let i = 1; i <= 8; i++) {
+				const input = $(`search-pos${i}`);
+				if (!input.value.trim()) {
+					input.value = heroName;
+					updateSearchTagsSelection();
+					updateSearchCounter();
+					return;
+				}
+			}
+			showToast(t('search.allSlotsFull'), true);
+		}
+
+		function addPetToSearch(petName) {
+			const petInput = $('search-pet');
+			
+			// Toggle - jeśli ten sam pet, usuń
+			if (petInput.value.trim().toLowerCase() === petName.toLowerCase()) {
+				petInput.value = '';
+			} 
+			// Jeśli pole pet jest aktywne LUB puste, wpisz
+			else if (activeSearchField === 'search-pet' || !petInput.value.trim()) {
+				petInput.value = petName;
+			} 
+			else {
+				showToast(t('search.petSlotFull'), true);
+				return;
+			}
+			updateSearchTagsSelection();
+			updateSearchCounter();
+		}
+
+        function updateSearchCounter() {
+            let count = getFieldValues('search-pos', 8).filter(v => v).length;
+            if ($('search-pet').value.trim()) count++;
+            
+            let counter = $('search-counter');
+            if (count > 0) {
+                if (!counter) {
+                    counter = document.createElement('div');
+                    counter.id = 'search-counter';
+                    counter.className = 'search-counter';
+                    $('quick-tags-container').parentNode.insertBefore(counter, $('quick-tags-container').nextSibling);
+                }
+                counter.innerHTML = `${t('search.selected')}: <strong>${count}</strong> / 6`;
+            } else counter?.remove();
+        }
+
+        function updateSearchTagsSelection() {
+            const values = [...getFieldValues('search-pos', 8), $('search-pet')?.value.trim()].filter(v => v).map(normalize);
+            document.querySelectorAll('#quick-tags-container .quick-tag').forEach(tag => {
+                tag.classList.toggle('selected', values.includes(tag.textContent.toLowerCase()));
+            });
+        }
+
+		function searchFormations() {
+			saveSearchToHistory();
+			
+			const searchHeroes = getFieldValues('search-pos', 8).filter(v => v).map(normalize);
+			const searchPet = normalize($('search-pet').value);
+			
+			if (!searchHeroes.length && !searchPet) { showToast(t('search.enterAtLeastOne'), true); return; }
+			if (!allFormations.length) { showToast(t('search.dataLoading'), true); return; }
+
+			const query = { heroes: searchHeroes, pet: searchPet || null };
+			const results = allFormations.map(f => {
+				const r = scoreFormation(f, query);
+				return r.score > 0
+					? { formation: f, matchedHeroes: r.matchedHeroes, petMatched: r.petMatched, score: r.score, maxScore: r.maxScore }
+					: null;
+			}).filter(Boolean).sort((a, b) => b.score - a.score);
+			
+			displayResults(results, searchHeroes);
+		}
+
+		function displayResults(results, searchHeroes) {
+			// Reset selekcji przy nowym wyszukiwaniu
+			selectedForCompare = [];
+			
+			if (!results.length) {
+				$('results-section').innerHTML = `<div class="empty-state"><p>${t('search.noResults')}</p></div>`;
+				return;
+			}
+			
+			// Filtruj wyniki według wykluczonych
+			let displayedResults = results;
+			let hiddenCount = 0;
+			
+			if (hideExcludedResults && excludedHeroes.length > 0) {
+				displayedResults = results.filter(r => !isFormationExcluded(r.formation).excluded);
+				hiddenCount = results.length - displayedResults.length;
+			}
+			
+			let html = `<div class="results-header">
+				<h3>${t('search.results')}</h3>
+				<span class="results-count">${t('search.found')}: ${displayedResults.length}${hiddenCount > 0 ? ` <span style="color:#f44336;">(+${hiddenCount} 🚫)</span>` : ''}</span>
+			</div>`;
+			
+			if (!displayedResults.length) {
+				html += `<div class="empty-state"><p>${t('search.noResults')}</p><p style="font-size:0.8rem;color:var(--text-muted);margin-top:10px;">${t('excluded.hiddenInResults', {n: hiddenCount})}</p></div>`;
+				$('results-section').innerHTML = html;
+				updateCompareButton();
+				return;
+			}
+			
+			html += displayedResults.map(r => {
+				const f = r.formation;
+				const enemyDisplay = f.enemy.filter(h => h).map(h => r.matchedHeroes.some(mh => normalize(h) === mh || normalize(h).startsWith(mh)) ? `<span class="matched-hero">${h}</span>` : h).join(', ');
+				const petDisplay = r.petMatched ? `<span class="matched-hero">${f.enemyPet}</span>` : (f.enemyPet || '—');
+				const missingHeroes = searchHeroes.filter(sh => !r.matchedHeroes.includes(sh));
+				
+				// Sprawdź wykluczone (dla trybu "pokaż wszystkie")
+				const exclusionCheck = isFormationExcluded(f);
+				const hasExcluded = !hideExcludedResults && exclusionCheck.excluded;
+				
+				// Info o dopasowaniu w komentarzu
+				const commentMatchInfo = r.commentMatched && r.matchedHeroes.length === 0 && !r.petMatched 
+					? `<div style="font-size:0.7rem;color:var(--accent-gold);margin-top:3px;">💬 ${t('search.foundInComment')}</div>`
+					: '';
+				
+				return `
+					<div class="result-card ${hasExcluded ? 'has-excluded' : ''}" id="result-card-${f.id}">
+						<div class="result-card-checkbox">
+							<input type="checkbox" id="compare-${f.id}" onchange="toggleCompareSelection(${f.id})" title="${t('compare.select')}">
+						</div>
+						<div class="result-card-content" onclick="showFormation(${f.id})">
+							<div class="result-card-header">
+								<span class="result-id">ID: ${f.id}${f.isBase ? '' : ` <span class="badge user-badge">${t('badge.user')}</span>`}</span>
+								<span class="match-score match-${Math.min(Math.floor(r.score), 6)}">${r.score % 1 === 0 ? r.score : '💬'}/${r.maxScore}</span>
+							</div>
+							<div class="result-name">${f.name}</div>
+							<div class="result-heroes">${t('search.enemy')}: ${enemyDisplay} + ${petDisplay}</div>
+							<div class="result-heroes result-my-heroes">⚔️ Kontra: ${f.my.filter(h => h).map(h => `<span class="my-hero">${h}</span>`).join(', ') || '—'}${f.myPet ? ` + <span class="my-pet">${f.myPet}</span>` : ''}</div>
+							${missingHeroes.length ? `<div class="result-missing">❌ ${t('search.missing')}: ${missingHeroes.join(', ')}</div>` : ''}
+							${commentMatchInfo}
+							${hasExcluded ? `<div class="result-excluded-heroes">🚫 ${t('exclude.has')}: ${exclusionCheck.heroes.join(', ')}</div>` : ''}
+						</div>
+					</div>`;
+			}).join('');
+			
+			$('results-section').innerHTML = html;
+			updateCompareButton();
+		}
+
+        function clearSearch() {
+            for (let i = 1; i <= 8; i++) $(`search-pos${i}`).value = '';
+            $('search-pet').value = '';
+            $('results-section').innerHTML = `<div class="empty-state"><p>${t('search.emptyState')}</p></div>`;
+            document.querySelectorAll('.quick-tag.selected').forEach(t => t.classList.remove('selected'));
+            $('search-counter')?.remove();
+        }
+
 		// =====================================================
 		// WYKLUCZANIE BOHATERÓW
 		// =====================================================
@@ -1768,84 +1764,7 @@
 				setTimeout(() => list.classList.remove('show'), 200);
 			});
 		}
-		
-		function displayResults(results, searchHeroes) {
-			// Reset selekcji przy nowym wyszukiwaniu
-			selectedForCompare = [];
-			
-			if (!results.length) {
-				$('results-section').innerHTML = `<div class="empty-state"><p>${t('search.noResults')}</p></div>`;
-				return;
-			}
-			
-			// Filtruj wyniki według wykluczonych
-			let displayedResults = results;
-			let hiddenCount = 0;
-			
-			if (hideExcludedResults && excludedHeroes.length > 0) {
-				displayedResults = results.filter(r => !isFormationExcluded(r.formation).excluded);
-				hiddenCount = results.length - displayedResults.length;
-			}
-			
-			let html = `<div class="results-header">
-				<h3>${t('search.results')}</h3>
-				<span class="results-count">${t('search.found')}: ${displayedResults.length}${hiddenCount > 0 ? ` <span style="color:#f44336;">(+${hiddenCount} 🚫)</span>` : ''}</span>
-			</div>`;
-			
-			if (!displayedResults.length) {
-				html += `<div class="empty-state"><p>${t('search.noResults')}</p><p style="font-size:0.8rem;color:var(--text-muted);margin-top:10px;">${t('excluded.hiddenInResults', {n: hiddenCount})}</p></div>`;
-				$('results-section').innerHTML = html;
-				updateCompareButton();
-				return;
-			}
-			
-			html += displayedResults.map(r => {
-				const f = r.formation;
-				const enemyDisplay = f.enemy.filter(h => h).map(h => r.matchedHeroes.some(mh => normalize(h) === mh || normalize(h).startsWith(mh)) ? `<span class="matched-hero">${h}</span>` : h).join(', ');
-				const petDisplay = r.petMatched ? `<span class="matched-hero">${f.enemyPet}</span>` : (f.enemyPet || '—');
-				const missingHeroes = searchHeroes.filter(sh => !r.matchedHeroes.includes(sh));
-				
-				// Sprawdź wykluczone (dla trybu "pokaż wszystkie")
-				const exclusionCheck = isFormationExcluded(f);
-				const hasExcluded = !hideExcludedResults && exclusionCheck.excluded;
-				
-				// Info o dopasowaniu w komentarzu
-				const commentMatchInfo = r.commentMatched && r.matchedHeroes.length === 0 && !r.petMatched 
-					? `<div style="font-size:0.7rem;color:var(--accent-gold);margin-top:3px;">💬 ${t('search.foundInComment')}</div>`
-					: '';
-				
-				return `
-					<div class="result-card ${hasExcluded ? 'has-excluded' : ''}" id="result-card-${f.id}">
-						<div class="result-card-checkbox">
-							<input type="checkbox" id="compare-${f.id}" onchange="toggleCompareSelection(${f.id})" title="${t('compare.select')}">
-						</div>
-						<div class="result-card-content" onclick="showFormation(${f.id})">
-							<div class="result-card-header">
-								<span class="result-id">ID: ${f.id}${f.isBase ? '' : ` <span class="badge user-badge">${t('badge.user')}</span>`}</span>
-								<span class="match-score match-${Math.min(Math.floor(r.score), 6)}">${r.score % 1 === 0 ? r.score : '💬'}/${r.maxScore}</span>
-							</div>
-							<div class="result-name">${f.name}</div>
-							<div class="result-heroes">${t('search.enemy')}: ${enemyDisplay} + ${petDisplay}</div>
-							<div class="result-heroes result-my-heroes">⚔️ Kontra: ${f.my.filter(h => h).map(h => `<span class="my-hero">${h}</span>`).join(', ') || '—'}${f.myPet ? ` + <span class="my-pet">${f.myPet}</span>` : ''}</div>
-							${missingHeroes.length ? `<div class="result-missing">❌ ${t('search.missing')}: ${missingHeroes.join(', ')}</div>` : ''}
-							${commentMatchInfo}
-							${hasExcluded ? `<div class="result-excluded-heroes">🚫 ${t('exclude.has')}: ${exclusionCheck.heroes.join(', ')}</div>` : ''}
-						</div>
-					</div>`;
-			}).join('');
-			
-			$('results-section').innerHTML = html;
-			updateCompareButton();
-		}
-        
-        function clearSearch() {
-            for (let i = 1; i <= 8; i++) $(`search-pos${i}`).value = '';
-            $('search-pet').value = '';
-            $('results-section').innerHTML = `<div class="empty-state"><p>${t('search.emptyState')}</p></div>`;
-            document.querySelectorAll('.quick-tag.selected').forEach(t => t.classList.remove('selected'));
-            $('search-counter')?.remove();
-        }
-		
+
 		// HISTORIA WYSZUKIWAŃ
 		function toggleSearchHistory() {
 			const dropdown = $('search-history-dropdown');
@@ -1988,179 +1907,132 @@
 			renderSearchHistory();
 			showToast(t('common.historyCleared'));
 		}
-		
-		// =====================================================
-		// HISTORIA PLANERA WOJNY
-		// =====================================================
 
-		function toggleWarHistory() {
-			const dropdown = $('war-history-dropdown');
-			dropdown.classList.toggle('hidden');
-			
-			if (!dropdown.classList.contains('hidden')) {
-				renderWarHistory();
-				setTimeout(() => {
-					document.addEventListener('click', closeWarHistoryOnClickOutside);
-				}, 10);
-			} else {
-				document.removeEventListener('click', closeWarHistoryOnClickOutside);
-			}
+
+        // ═══════════════════════════════════════════════════════════
+        // TAB: DATABASE — filtry, sortowanie, ulubione, porównywanie, quick select
+        // ═══════════════════════════════════════════════════════════
+
+        // =====================================================
+        // BAZA DANYCH
+        // =====================================================
+        function setDbFilter(filter) {
+            currentDbFilter = filter;
+            document.querySelectorAll('.filter-btn[data-filter]').forEach(b => b.classList.toggle('active', b.dataset.filter === filter));
+            filterDatabase();
+        }
+
+		function setDbSort(sort) {
+			currentDbSort = sort;
+			document.querySelectorAll('.sort-btn[data-sort]').forEach(b => b.classList.toggle('active', b.dataset.sort === sort));
+			filterDatabase();
 		}
 
-		function closeWarHistoryOnClickOutside(e) {
-			const dropdown = $('war-history-dropdown');
-			const wrapper = e.target.closest('.search-history-wrapper');
+		function sortFormations(formations) {
+			const sorted = [...formations];
 			
-			if (!wrapper && !dropdown.classList.contains('hidden')) {
-				dropdown.classList.add('hidden');
-				document.removeEventListener('click', closeWarHistoryOnClickOutside);
+			switch (currentDbSort) {
+				case 'id-asc':
+					sorted.sort((a, b) => a.id - b.id);
+					break;
+				case 'id-desc':
+					sorted.sort((a, b) => b.id - a.id);
+					break;
+				case 'name-asc':
+					sorted.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'pl'));
+					break;
+				case 'name-desc':
+					sorted.sort((a, b) => (b.name || '').localeCompare(a.name || '', 'pl'));
+					break;
+				case 'date-desc':
+					sorted.sort((a, b) => {
+						const dateA = a.dateAdded ? new Date(a.dateAdded) : new Date(0);
+						const dateB = b.dateAdded ? new Date(b.dateAdded) : new Date(0);
+						return dateB - dateA;
+					});
+					break;
+				case 'date-asc':
+					sorted.sort((a, b) => {
+						const dateA = a.dateAdded ? new Date(a.dateAdded) : new Date(0);
+						const dateB = b.dateAdded ? new Date(b.dateAdded) : new Date(0);
+						return dateA - dateB;
+					});
+					break;
 			}
+			
+			return sorted;
 		}
 
-		function saveWarToHistory() {
-			const enemies = [];
-			let hasAnyData = false;
+		function filterDatabase() {
+			const searchTerm = normalize($('db-search')?.value || '');
+			let formations = allFormations;
 			
-			for (let e = 1; e <= 3; e++) {
-				const enemy = { heroes: [], pet: '' };
-				for (let h = 1; h <= 8; h++) {
-					const val = $(`war-e${e}-h${h}`)?.value.trim() || '';
-					enemy.heroes.push(val); // Zachowaj pozycję (nawet puste)
-					if (val) hasAnyData = true;
-				}
-				enemy.pet = $(`war-e${e}-pet`)?.value.trim() || '';
-				if (enemy.pet) hasAnyData = true;
-				enemies.push(enemy);
+			if (currentDbFilter === 'base') formations = formations.filter(f => f.isBase);
+			else if (currentDbFilter === 'user') formations = formations.filter(f => !f.isBase);
+			else if (currentDbFilter === 'favorites') formations = formations.filter(f => favorites.includes(f.id));
+			
+			if (searchTerm) formations = formations.filter(f => normalize(f.name).includes(searchTerm));
+			
+			// Filtruj według wykluczonych bohaterów
+			let hiddenCount = 0;
+			if (hideExcludedResults && excludedHeroes.length > 0) {
+				const beforeCount = formations.length;
+				formations = formations.filter(f => !isFormationExcluded(f).excluded);
+				hiddenCount = beforeCount - formations.length;
 			}
 			
-			if (!hasAnyData) return;
+			// Sortowanie
+			formations = sortFormations(formations);
 			
-			const entry = {
-				enemies: enemies,
-				timestamp: new Date().toISOString()
-			};
-			
-			// Sprawdź czy takie samo wyszukiwanie już istnieje
-			const existingIndex = warSearchHistory.findIndex(h => {
-				return JSON.stringify(h.enemies) === JSON.stringify(enemies);
-			});
-			
-			if (existingIndex > -1) {
-				warSearchHistory.splice(existingIndex, 1);
+			// Pokaż info o ukrytych
+			let headerInfo = '';
+			if (hiddenCount > 0) {
+				headerInfo = `<div style="text-align:center;font-size:0.75rem;color:#f44336;margin-bottom:10px;">🚫 ${hiddenCount} ${t('excluded.hiddenCountLabel')}</div>`;
 			}
 			
-			warSearchHistory.unshift(entry);
-			
-			// Limit do 15 wpisów
-			if (warSearchHistory.length > 15) {
-				warSearchHistory = warSearchHistory.slice(0, 15);
-			}
-			
-			storage.setJson('souls_war_history', warSearchHistory);
-		}
-
-		function renderWarHistory() {
-			const list = $('war-history-list');
-			
-			if (!warSearchHistory.length) {
-				list.innerHTML = `<div class="search-history-empty">${t('search.historyEmpty')}</div>`;
-				return;
-			}
-			
-			list.innerHTML = warSearchHistory.map((entry, idx) => {
-				const timeAgo = getTimeAgo(new Date(entry.timestamp));
-				
-				// Generuj podgląd 3 składów
-				const enemiesHtml = entry.enemies.map((enemy, eIdx) => {
-					const heroesText = enemy.heroes.filter(h => h).slice(0, 3).join(', ');
-					const moreCount = enemy.heroes.filter(h => h).length - 3;
-					const petText = enemy.pet ? `+ 🐾${enemy.pet}` : '';
-					
-					if (!heroesText && !enemy.pet) return '';
-					
-					return `
-						<div class="war-history-enemy">
-							<strong>W${eIdx + 1}:</strong>
-							<span class="heroes">${heroesText || '—'}${moreCount > 0 ? ` +${moreCount}` : ''}</span>
-							${petText ? `<span class="pet">${petText}</span>` : ''}
-						</div>
-					`;
-				}).filter(h => h).join('');
-				
-				if (!enemiesHtml) return '';
+			$('database-list').innerHTML = headerInfo + (formations.length ? formations.map(f => {
+				const exclusionCheck = isFormationExcluded(f);
+				const hasExcluded = !hideExcludedResults && exclusionCheck.excluded;
 				
 				return `
-					<div class="search-history-item" onclick="loadWarFromHistory(${idx})">
-						<button class="search-history-item-remove" onclick="event.stopPropagation(); removeWarHistoryItem(${idx})" title="${t('common.delete')}">✕</button>
-						<div class="war-history-item-enemies">
-							${enemiesHtml}
-						</div>
-						<div class="search-history-item-time">🕐 ${timeAgo}</div>
+				<div class="db-item ${hasExcluded ? 'has-excluded' : ''}" onclick="showFormation(${f.id})">
+					<div class="db-item-info">
+						<div class="db-item-header"><span class="db-item-id">#${f.id}</span><span class="badge ${f.isBase ? 'base-badge' : 'user-badge'}">${t(f.isBase ? 'badge.base' : 'badge.user')}</span></div>
+						<div class="db-item-name">${f.name}</div>
+						<div class="db-item-details"><div>⚔️ ${f.my.filter(h => h).join(', ') || '—'} + ${f.myPet || '—'}</div><div>👹 ${f.enemy.filter(h => h).join(', ') || '—'} + ${f.enemyPet || '—'}</div></div>
+						${hasExcluded ? `<div style="font-size:0.65rem;color:#f44336;margin-top:3px;">🚫 ${exclusionCheck.heroes.join(', ')}</div>` : ''}
 					</div>
-				`;
-			}).filter(h => h).join('');
-			
-			if (!list.innerHTML.trim()) {
-				list.innerHTML = `<div class="search-history-empty">${t('search.historyEmpty')}</div>`;
-			}
+					<div class="db-item-date">${formatDate(f.dateAdded) ? `📅 ${formatDate(f.dateAdded)}` : ''}</div>
+					<div class="db-item-actions">
+						<button class="btn btn-small ${isFavorite(f.id) ? 'btn-favorite-active' : ''}" onclick="toggleFavorite(${f.id}, event)">${isFavorite(f.id) ? '⭐' : '☆'}</button>
+						<button class="btn btn-small" onclick="event.stopPropagation(); showFormation(${f.id})">👁️</button>
+						${isAdmin ? `<button class="btn btn-small btn-admin" onclick="event.stopPropagation(); openEditModal(${f.id})">✏️</button>` : ''}
+						${isAdmin ? `<button class="btn btn-small btn-danger" onclick="event.stopPropagation(); deleteFormation(${f.id})">🗑️</button>` : ''}
+					</div>
+				</div>`
+			}).join('') : `<div class="empty-state"><p>${t('database.noFormations')}</p></div>`);
 		}
 
-		function loadWarFromHistory(idx) {
-			const entry = warSearchHistory[idx];
-			if (!entry) return;
-			
-			// Wypełnij wszystkie pola
-			for (let e = 1; e <= 3; e++) {
-				const enemy = entry.enemies[e - 1];
-				if (!enemy) continue;
-				
-				for (let h = 1; h <= 8; h++) {
-					const el = $(`war-e${e}-h${h}`);
-					if (el) {
-						el.value = enemy.heroes[h - 1] || '';
-						updateInputHeroColor(el);
-					}
-				}
-				
-				const petEl = $(`war-e${e}-pet`);
-				if (petEl) {
-					petEl.value = enemy.pet || '';
-					updateInputHeroColor(petEl, true);
-				}
-			}
-			
-			updateWarTagsSelection();
-			
-			// Zamknij dropdown
-			$('war-history-dropdown').classList.add('hidden');
-			document.removeEventListener('click', closeWarHistoryOnClickOutside);
-			
-			// Aktualizuj info
-			updateWarAutosaveInfo();
-			
-			const timeAgo = getTimeAgo(new Date(entry.timestamp));
-			showToast(`📜 ${t('search.loadedFromHistory')} (${timeAgo})`);
-		}
+        // =====================================================
+        // ULUBIONE
+        // =====================================================
+        
+        const isFavorite = id => favorites.includes(id);
 
-		function removeWarHistoryItem(idx) {
-			warSearchHistory.splice(idx, 1);
-			storage.setJson('souls_war_history', warSearchHistory);
-			renderWarHistory();
-			showToast(t('common.formationDeleted'));
-		}
+        function toggleFavorite(id, event) {
+            event?.stopPropagation();
+            const idx = favorites.indexOf(id);
+            if (idx > -1) favorites.splice(idx, 1);
+            else favorites.push(id);
+            storage.setJson('souls_favorites', favorites);
+            showToast(t(idx > -1 ? 'common.removedFromFavorites' : 'common.addedToFavorites'));
+            filterDatabase();
+        }
 
-		function clearWarHistory() {
-			if (!confirm(t('war.historyConfirmClear'))) return;
-			
-			warSearchHistory = [];
-			storage.setJson('souls_war_history', warSearchHistory);
-			renderWarHistory();
-			showToast(t('common.historyCleared'));
-		}
-		
-		// =====================================================
-		// PORÓWNYWARKA SKŁADÓW
-		// =====================================================
+        function toggleFavoritePreview(id) {
+            toggleFavorite(id);
+            showFormation(id);
+        }
 
 		function toggleCompareSelection(id) {
 			const checkbox = $(`compare-${id}`);
@@ -2382,285 +2254,7 @@
 			
 			return `<div class="battle-pet filled ${diffClass}"><span class="pet-icon">🐾</span><span>${petName}</span></div>`;
 		}
-        
-        // =====================================================
-        // FORMULARZ DODAWANIA
-        // =====================================================
-        
-        function addTagToActiveField(value, type) {
-            if (!activeAddField) { showToast(t('search.clickFieldFirst'), true); return; }
-            
-            const input = $(activeAddField);
-            if (!input) return;
-            
-            const isPetField = activeAddField.includes('Pet');
-            const isHeroTag = !pets.includes(value);
-            
-            if (isPetField && isHeroTag) { showToast(t('search.fieldIsPet'), true); return; }
-            if (!isPetField && !isHeroTag) { showToast(t('search.selectPetField'), true); return; }
-            
-            const isMySection = activeAddField.includes('add-my');
-            const sectionFields = isPetField ? [isMySection ? 'add-myPet' : 'add-enemyPet'] : 
-                (isMySection ? [1,2,3,4,5,6,7,8].map(i => `add-my${i}`) : [1,2,3,4,5,6,7,8].map(i => `add-enemy${i}`));
-            
-            for (const fieldId of sectionFields) {
-                const field = $(fieldId);
-                if (field?.value.trim().toLowerCase() === value.toLowerCase()) {
-                    field.value = '';
-                    setValidation(field, null);
-                    updateAddFormTagsSelection();
-                    return;
-                }
-            }
-            
-            input.value = value;
-            setValidation(input, true);
-            updateAddFormTagsSelection();
-			
-			    // 🆕 AUTO-PRZESKAKIWANIE po kliknięciu taga
-				if (activeAddField) {
-					const nextFieldId = getNextEmptyField(activeAddField);
-					if (nextFieldId) {
-						setTimeout(() => {
-							const nextField = $(nextFieldId);
-							if (nextField) {
-								nextField.focus();
-								activeAddField = nextFieldId;
-								// Aktualizuj indicator
-								const indicator = $('active-field-indicator');
-								const nameEl = $('active-field-name');
-								if (indicator && nameEl) {
-									const fieldId = nextFieldId.replace('add-', '');
-									let fieldName = fieldId;
-									if (fieldId.startsWith('enemy')) {
-										const num = fieldId.replace('enemy', '').replace('Pet', '');
-										fieldName = fieldId.includes('Pet') ? t('fields.enemyPet') : `${t('fields.enemy')} ${num}`;
-									} else if (fieldId.startsWith('my')) {
-										const num = fieldId.replace('my', '').replace('Pet', '');
-										fieldName = fieldId.includes('Pet') ? t('fields.yourPet') : `${t('fields.your')} ${num}`;
-									}
-									nameEl.textContent = fieldName;
-								}
-							}
-						}, 50);
-					}
-				}
-        }
-        
-        function updateAddFormTagsSelection() {
-            const isMySection = activeAddField ? activeAddField.includes('add-my') : true;
-            const activeValues = [];
-            
-            const prefix = isMySection ? 'add-my' : 'add-enemy';
-            for (let i = 1; i <= 8; i++) {
-                const val = $(`${prefix}${i}`)?.value.trim().toLowerCase();
-                if (val) activeValues.push(val);
-            }
-            const pet = $(`${prefix}Pet`)?.value.trim().toLowerCase();
-            if (pet) activeValues.push(pet);
-            
-            document.querySelectorAll('#add-form-tags-container .quick-tag').forEach(tag => {
-                tag.classList.toggle('selected', activeValues.includes(tag.textContent.toLowerCase()));
-            });
-            
-            updateAddFormCounter();
-        }
-        
-        function updateAddFormCounter() {
-            // Liczymy tylko wypełnione pola (max 5 heroes + 1 pet = 6 na każdą stronę)
-            let myHeroes = 0, myPet = 0, enemyHeroes = 0, enemyPet = 0;
-            
-            for (let i = 1; i <= 8; i++) {
-                if ($(`add-my${i}`)?.value.trim()) myHeroes++;
-                if ($(`add-enemy${i}`)?.value.trim()) enemyHeroes++;
-            }
-            if ($('add-myPet')?.value.trim()) myPet = 1;
-            if ($('add-enemyPet')?.value.trim()) enemyPet = 1;
-            
-            const myTotal = Math.min(myHeroes, 5) + myPet; // Max 5 bohaterów + 1 pet
-            const enemyTotal = Math.min(enemyHeroes, 5) + enemyPet;
-            
-            let counter = $('add-form-counter');
-            if (myHeroes > 0 || enemyHeroes > 0 || myPet || enemyPet) {
-                if (!counter) {
-                    counter = document.createElement('div');
-                    counter.id = 'add-form-counter';
-                    counter.className = 'search-counter';
-                    counter.style.cssText = 'display:block;width:100%;margin-bottom:15px;';
-                    $('add-form-tags-container')?.parentNode.insertBefore(counter, $('add-form-tags-container'));
-                }
-                const yourLabel = t('add.yourTeam');
-                const enemyLabel = t('fields.enemy');
-                counter.innerHTML = `⚔️ ${yourLabel}: <strong>${myTotal}</strong>/6 &nbsp;│&nbsp; 👹 ${enemyLabel}: <strong>${enemyTotal}</strong>/6`;
-            } else counter?.remove();
-        }
-        
-		async function saveFormation() {
-			if (!isOnline) { showToast(t('common.noConnection'), true); return; }
-			
-			let name = $('add-name').value.trim();
-			
-			const my = getFieldValues('add-my', 8);
-			const enemy = getFieldValues('add-enemy', 8);
-			const myPet = $('add-myPet').value.trim();
-			const enemyPet = $('add-enemyPet').value.trim();
-			
-			if (!my.filter(h => h).length && !enemy.filter(h => h).length) { 
-				showToast(t('add.addAtLeastOne'), true); 
-				return; 
-			}
-			
-			const allHeroNames = heroes.map(h => h.name.toLowerCase());
-			const invalidHeroes = [...my, ...enemy].filter(h => h && !allHeroNames.includes(h.toLowerCase()));
-			if (invalidHeroes.length) { 
-				showToast(`${t('add.unknownHeroes')}: ${invalidHeroes.slice(0, 3).join(', ')}`, true); 
-				return; 
-			}
-			
-			const allPetNames = pets.map(p => getPetName(p).toLowerCase());
-			const invalidPets = [myPet, enemyPet].filter(p => p && !allPetNames.includes(p.toLowerCase()));
-			if (invalidPets.length) { 
-				showToast(`${t('add.unknownPets')}: ${invalidPets.join(', ')}`, true); 
-				return; 
-			}
-			
-			// 🔍 SPRAWDŹ DUPLIKATY
-			const existingDuplicate = checkForExactDuplicate(my, myPet, enemy, enemyPet);
-			if (existingDuplicate) {
-				showDuplicateWarning(existingDuplicate, { name, my, myPet, enemy, enemyPet });
-				return;
-			}
-			
-			// Kontynuuj zapis
-			await performSaveFormation(name, my, myPet, enemy, enemyPet);
-		}
 
-		async function performSaveFormation(name, my, myPet, enemy, enemyPet) {
-			// Auto-nazwa jeśli pusta
-			if (!name) {
-				const now = new Date();
-				name = now.toLocaleString('pl-PL', { 
-					day: '2-digit', 
-					month: '2-digit', 
-					year: 'numeric',
-					hour: '2-digit',
-					minute: '2-digit'
-				}).replace(',', '');
-			}
-			
-			const newId = allFormations.length ? Math.max(...allFormations.map(f => f.id)) + 1 : 1;
-			const isBase = isAdmin && $('add-isBase')?.checked || false;
-			
-			try {
-				await formationsRef.child(String(newId)).set({
-					id: newId, 
-					name, 
-					my, 
-					myPet, 
-					enemy, 
-					enemyPet,
-					comment: $('add-comment').value.trim(),
-					isBase: isBase,
-					dateAdded: new Date().toISOString()
-				});
-				showToast(`${t('add.saved')} #${newId}${isBase ? ' (BAZA)' : ''}!`);
-				clearAddForm();
-				hideDuplicateWarning();
-			} catch (e) { 
-				showToast(`${t('common.error')}: ${e.message}`, true); 
-			}
-		}
-
-		function showDuplicateWarning(existing, newData) {
-			// Usuń stare ostrzeżenie jeśli istnieje
-			hideDuplicateWarning();
-			
-			const warningHtml = `
-				<div class="duplicate-warning" id="duplicate-warning">
-					<h4>⚠️ ${t('duplicates.warningTitle')}</h4>
-					<p>${t('duplicates.warningText')}</p>
-					<div style="background: rgba(0,0,0,0.2); padding: 10px; border-radius: 8px; margin: 10px 0;">
-						<strong>#${existing.id}</strong> - "${existing.name}"
-						${existing.isBase ? '<span style="color: var(--accent-gold);"> 👑 BAZA</span>' : ''}
-					</div>
-					<div class="duplicate-warning-actions">
-						<button class="btn btn-secondary" onclick="hideDuplicateWarning()">
-							❌ ${t('duplicates.cancel')}
-						</button>
-						<button class="btn btn-danger" onclick="forceSaveFormation()">
-							⚠️ ${t('duplicates.saveAnyway')}
-						</button>
-					</div>
-				</div>
-			`;
-			
-			// Zapisz dane do późniejszego użycia
-			window.pendingFormation = newData;
-			
-			// Wstaw ostrzeżenie przed przyciskiem zapisu
-			const saveBtn = document.querySelector('#tab-add .btn-success');
-			if (saveBtn) {
-				saveBtn.insertAdjacentHTML('beforebegin', warningHtml);
-			}
-		}
-
-		function hideDuplicateWarning() {
-			const warning = $('duplicate-warning');
-			if (warning) warning.remove();
-			window.pendingFormation = null;
-		}
-
-		async function forceSaveFormation() {
-			if (!window.pendingFormation) return;
-			
-			const { name, my, myPet, enemy, enemyPet } = window.pendingFormation;
-			await performSaveFormation(name, my, myPet, enemy, enemyPet);
-		}
-		
-		function checkForExactDuplicate(my, myPet, enemy, enemyPet) {
-			const myClean = my.filter(h => h).map(h => h.toLowerCase()).sort();
-			const enemyClean = enemy.filter(h => h).map(h => h.toLowerCase()).sort();
-			const myPetClean = (myPet || '').toLowerCase();
-			const enemyPetClean = (enemyPet || '').toLowerCase();
-			
-			for (const f of allFormations) {
-				const fMyClean = f.my.filter(h => h).map(h => h.toLowerCase()).sort();
-				const fEnemyClean = f.enemy.filter(h => h).map(h => h.toLowerCase()).sort();
-				const fMyPetClean = (f.myPet || '').toLowerCase();
-				const fEnemyPetClean = (f.enemyPet || '').toLowerCase();
-				
-				// Sprawdź czy identyczne
-				const myMatch = myClean.length === fMyClean.length && 
-								myClean.every((h, i) => h === fMyClean[i]);
-				const enemyMatch = enemyClean.length === fEnemyClean.length && 
-								  enemyClean.every((h, i) => h === fEnemyClean[i]);
-				const petsMatch = myPetClean === fMyPetClean && enemyPetClean === fEnemyPetClean;
-				
-				if (myMatch && enemyMatch && petsMatch) {
-					return f; // Znaleziono duplikat
-				}
-			}
-			
-			return null; // Brak duplikatu
-		}
-        
-		function clearAddForm() {
-			$('add-name').value = '';
-			$('add-comment').value = '';
-			for (let i = 1; i <= 8; i++) {
-				[$(`add-my${i}`), $(`add-enemy${i}`)].forEach(el => { if (el) { el.value = ''; setValidation(el, null); } });
-			}
-			[$('add-myPet'), $('add-enemyPet')].forEach(el => { if (el) { el.value = ''; setValidation(el, null); } });
-			// Reset checkbox
-			const isBaseCheckbox = $('add-isBase');
-			if (isBaseCheckbox) isBaseCheckbox.checked = false;
-			updateAddFormTagsSelection();
-		}
-        
-        // =====================================================
-        // QUICK SELECT MODAL
-        // =====================================================
-        
         function openQuickSelect(targetId, label) {
             quickSelectTarget = targetId;
             $('quick-select-target').innerHTML = `${t('quickSelect.selectFor')}: <strong>${label}</strong>`;
@@ -2676,148 +2270,28 @@
             
             $('quick-select-modal').classList.remove('hidden');
         }
-        
+
         function selectQuickItem(value) {
             if (quickSelectTarget) $(quickSelectTarget).value = value;
             closeQuickSelect();
         }
-        
+
         function closeQuickSelect() {
             $('quick-select-modal').classList.add('hidden');
             quickSelectTarget = null;
         }
-        
-        // =====================================================
-        // BAZA DANYCH
-        // =====================================================
-        function setDbFilter(filter) {
-            currentDbFilter = filter;
-            document.querySelectorAll('.filter-btn[data-filter]').forEach(b => b.classList.toggle('active', b.dataset.filter === filter));
-            filterDatabase();
-        }
-		
-		function setDbSort(sort) {
-			currentDbSort = sort;
-			document.querySelectorAll('.sort-btn[data-sort]').forEach(b => b.classList.toggle('active', b.dataset.sort === sort));
-			filterDatabase();
-		}
 
-		function sortFormations(formations) {
-			const sorted = [...formations];
-			
-			switch (currentDbSort) {
-				case 'id-asc':
-					sorted.sort((a, b) => a.id - b.id);
-					break;
-				case 'id-desc':
-					sorted.sort((a, b) => b.id - a.id);
-					break;
-				case 'name-asc':
-					sorted.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'pl'));
-					break;
-				case 'name-desc':
-					sorted.sort((a, b) => (b.name || '').localeCompare(a.name || '', 'pl'));
-					break;
-				case 'date-desc':
-					sorted.sort((a, b) => {
-						const dateA = a.dateAdded ? new Date(a.dateAdded) : new Date(0);
-						const dateB = b.dateAdded ? new Date(b.dateAdded) : new Date(0);
-						return dateB - dateA;
-					});
-					break;
-				case 'date-asc':
-					sorted.sort((a, b) => {
-						const dateA = a.dateAdded ? new Date(a.dateAdded) : new Date(0);
-						const dateB = b.dateAdded ? new Date(b.dateAdded) : new Date(0);
-						return dateA - dateB;
-					});
-					break;
-			}
-			
-			return sorted;
-		}
-        
-		function filterDatabase() {
-			const searchTerm = normalize($('db-search')?.value || '');
-			let formations = allFormations;
-			
-			if (currentDbFilter === 'base') formations = formations.filter(f => f.isBase);
-			else if (currentDbFilter === 'user') formations = formations.filter(f => !f.isBase);
-			else if (currentDbFilter === 'favorites') formations = formations.filter(f => favorites.includes(f.id));
-			
-			if (searchTerm) formations = formations.filter(f => normalize(f.name).includes(searchTerm));
-			
-			// Filtruj według wykluczonych bohaterów
-			let hiddenCount = 0;
-			if (hideExcludedResults && excludedHeroes.length > 0) {
-				const beforeCount = formations.length;
-				formations = formations.filter(f => !isFormationExcluded(f).excluded);
-				hiddenCount = beforeCount - formations.length;
-			}
-			
-			// Sortowanie
-			formations = sortFormations(formations);
-			
-			// Pokaż info o ukrytych
-			let headerInfo = '';
-			if (hiddenCount > 0) {
-				headerInfo = `<div style="text-align:center;font-size:0.75rem;color:#f44336;margin-bottom:10px;">🚫 ${hiddenCount} ${t('excluded.hiddenCountLabel')}</div>`;
-			}
-			
-			$('database-list').innerHTML = headerInfo + (formations.length ? formations.map(f => {
-				const exclusionCheck = isFormationExcluded(f);
-				const hasExcluded = !hideExcludedResults && exclusionCheck.excluded;
-				
-				return `
-				<div class="db-item ${hasExcluded ? 'has-excluded' : ''}" onclick="showFormation(${f.id})">
-					<div class="db-item-info">
-						<div class="db-item-header"><span class="db-item-id">#${f.id}</span><span class="badge ${f.isBase ? 'base-badge' : 'user-badge'}">${t(f.isBase ? 'badge.base' : 'badge.user')}</span></div>
-						<div class="db-item-name">${f.name}</div>
-						<div class="db-item-details"><div>⚔️ ${f.my.filter(h => h).join(', ') || '—'} + ${f.myPet || '—'}</div><div>👹 ${f.enemy.filter(h => h).join(', ') || '—'} + ${f.enemyPet || '—'}</div></div>
-						${hasExcluded ? `<div style="font-size:0.65rem;color:#f44336;margin-top:3px;">🚫 ${exclusionCheck.heroes.join(', ')}</div>` : ''}
-					</div>
-					<div class="db-item-date">${formatDate(f.dateAdded) ? `📅 ${formatDate(f.dateAdded)}` : ''}</div>
-					<div class="db-item-actions">
-						<button class="btn btn-small ${isFavorite(f.id) ? 'btn-favorite-active' : ''}" onclick="toggleFavorite(${f.id}, event)">${isFavorite(f.id) ? '⭐' : '☆'}</button>
-						<button class="btn btn-small" onclick="event.stopPropagation(); showFormation(${f.id})">👁️</button>
-						${isAdmin ? `<button class="btn btn-small btn-admin" onclick="event.stopPropagation(); openEditModal(${f.id})">✏️</button>` : ''}
-						${isAdmin ? `<button class="btn btn-small btn-danger" onclick="event.stopPropagation(); deleteFormation(${f.id})">🗑️</button>` : ''}
-					</div>
-				</div>`
-			}).join('') : `<div class="empty-state"><p>${t('database.noFormations')}</p></div>`);
-		}
-        
-        // =====================================================
-        // ULUBIONE
-        // =====================================================
-        
-        const isFavorite = id => favorites.includes(id);
-        
-        function toggleFavorite(id, event) {
-            event?.stopPropagation();
-            const idx = favorites.indexOf(id);
-            if (idx > -1) favorites.splice(idx, 1);
-            else favorites.push(id);
-            storage.setJson('souls_favorites', favorites);
-            showToast(t(idx > -1 ? 'common.removedFromFavorites' : 'common.addedToFavorites'));
-            filterDatabase();
-        }
-        
-        function toggleFavoritePreview(id) {
-            toggleFavorite(id);
-            showFormation(id);
-        }
-        
-        // =====================================================
-        // PODGLĄD FORMACJI
-        // =====================================================
-        
+
+        // ═══════════════════════════════════════════════════════════
+        // TAB: VIEW — podgląd formacji, nawigacja, edycja, usuwanie
+        // ═══════════════════════════════════════════════════════════
+
         function lookupById() {
             const id = parseInt($('lookup-id').value.trim());
             if (!id || id < 1) { showToast(t('preview.invalidId'), true); return; }
             showFormation(id);
         }
-        
+
 		function showFormation(id) {
 			const f = allFormations.find(x => x.id === id);
 			currentFormation = f;
@@ -2879,11 +2353,7 @@
 				</div>
 				${similarHtml}`;
 		}
-        
-        // =====================================================
-        // OSTATNIO PRZEGLĄDANE
-        // =====================================================
-        
+
         function addToRecentlyViewed(id, name) {
             // Usuń jeśli już jest (przeniesie na początek)
             recentlyViewed = recentlyViewed.filter(item => item.id !== id);
@@ -2902,7 +2372,7 @@
             // Odśwież widok
             renderRecentlyViewed();
         }
-        
+
 		function renderRecentlyViewed() {
 			const container = $('recently-viewed-list');
 			const countEl = $('rv-count');
@@ -2929,7 +2399,7 @@
 				$('rv-toggle-icon')?.classList.add('expanded');
 			}
 		}
-        
+
         function clearRecentlyViewed() {
             if (!confirm(t('preview.confirmClearViewed'))) return;
             recentlyViewed = [];
@@ -2937,7 +2407,7 @@
             renderRecentlyViewed();
             showToast(t('preview.viewedCleared'));
         }
-		
+
 		function toggleRecentlyViewed() {
 			const list = $('recently-viewed-list');
 			const icon = $('rv-toggle-icon');
@@ -2948,7 +2418,7 @@
 			// Zapisz stan
 			localStorage.setItem('souls_rv_expanded', list.classList.contains('show'));
 		}
-        
+
         // PODOBNE FORMACJE
 		function buildSimilarFormations(formation) {
 			const similar = findSimilarFormations(formation);
@@ -2979,7 +2449,7 @@
 				</div>
 			`;
 		}
-        
+
         function findSimilarFormations(formation) {
             const enemyKey = getEnemyKey(formation);
             
@@ -2992,14 +2462,14 @@
                 return enemyKey === otherEnemyKey;
             });
         }
-        
+
         function getEnemyKey(formation) {
             // Tworzymy unikalny klucz dla przeciwnika (sortowane dla spójności)
             const enemyHeroes = formation.enemy.filter(h => h).map(h => h.toLowerCase()).sort();
             const enemyPet = (formation.enemyPet || '').toLowerCase();
             return enemyHeroes.join('|') + '||' + enemyPet;
         }
-        
+
 		function buildFormationNav(currentId) {
 			const idx = navFormationIds.indexOf(currentId);
 			const total = navFormationIds.length;
@@ -3024,7 +2494,7 @@
 				</div>
 			`;
 		}
-		
+
 		function updateFormationNav(currentId) {
 			const total = navFormationIds.length;
 			const idx = navFormationIds.indexOf(currentId);
@@ -3047,7 +2517,7 @@
 				}
 			}
 		}
-				
+
         function navigateFormation(direction) {
             if (navFormationIds.length === 0 || navCurrentIndex === -1) return;
             
@@ -3057,72 +2527,49 @@
             const newId = navFormationIds[newIndex];
             showFormation(newId);
         }
-				
+
         function setNavContext(formationIds) {
             navFormationIds = formationIds || [];
             navCurrentIndex = -1;
         }
 
-        function exportWarPlanAsText() {
-            const combo = window.currentWarCombo;
-            if (!combo || !combo.formations) {
-                showToast(t('war.selectPlanFirst'), true);
-                return;
-            }
+        // Przechowuj aktualne wyniki wojny
+        let currentWarResults = null;
+
+        function renderBattleGrid(arr, isEnemy) {
+            const slot = i => {
+                const name = arr[i] || '';
+                if (!name) return `<div class="battle-slot empty"></div>`;
+                const hero = heroes.find(h => h.name.toLowerCase() === name.toLowerCase());
+                const rc = hero ? `race-${hero.race.toLowerCase()}` : '';
+                return `<div class="battle-slot filled ${rc}"><span class="hero-name">${name}</span></div>`;
+            };
             
-            let text = '';
-            
-            combo.formations.forEach((match, idx) => {
-                const f = match.formation;
-                const myHeroes = f.my || [];
-                const myPet = f.myPet || '';
-                
-                text += `Walka ${idx + 1}\n`;
-                text += formatFormationAsText(myHeroes, myPet);
-                text += '\n';
-            });
-            
-            // Kopiuj do schowka
-            navigator.clipboard.writeText(text.trim()).then(() => {
-                showToast(t('clipboard.formationCopied'));
-            }).catch(() => {
-                const textarea = document.createElement('textarea');
-                textarea.value = text.trim();
-                document.body.appendChild(textarea);
-                textarea.select();
-                document.execCommand('copy');
-                document.body.removeChild(textarea);
-                showToast(t('clipboard.formationCopied'));
-            });
+            return isEnemy ? `<div class="battle-grid"><div class="battle-row">${slot(5)}${slot(6)}${slot(7)}</div><div class="battle-row">${slot(3)}${slot(4)}</div><div class="battle-row">${slot(0)}${slot(1)}${slot(2)}</div></div>` :
+                `<div class="battle-grid"><div class="battle-row">${slot(0)}${slot(1)}${slot(2)}</div><div class="battle-row">${slot(3)}${slot(4)}</div><div class="battle-row">${slot(5)}${slot(6)}${slot(7)}</div></div>`;
         }
-        
-        // Wspólna funkcja formatowania składu jako tekst
-        function formatFormationAsText(heroes, pet) {
-            const row1 = [heroes[0] || 'x', heroes[1] || 'x', heroes[2] || 'x'];
-            const row2 = [heroes[3] || 'x', heroes[4] || 'x'];
-            const row3 = [heroes[5] || 'x', heroes[6] || 'x', heroes[7] || 'x'];
-            
-            const maxLen = Math.max(
-                ...row1.map(h => h.length),
-                ...row2.map(h => h.length),
-                ...row3.map(h => h.length),
-                1
-            );
-            
-            const pad = (str) => str.padEnd(maxLen, ' ');
-            
-            let text = '';
-            text += `${pad(row1[0])}  ${pad(row1[1])}  ${row1[2]}\n`;
-            text += `   ${pad(row2[0])}  ${row2[1]}\n`;
-            text += `${pad(row3[0])}  ${pad(row3[1])}  ${row3[2]}\n`;
-            
-            if (pet) {
-                text += `Pet: ${pet}\n`;
-            }
-            
-            return text;
+
+        function renderBattlePet(name) {
+            return name ? `<div class="battle-pet filled"><span class="pet-icon">🐾</span><span>${name}</span></div>` :
+                `<div class="battle-pet empty"><span class="pet-icon">🐾</span><span>${t('preview.noPet')}</span></div>`;
         }
-		
+
+		function copyFormationLink(id) {
+			const url = `${window.location.origin}${window.location.pathname}?formation=${id}`;
+			navigator.clipboard.writeText(url).then(() => {
+				showToast(t('clipboard.linkCopied'));
+			}).catch(() => {
+				// Fallback dla starszych przeglądarek
+				const input = document.createElement('input');
+				input.value = url;
+				document.body.appendChild(input);
+				input.select();
+				document.execCommand('copy');
+				document.body.removeChild(input);
+				showToast(t('clipboard.linkCopied'));
+			});
+		}
+
 		function exportSingleFormationAsText() {
 			const f = currentFormation;
 			if (!f) {
@@ -3148,56 +2595,7 @@
 				showToast('📋 Skład skopiowany!');
 			});
 		}
-        
-        function collectWarPlanData() {
-            // Zbierz dane o wrogach z inputów
-            const battles = [];
-            
-            for (let i = 1; i <= 3; i++) {
-                const enemyHeroes = [];
-                for (let j = 1; j <= 5; j++) {
-                    const val = $(`war-e${i}-h${j}`)?.value.trim();
-                    if (val) enemyHeroes.push(val);
-                }
-                const enemyPet = $(`war-e${i}-pet`)?.value.trim();
-                
-                // Szukaj kontry w wynikach (jeśli jest)
-                const counterData = currentWarResults?.[i-1];
-                
-                battles.push({
-                    enemy: { heroes: enemyHeroes, pet: enemyPet },
-                    counter: counterData ? {
-                        heroes: counterData.formation.my.filter(h => h),
-                        pet: counterData.formation.myPet,
-                        comment: counterData.formation.comment
-                    } : { heroes: [], pet: '', comment: '' }
-                });
-            }
-            
-            return battles;
-        }
-        
-        // Przechowuj aktualne wyniki wojny
-        let currentWarResults = null;
-        
-        function renderBattleGrid(arr, isEnemy) {
-            const slot = i => {
-                const name = arr[i] || '';
-                if (!name) return `<div class="battle-slot empty"></div>`;
-                const hero = heroes.find(h => h.name.toLowerCase() === name.toLowerCase());
-                const rc = hero ? `race-${hero.race.toLowerCase()}` : '';
-                return `<div class="battle-slot filled ${rc}"><span class="hero-name">${name}</span></div>`;
-            };
-            
-            return isEnemy ? `<div class="battle-grid"><div class="battle-row">${slot(5)}${slot(6)}${slot(7)}</div><div class="battle-row">${slot(3)}${slot(4)}</div><div class="battle-row">${slot(0)}${slot(1)}${slot(2)}</div></div>` :
-                `<div class="battle-grid"><div class="battle-row">${slot(0)}${slot(1)}${slot(2)}</div><div class="battle-row">${slot(3)}${slot(4)}</div><div class="battle-row">${slot(5)}${slot(6)}${slot(7)}</div></div>`;
-        }
-        
-        function renderBattlePet(name) {
-            return name ? `<div class="battle-pet filled"><span class="pet-icon">🐾</span><span>${name}</span></div>` :
-                `<div class="battle-pet empty"><span class="pet-icon">🐾</span><span>${t('preview.noPet')}</span></div>`;
-        }
-        
+
 		// =====================================================
 		// EDYCJA FORMACJI
 		// =====================================================
@@ -3297,7 +2695,7 @@
 				showToast(`${t('common.error')}: ${e.message}`, true);
 			}
 		}
-		
+
         // =====================================================
         // USUWANIE
         // =====================================================
@@ -3312,506 +2710,409 @@
                 showToast(t('common.formationDeleted'));
             } catch (e) { showToast(`${t('common.error')}: ${e.message}`, true); }
         }
-        
-        // =====================================================
-        // ADMIN
-        // =====================================================
-        
-        function headerClick() {
-            headerClickCount++;
-            clearTimeout(headerClickTimer);
-            if (headerClickCount >= 5) {
-                headerClickCount = 0;
-                isAdmin ? showToast(t('admin.alreadyLogged')) : $('admin-modal').classList.remove('hidden');
-            } else headerClickTimer = setTimeout(() => headerClickCount = 0, 2000);
-        }
-        
-        function closeAdminModal() {
-            $('admin-modal').classList.add('hidden');
-            $('admin-password').value = '';
-        }
-        
-		async function tryAdminLogin() {
-			const password = $('admin-password').value;
-			if (!password) {
-				showToast('❌ ' + t('admin.wrongPassword'), true);
-				return;
-			}
-			
-			const hash = await hashPassword(password);
-			
-			if (hash === ADMIN_PASSWORD_HASH) {
-				isAdmin = true;
-				localStorage.setItem('souls_admin', hash);
-				closeAdminModal();
-				enableAdminMode();
-				showToast('🔓 ' + t('admin.loggedIn'));
-			} else {
-				showToast('❌ ' + t('admin.wrongPassword'), true);
-				$('admin-password').value = '';
-			}
-		}
-        
-		function enableAdminMode() {
-			isAdmin = true;
-			$('admin-badge').style.display = 'inline';
-			$('nav-admin').classList.add('show');
-			$('nav-settings').classList.add('show');
-			$('nav-war').classList.add('show');
-			// Pokaż opcję "formacja bazowa" w formularzu dodawania
-			const baseOption = $('add-base-option');
-			if (baseOption) baseOption.style.display = 'block';
-			renderHeroesList();
-			renderPetsList();
-			filterDatabase();
-		}
-        
-		function adminLogout() {
-			isAdmin = false;
-			localStorage.removeItem('souls_admin');
-			$('admin-badge').style.display = 'none';
-			$('nav-admin').classList.remove('show');
-			$('nav-settings').classList.remove('show');
-			$('nav-war').classList.remove('show');
-			// Ukryj opcję "formacja bazowa" w formularzu dodawania
-			const baseOption = $('add-base-option');
-			if (baseOption) baseOption.style.display = 'none';
-			switchTab('search');
-			filterDatabase();
-			showToast('🚪 ' + t('admin.loggedOut'));
-		}
-        
-        function renderHeroesList() {
-            $('heroes-count').textContent = heroes.length;
-            const byRace = {};
-            heroes.forEach(h => { (byRace[h.race] = byRace[h.race] || []).push(h); });
-            
-            $('heroes-list').innerHTML = Object.keys(byRace).sort().map(r =>
-                `<div style="font-size:0.7rem;color:var(--accent-gold);margin:10px 0 5px;border-bottom:1px solid var(--border);padding-bottom:3px;">${r} (${byRace[r].length})</div>` +
-                byRace[r].map(h => `<div class="entity-item"><span class="entity-name">${h.name}</span><button class="btn btn-danger btn-small" onclick="deleteHero('${h.name}')">🗑️</button></div>`).join('')
-            ).join('') || `<p style="color:var(--text-muted);text-align:center;">${t('database.noFormations')}</p>`;
-        }
-        
-        function renderPetsList() {
-            $('pets-count').textContent = pets.length;
-            $('pets-list').innerHTML = pets.map(p => `<div class="entity-item"><span class="entity-name">🐾 ${p}</span><button class="btn btn-danger btn-small" onclick="deletePet('${p}')">🗑️</button></div>`).join('') ||
-                `<p style="color:var(--text-muted);text-align:center;">${t('database.noFormations')}</p>`;
-        }
-        
-        async function addHero() {
-            const name = $('new-hero-name').value.trim();
-            const race = $('new-hero-race').value;
-            if (!name) { showToast(t('admin.enterHeroName'), true); return; }
-            if (heroes.some(h => h.name.toLowerCase() === name.toLowerCase())) { showToast(t('admin.heroExists'), true); return; }
-            try {
-                await heroesRef.child(name).set({ name, race });
-                $('new-hero-name').value = '';
-                showToast(`${t('admin.heroAdded')}: ${name}`);
-            } catch (e) { showToast(`${t('common.error')}: ${e.message}`, true); }
-        }
-        
-        async function deleteHero(name) {
-            if (!confirm(`${t('admin.confirmDeleteHero')} "${name}"?`)) return;
-            try { await heroesRef.child(name).remove(); showToast(`${t('admin.heroDeleted')}: ${name}`); }
-            catch (e) { showToast(`${t('common.error')}: ${e.message}`, true); }
-        }
-        
-        async function addPet() {
-            const name = $('new-pet-name').value.trim();
-            if (!name) { showToast(t('admin.enterPetName'), true); return; }
-            if (pets.some(p => p.toLowerCase() === name.toLowerCase())) { showToast(t('admin.petExists'), true); return; }
-            try {
-                await petsRef.child(name).set({ name });
-                $('new-pet-name').value = '';
-                showToast(`${t('admin.petAdded')}: ${name}`);
-            } catch (e) { showToast(`${t('common.error')}: ${e.message}`, true); }
-        }
-        
-        async function deletePet(name) {
-            if (!confirm(`${t('admin.confirmDeletePet')} "${name}"?`)) return;
-            try { await petsRef.child(name).remove(); showToast(`${t('admin.heroDeleted')}: ${name}`); }
-            catch (e) { showToast(`${t('common.error')}: ${e.message}`, true); }
-        }
-		
-		// ========== SKANER DUPLIKATÓW ==========
 
-		function scanDuplicates() {
-			const duplicates = findDuplicates();
-			renderDuplicatesModal(duplicates);
-			$('duplicates-modal').classList.remove('hidden');
-		}
 
-		function closeDuplicatesModal() {
-			$('duplicates-modal').classList.add('hidden');
-		}
+        // ═══════════════════════════════════════════════════════════
+        // TAB: ADD — formularz, duplikaty, layout preferencje
+        // ═══════════════════════════════════════════════════════════
 
-		function findDuplicates() {
-			const results = {
-				identical: [],      // 5/5 enemy + 5/5 my + oba pety
-				almostIdentical: [] // 5/5 enemy + 5/5 my (pety mogą się różnić)
-			};
-			
-			const formations = allFormations;
-			
-			for (let i = 0; i < formations.length; i++) {
-				for (let j = i + 1; j < formations.length; j++) {
-					const a = formations[i];
-					const b = formations[j];
-					
-					const similarity = compareFormations(a, b);
-					
-					if (similarity.type === 'identical') {
-						addToGroup(results.identical, a, b, similarity);
-					} else if (similarity.type === 'almostIdentical') {
-						addToGroup(results.almostIdentical, a, b, similarity);
-					}
-				}
-			}
-			
-			return results;
-		}
-
-		function compareFormations(a, b) {
-			// Porównaj enemy
-			const enemyA = a.enemy.filter(h => h).map(h => h.toLowerCase()).sort();
-			const enemyB = b.enemy.filter(h => h).map(h => h.toLowerCase()).sort();
-			const enemyMatch = enemyA.length === enemyB.length && enemyA.every((h, i) => h === enemyB[i]);
-			
-			// Porównaj my
-			const myA = a.my.filter(h => h).map(h => h.toLowerCase()).sort();
-			const myB = b.my.filter(h => h).map(h => h.toLowerCase()).sort();
-			const myMatch = myA.length === myB.length && myA.every((h, i) => h === myB[i]);
-			
-			// Porównaj pety
-			const enemyPetSame = (a.enemyPet || '').toLowerCase() === (b.enemyPet || '').toLowerCase();
-			const myPetSame = (a.myPet || '').toLowerCase() === (b.myPet || '').toLowerCase();
-			
-			// Określ typ
-			if (enemyMatch && myMatch) {
-				if (enemyPetSame && myPetSame) {
-					return { type: 'identical' };
-				}
-				return { type: 'almostIdentical' };
-			}
-			
-			return { type: 'none' };
-		}
-
-		function addToGroup(groups, a, b, similarity) {
-			// Szukaj istniejącej grupy zawierającej a lub b
-			let foundGroup = null;
-			for (const group of groups) {
-				if (group.formations.some(f => f.id === a.id || f.id === b.id)) {
-					foundGroup = group;
-					break;
-				}
-			}
-			
-			if (foundGroup) {
-				if (!foundGroup.formations.some(f => f.id === a.id)) foundGroup.formations.push(a);
-				if (!foundGroup.formations.some(f => f.id === b.id)) foundGroup.formations.push(b);
-			} else {
-				groups.push({
-					formations: [a, b],
-					similarity: similarity
-				});
-			}
-		}
-
-		function renderDuplicatesModal(duplicates) {
-			const totalGroups = duplicates.identical.length + duplicates.almostIdentical.length;
-			
-			if (totalGroups === 0) {
-				$('duplicates-results').innerHTML = `
-					<div class="duplicates-empty">
-						<div class="duplicates-empty-icon">✅</div>
-						<h3>${t('duplicates.noDuplicates')}</h3>
-						<p style="color: var(--text-muted);">${t('duplicates.allUnique')}</p>
-					</div>
-				`;
-				return;
-			}
-			
-			let html = `
-				<div class="duplicates-summary">
-					<strong>${t('duplicates.found')}: ${totalGroups} ${t('duplicates.groups')}</strong><br>
-					<span style="font-size: 0.8rem; color: var(--text-muted);">
-						🔴 ${t('duplicates.identical')}: ${duplicates.identical.length} | 
-						🟠 ${t('duplicates.almostIdentical')}: ${duplicates.almostIdentical.length}
-					</span>
-				</div>
-			`;
-			
-			if (duplicates.identical.length > 0) {
-				html += `<h4 style="color: #d32f2f; margin: 20px 0 10px;">🔴 ${t('duplicates.identical')} (100%)</h4>`;
-				html += renderDuplicateGroups(duplicates.identical, 'identical');
-			}
-			
-			if (duplicates.almostIdentical.length > 0) {
-				html += `<h4 style="color: #f57c00; margin: 20px 0 10px;">🟠 ${t('duplicates.almostIdentical')}</h4>`;
-				html += renderDuplicateGroups(duplicates.almostIdentical, 'almostIdentical');
-			}
-			
-			$('duplicates-results').innerHTML = html;
-		}
-
-		function renderDuplicateGroups(groups, type) {
-			return groups.map((group, groupIndex) => {
-				const first = group.formations[0];
-				const enemyList = first.enemy.filter(h => h).join(', ') || '—';
-				const myList = first.my.filter(h => h).join(', ') || '—';
-				
-				return `
-					<div class="duplicate-group ${type}">
-						<div class="duplicate-group-header">
-							<strong>👹 ${t('duplicates.enemy')}:</strong> ${enemyList} ${first.enemyPet ? '+ ' + first.enemyPet : ''}<br>
-							<strong>⚔️ ${t('duplicates.counter')}:</strong> ${myList} ${first.myPet ? '+ ' + first.myPet : ''}
-						</div>
-						${group.formations.map(f => `
-							<div class="duplicate-item">
-								<div class="duplicate-item-info">
-									<span class="duplicate-item-name">${f.name}</span>
-									<span class="duplicate-item-id">#${f.id} ${f.isBase ? '👑 BAZA' : ''}</span>
-								</div>
-								<div class="duplicate-item-actions">
-									<button class="btn btn-small" onclick="openDuplicatePreview(${f.id})" title="${t('duplicates.preview')}">👁️</button>
-									<button class="btn btn-small btn-danger" onclick="deleteDuplicateFormation(${f.id})" title="${t('common.delete')}">🗑️</button>
-								</div>
-							</div>
-						`).join('')}
-					</div>
-				`;
-			}).join('');
-		}
-		
-		function openDuplicatePreview(id) {
-			const f = allFormations.find(x => x.id === id);
-			if (!f) return;
-			
-			$('dup-preview-title').innerHTML = `👁️ #${f.id} - ${f.name} ${f.isBase ? '<span style="color: var(--accent-gold);">👑 BAZA</span>' : ''}`;
-			
-			$('dup-preview-content').innerHTML = `
-				<div class="formation-preview" style="margin-top: 15px;">
-					<div class="battle-section enemy">
-						<div class="battle-title enemy-title"><span class="title-icon">👹</span>${t('preview.enemy')}</div>
-						<div style="text-align:center">${renderBattlePet(f.enemyPet)}</div>
-						${renderBattleGrid(f.enemy, true)}
-					</div>
-					
-					<div class="vs-separator"><span class="vs-badge">VS</span></div>
-					
-					<div class="battle-section player">
-						${renderBattleGrid(f.my, false)}
-						<div style="text-align:center">${renderBattlePet(f.myPet)}</div>
-						<div class="battle-title player-title"><span class="title-icon">⚔️</span>${t('preview.yourTeam')}</div>
-					</div>
-					
-					${f.comment ? `<div class="preview-comment"><span class="comment-icon">💬</span>${f.comment}</div>` : ''}
-				</div>
-				
-				<div style="margin-top: 20px; display: flex; gap: 10px; justify-content: center;">
-					<button class="btn btn-secondary" onclick="closeDuplicatePreviewModal()">✖️ ${t('common.close')}</button>
-					<button class="btn btn-danger" onclick="closeDuplicatePreviewModal(); deleteDuplicateFormation(${f.id});">🗑️ ${t('common.delete')}</button>
-				</div>
-			`;
-			
-			$('duplicate-preview-modal').classList.remove('hidden');
-		}
-
-		function closeDuplicatePreviewModal() {
-			$('duplicate-preview-modal').classList.add('hidden');
-		}
-
-		async function deleteDuplicateFormation(id) {
-			const f = allFormations.find(x => x.id === id);
-			if (!f) return;
-			
-			if (!confirm(`${t('duplicates.confirmDelete')} #${id} "${f.name}"?`)) return;
-			
-			try {
-				await formationsRef.child(String(id)).remove();
-				showToast(`🗑️ ${t('database.deleted')} #${id}`);
-				// Odśwież wyniki skanera
-				scanDuplicates();
-			} catch (e) {
-				showToast(`${t('common.error')}: ${e.message}`, true);
-			}
-		}
-
-		// ========== PODWÓJNE POTWIERDZENIE USUWANIA WSZYSTKICH ==========
-
-		function confirmDeleteAllUserFormations() {
-			const userFormations = allFormations.filter(f => !f.isBase);
-			
-			if (userFormations.length === 0) {
-				showToast(t('admin.noUserFormations') || 'Brak formacji użytkowników do usunięcia!');
-				return;
-			}
-			
-			// Pierwsze potwierdzenie
-			if (!confirm(`⚠️ ${t('admin.deleteAllConfirm1')} ${userFormations.length} ${t('admin.formations')}?`)) return;
-			
-			// Drugie potwierdzenie - wpisanie liczby
-			const confirmNumber = prompt(`${t('admin.deleteAllConfirm2')} ${userFormations.length}:`);
-			
-			if (confirmNumber !== String(userFormations.length)) {
-				showToast('❌ ' + t('admin.deleteAllCancelled'), true);
-				return;
-			}
-			
-			// Wykonaj usunięcie
-			deleteAllUserFormationsConfirmed(userFormations);
-		}
-
-		async function deleteAllUserFormationsConfirmed(userFormations) {
-			if (!isOnline) { showToast(t('common.noConnection'), true); return; }
-			
-			try {
-				for (const f of userFormations) {
-					await formationsRef.child(String(f.id)).remove();
-				}
-				showToast(`✅ ${t('admin.deletedAll')} ${userFormations.length} ${t('admin.formations')}!`);
-			} catch (e) {
-				showToast(`${t('common.error')}: ${e.message}`, true);
-			}
-		}
-        
-        // =====================================================
-        // IMPORT / EKSPORT
-        // =====================================================
-		function exportToCSV() {
-			const headers = [
-				'Lp', 'Nazwa',
-				'moja1', 'moja2', 'moja3', 'moja4', 'moja5', 'moja6', 'moja7', 'moja8', 'mojPet',
-				'enemy1', 'enemy2', 'enemy3', 'enemy4', 'enemy5', 'enemy6', 'enemy7', 'enemy8', 'enemyPet',
-				'Komentarz', 'CzyBazowa'
-			];
-			
-			const escapeCSV = (val) => {
-				const str = String(val || '');
-				// Jeśli zawiera przecinek, średnik, cudzysłów lub nową linię - owijamy w cudzysłowy
-				if (str.includes(';') || str.includes(',') || str.includes('"') || str.includes('\n')) {
-					return `"${str.replace(/"/g, '""')}"`;
-				}
-				return str;
-			};
-			
-			const rows = allFormations.map(f => {
-				// Upewnij się że my i enemy mają 8 elementów
-				const myArr = f.my || [];
-				const enemyArr = f.enemy || [];
-				while (myArr.length < 8) myArr.push('');
-				while (enemyArr.length < 8) enemyArr.push('');
-				
-				return [
-					f.id,
-					escapeCSV(f.name),
-					...myArr.map(h => escapeCSV(h)),
-					escapeCSV(f.myPet),
-					...enemyArr.map(h => escapeCSV(h)),
-					escapeCSV(f.enemyPet),
-					escapeCSV(f.comment),
-					f.isBase ? '1' : '0'
-				].join(';');
-			});
-			
-			const blob = new Blob(['\ufeff' + [headers.join(';'), ...rows].join('\n')], { type: 'text/csv;charset=utf-8;' });
-			const a = document.createElement('a');
-			a.href = URL.createObjectURL(blob);
-			a.download = `TABELA_${new Date().toISOString().slice(0,10)}.csv`;
-			a.click();
-			showToast(`${t('settings.exported')} ${allFormations.length} ${t('status.formations')}`);
-		}
-        
-		async function importFromCSV(event) {
-			const file = event.target.files[0];
-			if (!file) return;
-			if (!isOnline) { showToast(t('common.noConnection'), true); return; }
-			
-			const reader = new FileReader();
-			reader.onload = async e => {
-				try {
-					const lines = e.target.result.split('\n').filter(l => l.trim());
-					if (lines.length < 2) { showToast('Plik jest pusty lub ma tylko nagłówki', true); return; }
-					
-					const sep = lines[0].includes(';') ? ';' : ',';
-					const headers = parseCSVLine(lines[0], sep).map(h => h.toLowerCase().trim());
-					
-					// Sprawdź czy mamy nowy format (z komentarzem) czy stary
-					const hasComment = headers.includes('komentarz') || headers.length >= 22;
-					
-					let imported = 0, skipped = 0;
-					let maxId = allFormations.length ? Math.max(...allFormations.map(f => f.id)) : 0;
-					const existingIds = allFormations.map(f => f.id);
-					
-					for (let i = 1; i < lines.length; i++) {
-						const vals = parseCSVLine(lines[i], sep);
-						if (vals.length < 20) { skipped++; continue; }
-						
-						// Określ czy pierwsza kolumna to ID
-						const startIdx = vals[0].match(/^\d+$/) ? 1 : 0;
-						
-						// Generuj nowe unikalne ID
-						while (existingIds.includes(++maxId));
-						existingIds.push(maxId);
-						
-						// Parsuj pola
-						const myHeroes = vals.slice(startIdx + 1, startIdx + 9).map(cleanVal);
-						const myPet = cleanVal(vals[startIdx + 9]);
-						const enemyHeroes = vals.slice(startIdx + 10, startIdx + 18).map(cleanVal);
-						const enemyPet = cleanVal(vals[startIdx + 18]);
-						
-						// Komentarz i isBase (jeśli dostępne)
-						let comment = '';
-						let isBase = false;
-						
-						if (hasComment && vals.length >= startIdx + 21) {
-							comment = cleanVal(vals[startIdx + 19]);
-							isBase = cleanVal(vals[startIdx + 20]) === '1';
-						}
-						
-						await formationsRef.child(String(maxId)).set({
-							id: maxId,
-							name: cleanVal(vals[startIdx]) || `Import #${maxId}`,
-							my: myHeroes,
-							myPet: myPet,
-							enemy: enemyHeroes,
-							enemyPet: enemyPet,
-							comment: comment,
-							isBase: isBase,
-							dateAdded: new Date().toISOString()
-						});
-						imported++;
-					}
-					
-					let msg = `${t('settings.imported')} ${imported} ${t('status.formations')}!`;
-					if (skipped > 0) msg += ` (${skipped} pominięto)`;
-					showToast(msg);
-					
-				} catch (e) { 
-					console.error('Import error:', e);
-					showToast(`${t('common.error')}: ${e.message}`, true); 
-				}
-			};
-			reader.readAsText(file);
-			event.target.value = '';
-		}
-        
-        function parseCSVLine(line, sep = ';') {
-            const result = [];
-            let current = '', inQuotes = false;
-            for (const char of line) {
-                if (char === '"') inQuotes = !inQuotes;
-                else if (char === sep && !inQuotes) { result.push(current); current = ''; }
-                else current += char;
+        // Załaduj preferencję przy starcie
+        function loadSectionOrderPreference() {
+            const reversed = storage.getBool('souls_addFormSectionsReversed');
+            const container = $('add-form-sections');
+            if (container && reversed) {
+                container.classList.add('reversed');
             }
-            result.push(current);
-            return result;
         }
-        
+
+        // Zamień kolejność sekcji
+        function swapAddFormSections() {
+            const container = $('add-form-sections');
+            if (!container) return;
+            
+            container.classList.toggle('reversed');
+            
+            // Zapisz preferencję
+            const isReversed = container.classList.contains('reversed');
+            localStorage.setItem('souls_addFormSectionsReversed', isReversed);
+            
+            // Pokaż informację
+            const msg = isReversed 
+                ? t('ordering.yourTeamFirst')
+                : t('ordering.enemyFirst');
+            showToast(msg);
+        }
+
+		// Odwrócenie kolejności rzędów w sekcji przeciwnika
+		function loadEnemyRowsPreference() {
+			// Domyślnie true (6-7-8 na górze), chyba że użytkownik wybrał inaczej
+			const reversed = storage.getBool('souls_enemyRowsReversed', true);
+			const container = $('enemy-rows-container');
+			const btn = $('btn-flip-enemy-rows');
+			if (container && reversed) {
+				container.classList.add('reversed');
+			}
+			if (btn && reversed) {
+				btn.classList.add('active');
+			}
+		}
+
+		function toggleEnemyRowsOrder() {
+			const container = $('enemy-rows-container');
+			const btn = $('btn-flip-enemy-rows');
+			if (!container) return;
+			
+			container.classList.toggle('reversed');
+			btn?.classList.toggle('active');
+			
+			const isReversed = container.classList.contains('reversed');
+			localStorage.setItem('souls_enemyRowsReversed', isReversed);
+			
+			const msg = isReversed 
+				? t('layout.top678')
+				: t('layout.top123');
+			showToast(msg);
+		}
+
+		// Zwraca pola przeciwnika w kolejności wizualnej (uwzględnia odwrócenie rzędów)
+		function getEnemyFieldsInOrder() {
+			const reversed = storage.getBool('souls_enemyRowsReversed', true);
+
+			if (reversed) {
+				// 6-7-8 na górze → kolejność: 6,7,8 → 4,5 → 1,2,3 → Pet
+				return [
+					'add-enemy6', 'add-enemy7', 'add-enemy8',
+					'add-enemy4', 'add-enemy5',
+					'add-enemy1', 'add-enemy2', 'add-enemy3',
+					'add-enemyPet'
+				];
+			} else {
+				// 1-2-3 na górze → standardowa kolejność
+				return FORM_FIELD_CONFIG['add-enemy'].fields;
+			}
+		}
+
+		// Przełączanie układu: obok siebie vs góra-dół
+		function loadFormLayoutPreference() {
+			const stacked = storage.getBool('souls_addFormStacked');
+			const container = $('add-form-sections');
+			const btn = $('btn-layout-toggle');
+			const text = $('layout-toggle-text');
+			if (container && stacked) {
+				container.classList.add('stacked');
+			}
+			if (btn && stacked) {
+				btn.classList.add('active');
+			}
+			if (text) {
+				text.textContent = stacked 
+					? t('layout.sideBySide')
+					: t('layout.stacked');
+			}
+		}
+
+		function toggleFormLayout() {
+			const container = $('add-form-sections');
+			const btn = $('btn-layout-toggle');
+			const text = $('layout-toggle-text');
+			if (!container) return;
+			
+			container.classList.toggle('stacked');
+			btn?.classList.toggle('active');
+			
+			const isStacked = container.classList.contains('stacked');
+			localStorage.setItem('souls_addFormStacked', isStacked);
+			
+			if (text) {
+				text.textContent = isStacked 
+					? t('layout.sideBySide')
+					: t('layout.stacked');
+			}
+			
+			const msg = isStacked 
+				? t('layout.stackedLabel')
+				: t('layout.sideBySideLabel');
+			showToast(msg);
+		}
+
+        function addTagToActiveField(value, type) {
+            if (!activeAddField) { showToast(t('search.clickFieldFirst'), true); return; }
+            
+            const input = $(activeAddField);
+            if (!input) return;
+            
+            const isPetField = activeAddField.includes('Pet');
+            const isHeroTag = !pets.includes(value);
+            
+            if (isPetField && isHeroTag) { showToast(t('search.fieldIsPet'), true); return; }
+            if (!isPetField && !isHeroTag) { showToast(t('search.selectPetField'), true); return; }
+            
+            const isMySection = activeAddField.includes('add-my');
+            const sectionFields = isPetField ? [isMySection ? 'add-myPet' : 'add-enemyPet'] : 
+                (isMySection ? [1,2,3,4,5,6,7,8].map(i => `add-my${i}`) : [1,2,3,4,5,6,7,8].map(i => `add-enemy${i}`));
+            
+            for (const fieldId of sectionFields) {
+                const field = $(fieldId);
+                if (field?.value.trim().toLowerCase() === value.toLowerCase()) {
+                    field.value = '';
+                    setValidation(field, null);
+                    updateAddFormTagsSelection();
+                    return;
+                }
+            }
+            
+            input.value = value;
+            setValidation(input, true);
+            updateAddFormTagsSelection();
+			
+			    // 🆕 AUTO-PRZESKAKIWANIE po kliknięciu taga
+				if (activeAddField) {
+					const nextFieldId = getNextEmptyField(activeAddField);
+					if (nextFieldId) {
+						setTimeout(() => {
+							const nextField = $(nextFieldId);
+							if (nextField) {
+								nextField.focus();
+								activeAddField = nextFieldId;
+								// Aktualizuj indicator
+								const indicator = $('active-field-indicator');
+								const nameEl = $('active-field-name');
+								if (indicator && nameEl) {
+									const fieldId = nextFieldId.replace('add-', '');
+									let fieldName = fieldId;
+									if (fieldId.startsWith('enemy')) {
+										const num = fieldId.replace('enemy', '').replace('Pet', '');
+										fieldName = fieldId.includes('Pet') ? t('fields.enemyPet') : `${t('fields.enemy')} ${num}`;
+									} else if (fieldId.startsWith('my')) {
+										const num = fieldId.replace('my', '').replace('Pet', '');
+										fieldName = fieldId.includes('Pet') ? t('fields.yourPet') : `${t('fields.your')} ${num}`;
+									}
+									nameEl.textContent = fieldName;
+								}
+							}
+						}, 50);
+					}
+				}
+        }
+
+        function updateAddFormTagsSelection() {
+            const isMySection = activeAddField ? activeAddField.includes('add-my') : true;
+            const activeValues = [];
+            
+            const prefix = isMySection ? 'add-my' : 'add-enemy';
+            for (let i = 1; i <= 8; i++) {
+                const val = $(`${prefix}${i}`)?.value.trim().toLowerCase();
+                if (val) activeValues.push(val);
+            }
+            const pet = $(`${prefix}Pet`)?.value.trim().toLowerCase();
+            if (pet) activeValues.push(pet);
+            
+            document.querySelectorAll('#add-form-tags-container .quick-tag').forEach(tag => {
+                tag.classList.toggle('selected', activeValues.includes(tag.textContent.toLowerCase()));
+            });
+            
+            updateAddFormCounter();
+        }
+
+        function updateAddFormCounter() {
+            // Liczymy tylko wypełnione pola (max 5 heroes + 1 pet = 6 na każdą stronę)
+            let myHeroes = 0, myPet = 0, enemyHeroes = 0, enemyPet = 0;
+            
+            for (let i = 1; i <= 8; i++) {
+                if ($(`add-my${i}`)?.value.trim()) myHeroes++;
+                if ($(`add-enemy${i}`)?.value.trim()) enemyHeroes++;
+            }
+            if ($('add-myPet')?.value.trim()) myPet = 1;
+            if ($('add-enemyPet')?.value.trim()) enemyPet = 1;
+            
+            const myTotal = Math.min(myHeroes, 5) + myPet; // Max 5 bohaterów + 1 pet
+            const enemyTotal = Math.min(enemyHeroes, 5) + enemyPet;
+            
+            let counter = $('add-form-counter');
+            if (myHeroes > 0 || enemyHeroes > 0 || myPet || enemyPet) {
+                if (!counter) {
+                    counter = document.createElement('div');
+                    counter.id = 'add-form-counter';
+                    counter.className = 'search-counter';
+                    counter.style.cssText = 'display:block;width:100%;margin-bottom:15px;';
+                    $('add-form-tags-container')?.parentNode.insertBefore(counter, $('add-form-tags-container'));
+                }
+                const yourLabel = t('add.yourTeam');
+                const enemyLabel = t('fields.enemy');
+                counter.innerHTML = `⚔️ ${yourLabel}: <strong>${myTotal}</strong>/6 &nbsp;│&nbsp; 👹 ${enemyLabel}: <strong>${enemyTotal}</strong>/6`;
+            } else counter?.remove();
+        }
+
+		async function saveFormation() {
+			if (!isOnline) { showToast(t('common.noConnection'), true); return; }
+			
+			let name = $('add-name').value.trim();
+			
+			const my = getFieldValues('add-my', 8);
+			const enemy = getFieldValues('add-enemy', 8);
+			const myPet = $('add-myPet').value.trim();
+			const enemyPet = $('add-enemyPet').value.trim();
+			
+			if (!my.filter(h => h).length && !enemy.filter(h => h).length) { 
+				showToast(t('add.addAtLeastOne'), true); 
+				return; 
+			}
+			
+			const allHeroNames = heroes.map(h => h.name.toLowerCase());
+			const invalidHeroes = [...my, ...enemy].filter(h => h && !allHeroNames.includes(h.toLowerCase()));
+			if (invalidHeroes.length) { 
+				showToast(`${t('add.unknownHeroes')}: ${invalidHeroes.slice(0, 3).join(', ')}`, true); 
+				return; 
+			}
+			
+			const allPetNames = pets.map(p => getPetName(p).toLowerCase());
+			const invalidPets = [myPet, enemyPet].filter(p => p && !allPetNames.includes(p.toLowerCase()));
+			if (invalidPets.length) { 
+				showToast(`${t('add.unknownPets')}: ${invalidPets.join(', ')}`, true); 
+				return; 
+			}
+			
+			// 🔍 SPRAWDŹ DUPLIKATY
+			const existingDuplicate = checkForExactDuplicate(my, myPet, enemy, enemyPet);
+			if (existingDuplicate) {
+				showDuplicateWarning(existingDuplicate, { name, my, myPet, enemy, enemyPet });
+				return;
+			}
+			
+			// Kontynuuj zapis
+			await performSaveFormation(name, my, myPet, enemy, enemyPet);
+		}
+
+		async function performSaveFormation(name, my, myPet, enemy, enemyPet) {
+			// Auto-nazwa jeśli pusta
+			if (!name) {
+				const now = new Date();
+				name = now.toLocaleString('pl-PL', { 
+					day: '2-digit', 
+					month: '2-digit', 
+					year: 'numeric',
+					hour: '2-digit',
+					minute: '2-digit'
+				}).replace(',', '');
+			}
+			
+			const newId = allFormations.length ? Math.max(...allFormations.map(f => f.id)) + 1 : 1;
+			const isBase = isAdmin && $('add-isBase')?.checked || false;
+			
+			try {
+				await formationsRef.child(String(newId)).set({
+					id: newId, 
+					name, 
+					my, 
+					myPet, 
+					enemy, 
+					enemyPet,
+					comment: $('add-comment').value.trim(),
+					isBase: isBase,
+					dateAdded: new Date().toISOString()
+				});
+				showToast(`${t('add.saved')} #${newId}${isBase ? ' (BAZA)' : ''}!`);
+				clearAddForm();
+				hideDuplicateWarning();
+			} catch (e) { 
+				showToast(`${t('common.error')}: ${e.message}`, true); 
+			}
+		}
+
+		async function forceSaveFormation() {
+			if (!window.pendingFormation) return;
+			
+			const { name, my, myPet, enemy, enemyPet } = window.pendingFormation;
+			await performSaveFormation(name, my, myPet, enemy, enemyPet);
+		}
+
+		function showDuplicateWarning(existing, newData) {
+			// Usuń stare ostrzeżenie jeśli istnieje
+			hideDuplicateWarning();
+			
+			const warningHtml = `
+				<div class="duplicate-warning" id="duplicate-warning">
+					<h4>⚠️ ${t('duplicates.warningTitle')}</h4>
+					<p>${t('duplicates.warningText')}</p>
+					<div style="background: rgba(0,0,0,0.2); padding: 10px; border-radius: 8px; margin: 10px 0;">
+						<strong>#${existing.id}</strong> - "${existing.name}"
+						${existing.isBase ? '<span style="color: var(--accent-gold);"> 👑 BAZA</span>' : ''}
+					</div>
+					<div class="duplicate-warning-actions">
+						<button class="btn btn-secondary" onclick="hideDuplicateWarning()">
+							❌ ${t('duplicates.cancel')}
+						</button>
+						<button class="btn btn-danger" onclick="forceSaveFormation()">
+							⚠️ ${t('duplicates.saveAnyway')}
+						</button>
+					</div>
+				</div>
+			`;
+			
+			// Zapisz dane do późniejszego użycia
+			window.pendingFormation = newData;
+			
+			// Wstaw ostrzeżenie przed przyciskiem zapisu
+			const saveBtn = document.querySelector('#tab-add .btn-success');
+			if (saveBtn) {
+				saveBtn.insertAdjacentHTML('beforebegin', warningHtml);
+			}
+		}
+
+		function hideDuplicateWarning() {
+			const warning = $('duplicate-warning');
+			if (warning) warning.remove();
+			window.pendingFormation = null;
+		}
+
+		function checkForExactDuplicate(my, myPet, enemy, enemyPet) {
+			const myClean = my.filter(h => h).map(h => h.toLowerCase()).sort();
+			const enemyClean = enemy.filter(h => h).map(h => h.toLowerCase()).sort();
+			const myPetClean = (myPet || '').toLowerCase();
+			const enemyPetClean = (enemyPet || '').toLowerCase();
+			
+			for (const f of allFormations) {
+				const fMyClean = f.my.filter(h => h).map(h => h.toLowerCase()).sort();
+				const fEnemyClean = f.enemy.filter(h => h).map(h => h.toLowerCase()).sort();
+				const fMyPetClean = (f.myPet || '').toLowerCase();
+				const fEnemyPetClean = (f.enemyPet || '').toLowerCase();
+				
+				// Sprawdź czy identyczne
+				const myMatch = myClean.length === fMyClean.length && 
+								myClean.every((h, i) => h === fMyClean[i]);
+				const enemyMatch = enemyClean.length === fEnemyClean.length && 
+								  enemyClean.every((h, i) => h === fEnemyClean[i]);
+				const petsMatch = myPetClean === fMyPetClean && enemyPetClean === fEnemyPetClean;
+				
+				if (myMatch && enemyMatch && petsMatch) {
+					return f; // Znaleziono duplikat
+				}
+			}
+			
+			return null; // Brak duplikatu
+		}
+
+		function clearAddForm() {
+			$('add-name').value = '';
+			$('add-comment').value = '';
+			for (let i = 1; i <= 8; i++) {
+				[$(`add-my${i}`), $(`add-enemy${i}`)].forEach(el => { if (el) { el.value = ''; setValidation(el, null); } });
+			}
+			[$('add-myPet'), $('add-enemyPet')].forEach(el => { if (el) { el.value = ''; setValidation(el, null); } });
+			// Reset checkbox
+			const isBaseCheckbox = $('add-isBase');
+			if (isBaseCheckbox) isBaseCheckbox.checked = false;
+			updateAddFormTagsSelection();
+		}
+
+
+        // ═══════════════════════════════════════════════════════════
+        // TAB: WAR + WAR-PREVIEW — planer wojny, pinned combos, historia
+        // ═══════════════════════════════════════════════════════════
+
         const cleanVal = v => (v || '').replace(/"/g, '').trim();
         const refreshData = () => location.reload();
-        
+
         // =====================================================
         // PLANER WOJNY - 3 SKŁADY
         // =====================================================
@@ -3835,59 +3136,6 @@
 				petRaw: petRaw           // Do wyświetlania
 			};
 		}
-        
-        // Funkcja pomocnicza do matchowania bohaterów z wagą
-        function heroMatchScore(search, target) {
-            if (!search || !target) return 0;
-            if (search === target) return 1.0;  // pełne dopasowanie
-            // Częściowe dopasowanie tylko dla min. 3 znaków
-            if (search.length >= 3 && target.startsWith(search)) return 0.9;
-            if (target.length >= 3 && search.startsWith(target)) return 0.9;
-            return 0;
-        }
-
-        // Wspólny scoring formacji — używany przez searchFormations i findMatchingFormations.
-        // query: { heroes (compact normalized), heroesRaw? (8-slot z pozycjami), pet? (normalized) }
-        // opts.withPositionBonus: +0.3 za każdego bohatera trafionego na tym samym indeksie slotu
-        function scoreFormation(formation, query, opts = {}) {
-            const enemyHeroes = formation.enemy.map(h => h ? normalize(h) : '');
-            const enemyPet = normalize(formation.enemyPet);
-            const withPositionBonus = !!opts.withPositionBonus;
-
-            const matchedHeroes = [];
-            let positionBonus = 0;
-
-            query.heroes.forEach(searchHero => {
-                if (!searchHero) return;
-                let matched = false;
-
-                enemyHeroes.forEach((formationHero, formationIdx) => {
-                    if (!formationHero) return;
-                    if (heroMatchScore(searchHero, formationHero) > 0) {
-                        matched = true;
-                        if (withPositionBonus && query.heroesRaw) {
-                            const rawIdx = query.heroesRaw.findIndex(h => h && normalize(h) === searchHero);
-                            if (rawIdx === formationIdx) positionBonus += 0.3;
-                        }
-                    }
-                });
-
-                if (matched) matchedHeroes.push(searchHero);
-            });
-
-            const petMatched = !!(query.pet && heroMatchScore(query.pet, enemyPet) > 0);
-            const baseScore = matchedHeroes.length + (petMatched ? 1 : 0);
-            const maxScore = query.heroes.length + (query.pet ? 1 : 0);
-
-            return {
-                score: baseScore + positionBonus,
-                baseScore,
-                positionBonus,
-                matchedHeroes,
-                petMatched,
-                maxScore,
-            };
-        }
 
         function findMatchingFormations(enemyTeam, minMatch = 1) {
             const query = {
@@ -3912,7 +3160,7 @@
             });
             return results.sort((a, b) => b.score - a.score);
         }
-        
+
         function countHeroConflicts(formations) {
             const heroCount = {};
             const petCount = {};
@@ -3951,11 +3199,11 @@
                 details: conflicts
             };
         }
-        
+
 		// ===== FILTR PODOBIEŃSTWA =====
 		// DOMYŚLNA WARTOŚĆ SUWAKA PO ZAZNACZENIU CHECKBOX - ZMIEŃ TUTAJ:
 		const SIMILARITY_DEFAULT_VALUE = 60; // Możesz zmienić na 40, 50, 70, 80, 90
-		
+
 		function toggleSimilarityFilter(enabled) {
 			const container = $('similarity-slider-container');
 			const slider = $('war-similarity-threshold');
@@ -3967,7 +3215,7 @@
 				updateSimilarityLabel(SIMILARITY_DEFAULT_VALUE);
 			}
 		}
-		
+
 		function updateSimilarityLabel(value) {
 			const label = $('similarity-value');
 			const hint = $('similarity-hint');
@@ -3978,7 +3226,7 @@
 		// ===== WYKLUCZANIE BOHATERÓW W PLANERZE WOJNY =====
 		let warExcludedHeroes = storage.getJson('souls_war_excluded_heroes', []);
 		let warHideExcluded = storage.getBool('souls_war_hide_excluded', true);
-		
+
 		function initWarExcluded() {
 			renderWarExcludedChips();
 			updateWarExcludedCount();
@@ -3997,7 +3245,7 @@
 				});
 			}
 		}
-		
+
 		function initWarFields() {
 			// Dodaj listenery do wszystkich pól Wojny
 			for (let e = 1; e <= 3; e++) {
@@ -4015,7 +3263,7 @@
 				}
 			}
 		}
-		
+
 		function addWarExcludedHero(heroName) {
 			if (!heroName) return;
 
@@ -4050,7 +3298,7 @@
 			updateWarExcludedCount();
 			showToast(t('war.exclude.cleared'));
 		}
-		
+
 		function renderWarExcludedChips() {
 			const container = $('war-excluded-chips');
 			const emptyMsg = $('war-excluded-empty');
@@ -4068,17 +3316,17 @@
 				</span>
 			`).join('');
 		}
-		
+
 		function updateWarExcludedCount() {
 			const countEl = $('war-excluded-count');
 			if (countEl) countEl.textContent = `(${warExcludedHeroes.length})`;
 		}
-		
+
 		function onWarExcludeSettingChange() {
 			warHideExcluded = $('war-hide-excluded')?.checked ?? true;
 			localStorage.setItem('souls_war_hide_excluded', warHideExcluded);
 		}
-		
+
 		function isWarFormationExcluded(formation) {
 			if (!warExcludedHeroes.length) return { excluded: false, heroes: [] };
 			
@@ -4096,85 +3344,143 @@
 			};
 		}
 
-		// ===== WYKLUCZANIE BOHATERÓW W KREATORZE =====
-		// kreatorExcludedHeroes zdefiniowane wcześniej (przed generateKreatorTags)
-		
-		function initKreatorExcluded() {
-			renderKreatorExcludedChips();
-			updateKreatorExcludedCount();
-			
-			// Obsługa inputa
-			const input = $('kreator-excluded-input');
-			if (input) {
-				input.addEventListener('keydown', (e) => {
-					if (e.key === 'Enter') {
-						e.preventDefault();
-						addKreatorExcludedHero(input.value.trim());
-						input.value = '';
-					}
-				});
-			}
-		}
-		
-		function addKreatorExcludedHero(heroName) {
-			if (!heroName) return;
+        // ===== TAGI DLA WOJNY =====
+        let activeWarField = null;
 
-			const finalName = findCanonicalHeroName(heroName);
+        function addToWar(heroName, event) {
+            // Ctrl+klik = wyklucz bohatera z wyników
+            if (event && event.ctrlKey) {
+                addWarExcludedHero(heroName);
+                return;
+            }
+            
+            // Znajdź wszystkie pola wroga na zakładce Wojna
+            const allFields = [];
+            for (let e = 1; e <= 3; e++) {
+                for (let h = 1; h <= 8; h++) {
+                    allFields.push(`war-e${e}-h${h}`);
+                }
+            }
+            
+            // Sprawdź czy już jest - jeśli tak, usuń (toggle)
+            for (const fieldId of allFields) {
+                const input = $(fieldId);
+                if (input && input.value.trim().toLowerCase() === heroName.toLowerCase()) {
+                    input.value = '';
+                    input.classList.remove('hero-race-dark', 'hero-race-light', 'hero-race-human', 
+                        'hero-race-fire', 'hero-race-elf', 'hero-race-undead');
+                    updateWarTagsSelection();
+                    return;
+                }
+            }
+            
+            // Funkcja wpisująca do pola i przeskakująca dalej
+            function fillFieldAndJump(fieldId) {
+                const input = $(fieldId);
+                if (!input) return false;
+                input.value = heroName;
+                updateInputHeroColor(input, false);
+                updateWarTagsSelection();
+                const nextField = getNextEmptyWarField(fieldId);
+                if (nextField) {
+                    setTimeout(() => {
+                        $(nextField)?.focus();
+                        activeWarField = nextField;
+                    }, 10);
+                }
+                return true;
+            }
+            
+            // Jeśli jest aktywne pole
+            if (activeWarField) {
+                const activeInput = $(activeWarField);
+                // Jeśli aktywne pole jest puste - wpisz tam
+                if (activeInput && !activeInput.value.trim()) {
+                    fillFieldAndJump(activeWarField);
+                    return;
+                }
+                // Jeśli aktywne pole jest zajęte - znajdź następne puste PO nim
+                const nextEmpty = getNextEmptyWarField(activeWarField);
+                if (nextEmpty) {
+                    fillFieldAndJump(nextEmpty);
+                    return;
+                }
+            }
+            
+            // Brak aktywnego pola lub wszystkie po nim zajęte - szukaj od początku
+            for (const fieldId of allFields) {
+                const input = $(fieldId);
+                if (input && !input.value.trim()) {
+                    fillFieldAndJump(fieldId);
+                    return;
+                }
+            }
+            showToast(t('search.allSlotsFull'), true);
+        }
 
-			if (isHeroInList(kreatorExcludedHeroes, finalName)) {
-				showToast(t('kreator.hide.alreadyHidden'), true);
-				return;
-			}
+        function addPetToWar(petName) {
+            const petFields = ['war-e1-pet', 'war-e2-pet', 'war-e3-pet'];
+            
+            // Toggle - jeśli już jest, usuń
+            for (const fieldId of petFields) {
+                const input = $(fieldId);
+                if (input && input.value.trim().toLowerCase() === petName.toLowerCase()) {
+                    input.value = '';
+                    input.classList.remove('hero-race-pet');
+                    updateWarTagsSelection();
+                    return;
+                }
+            }
+            
+            // Dodaj do pierwszego wolnego pola pet
+            for (const fieldId of petFields) {
+                const input = $(fieldId);
+                if (input && !input.value.trim()) {
+                    input.value = petName;
+                    input.classList.add('hero-race-pet');
+                    updateWarTagsSelection();
+                    return;
+                }
+            }
+            showToast('Wszystkie pola Pet są zajęte!', true);
+        }
 
-			kreatorExcludedHeroes.push(finalName);
-			storage.setJson('souls_kreator_excluded_heroes', kreatorExcludedHeroes);
-			renderKreatorExcludedChips();
-			updateKreatorExcludedCount();
-			generateKreatorTags();
-			showToast(t('kreator.hide.hiddenFrom', { name: finalName }));
-		}
+        function getNextEmptyWarField(currentFieldId) {
+            const allFields = [];
+            for (let e = 1; e <= 3; e++) {
+                for (let h = 1; h <= 8; h++) {
+                    allFields.push(`war-e${e}-h${h}`);
+                }
+            }
+            const currentIdx = allFields.indexOf(currentFieldId);
+            for (let i = currentIdx + 1; i < allFields.length; i++) {
+                const input = $(allFields[i]);
+                if (input && !input.value.trim()) return allFields[i];
+            }
+            return null;
+        }
 
-		function removeKreatorExcludedHero(heroName) {
-			const n = normalize(heroName);
-			kreatorExcludedHeroes = kreatorExcludedHeroes.filter(h => normalize(h) !== n);
-			storage.setJson('souls_kreator_excluded_heroes', kreatorExcludedHeroes);
-			renderKreatorExcludedChips();
-			updateKreatorExcludedCount();
-			generateKreatorTags();
-		}
-
-		function clearKreatorExcludedHeroes() {
-			if (!kreatorExcludedHeroes.length) return;
-			if (!confirm(t('kreator.hide.confirmClear'))) return;
-			kreatorExcludedHeroes = [];
-			storage.setJson('souls_kreator_excluded_heroes', kreatorExcludedHeroes);
-			renderKreatorExcludedChips();
-			updateKreatorExcludedCount();
-			generateKreatorTags();
-			showToast(t('kreator.hide.cleared'));
-		}
-		
-		function renderKreatorExcludedChips() {
-			const container = $('kreator-excluded-chips');
-			if (!container) return;
-			
-			if (!kreatorExcludedHeroes.length) {
-				container.innerHTML = `<span id="kreator-excluded-empty" style="color: var(--text-muted); font-size: 0.75rem; font-style: italic; width: 100%; text-align: center;">${t('kreator.hide.empty')}</span>`;
-				return;
-			}
-
-			container.innerHTML = kreatorExcludedHeroes.map(hero => `
-				<span class="excluded-chip" style="display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; background: rgba(244, 67, 54, 0.2); border: 1px solid rgba(244, 67, 54, 0.4); border-radius: 12px; font-size: 0.75rem; color: #f44336;">
-					${hero}
-					<button onclick="removeKreatorExcludedHero('${hero.replace(/'/g, "\\'")}')" style="background: none; border: none; color: #f44336; cursor: pointer; font-size: 0.8rem; padding: 0 2px; opacity: 0.7;" title="${t('common.remove')}">✕</button>
-				</span>
-			`).join('');
-		}
-		
-		function updateKreatorExcludedCount() {
-			const countEl = $('kreator-excluded-count');
-			if (countEl) countEl.textContent = `(${kreatorExcludedHeroes.length})`;
-		}
+        function updateWarTagsSelection() {
+            const container = $('war-quick-tags-container');
+            if (!container) return;
+            
+            // Zbierz wszystkie wartości z pól
+            const values = new Set();
+            for (let e = 1; e <= 3; e++) {
+                for (let h = 1; h <= 8; h++) {
+                    const val = $(`war-e${e}-h${h}`)?.value.trim().toLowerCase();
+                    if (val) values.add(val);
+                }
+                const pet = $(`war-e${e}-pet`)?.value.trim().toLowerCase();
+                if (pet) values.add(pet);
+            }
+            
+            // Zaznacz tagi
+            container.querySelectorAll('.quick-tag').forEach(tag => {
+                const tagValue = tag.textContent.trim().toLowerCase();
+                tag.classList.toggle('selected', values.has(tagValue));
+            });
+        }
 
         function findWarFormations() {
 			// Zapisz do historii
@@ -4305,7 +3611,7 @@
             
             displayWarResults(top, [enemy1, enemy2, enemy3]);
         }
-        
+
 		function displayWarResults(results, enemies) {
 			if (!results.length) {
 				$('war-results-section').innerHTML = `
@@ -4491,10 +3797,6 @@
 			$('war-results-section').innerHTML = html;
 		}
 
-		// =====================================================
-		// PINEZKI - ZAPISYWANIE SKŁADÓW
-		// =====================================================
-		
 		function pinWarCombo(comboIndex) {
 			const combo = window.warResults?.[comboIndex];
 			if (!combo) return;
@@ -4532,7 +3834,7 @@
 			renderPinnedCombos();
 			showToast('📌 Skład przypięty!');
 		}
-		
+
 		// Przenieś wynik z Wojny do Kreatora
 		function copyWarComboToKreator(comboIndex) {
 			const combo = window.warResults?.[comboIndex];
@@ -4588,7 +3890,7 @@
 			
 			showToast('📝 Skład przeniesiony do Kreatora!');
 		}
-		
+
 		// Przenieś aktualnie oglądany skład do Kreatora (z podglądu wojny)
 		function copyCurrentWarComboToKreator() {
 			if (window.currentWarComboIndex !== undefined && window.warResults?.[window.currentWarComboIndex]) {
@@ -4648,7 +3950,7 @@
 			showTab('tab-kreator');
 			showToast('📝 Skład przeniesiony do Kreatora!');
 		}
-		
+
 		// Przypnij aktualnie oglądany skład (z podglądu wojny)
 		function pinCurrentWarCombo() {
 			// Jeśli mamy indeks z warResults, użyj standardowej funkcji
@@ -4697,7 +3999,7 @@
 			renderPinnedCombos();
 			showToast('📌 Skład przypięty!');
 		}
-		
+
 		function unpinCombo(id) {
 			if (!confirm('Czy na pewno chcesz odpiąć ten skład?')) return;
 			
@@ -4707,7 +4009,7 @@
 			renderPinnedCombos();
 			showToast('Skład odpięty');
 		}
-		
+
 		function renderPinnedCombos() {
 			const container = $('pinned-combos-list');
 			const section = $('pinned-combos-section');
@@ -4761,7 +4063,7 @@
 				`;
 			}).join('');
 		}
-		
+
 		function loadPinnedCombo(id) {
 			const pinned = pinnedCombos.find(p => p.id === id);
 			if (!pinned) return;
@@ -4801,7 +4103,7 @@
 			switchTab('war-preview');
 			renderWarPreview();
 		}
-		
+
 		function clearAllPinnedCombos() {
 			if (!confirm('Czy na pewno chcesz usunąć WSZYSTKIE przypięte składy?')) return;
 			
@@ -4810,10 +4112,6 @@
 			renderPinnedCombos();
 			showToast('Wszystkie pinezki usunięte');
 		}
-        
-		// =====================================================
-		// WAR PLANNER - ZAPIS/ODCZYT Z LOCALSTORAGE
-		// =====================================================
 
 		function saveWarPlannerToStorage() {
 			const data = {
@@ -4859,17 +4157,6 @@
 			}
 		}
 
-		function getTimeAgo(date) {
-			const now = new Date();
-			const diff = Math.floor((now - date) / 1000); // sekundy
-			
-			if (diff < 60) return 'przed chwilą';
-			if (diff < 3600) return `${Math.floor(diff / 60)} min temu`;
-			if (diff < 86400) return `${Math.floor(diff / 3600)} godz. temu`;
-			if (diff < 604800) return `${Math.floor(diff / 86400)} dni temu`;
-			return date.toLocaleDateString('pl-PL');
-		}
-
 		function setupWarPlannerAutosave() {
 			// Nasłuchuj zmian we wszystkich polach war planner
 			for (let e = 1; e <= 3; e++) {
@@ -4898,287 +4185,7 @@
 			// Pokaż info o ostatnim zapisie
 			updateWarAutosaveInfo();
 		}
-		
-		// Aktualizuj kolor inputa na podstawie rasy bohatera
-		function updateInputHeroColor(input, isPet = false) {
-			// Usuń wszystkie klasy kolorów
-			input.classList.remove('hero-race-dark', 'hero-race-light', 'hero-race-human', 
-				'hero-race-fire', 'hero-race-elf', 'hero-race-undead', 'hero-race-pet');
-			
-			const value = input.value.trim();
-			if (!value) return;
-			
-			if (isPet) {
-				// Dla petów - zawsze złoty kolor
-				input.classList.add('hero-race-pet');
-				return;
-			}
-			
-			// Znajdź bohatera i jego rasę
-			const hero = heroes.find(h => normalize(h.name) === normalize(value));
-			if (hero && hero.race) {
-				const raceClass = `hero-race-${hero.race.toLowerCase()}`;
-				input.classList.add(raceClass);
-			}
-		}
 
-		// Funkcja debounce - opóźnia wykonanie
-		function debounce(func, wait) {
-			let timeout;
-			return function(...args) {
-				clearTimeout(timeout);
-				timeout = setTimeout(() => func.apply(this, args), wait);
-			};
-		}
-		
-		// =====================================================
-		// KREATOR SKŁADÓW
-		// =====================================================
-		
-		let kreatorCount = 3;
-		let kreatorSaved = storage.getJson('souls_kreator_saved', []);
-		
-		function setKreatorCount(count) {
-			kreatorCount = count;
-			const grid = $('kreator-grid');
-			
-			// Aktualizuj przyciski
-			for (let i = 1; i <= 3; i++) {
-				const btn = $(`kreator-count-${i}`);
-				if (btn) {
-					btn.classList.remove('btn-success');
-					if (i === count) btn.classList.add('btn-success');
-				}
-			}
-			
-			// Pokaż/ukryj sekcje
-			$('kreator-section-1').style.display = 'block';
-			$('kreator-section-2').style.display = count >= 2 ? 'block' : 'none';
-			$('kreator-section-3').style.display = count >= 3 ? 'block' : 'none';
-			
-			// Zmień grid
-			grid.classList.remove('count-1', 'count-2');
-			if (count === 1) grid.classList.add('count-1');
-			if (count === 2) grid.classList.add('count-2');
-		}
-		
-		function getKreatorFormation(idx) {
-			const heroes = [];
-			for (let h = 1; h <= 8; h++) {
-				heroes.push($(`kreator-${idx}-h${h}`)?.value.trim() || '');
-			}
-			const pet = $(`kreator-${idx}-pet`)?.value.trim() || '';
-			return { heroes, pet };
-		}
-		
-		function copyKreatorAsText() {
-			let text = '';
-			let hasContent = false;
-			
-			for (let i = 1; i <= kreatorCount; i++) {
-				const formation = getKreatorFormation(i);
-				const filledHeroes = formation.heroes.filter(h => h);
-				
-				if (filledHeroes.length > 0 || formation.pet) {
-					hasContent = true;
-					if (kreatorCount > 1) {
-						text += `Skład ${i}\n`;
-					}
-					text += formatFormationAsText(formation.heroes, formation.pet);
-					text += '\n';
-				}
-			}
-			
-			if (!hasContent) {
-				showToast('Wpisz przynajmniej jednego bohatera!', true);
-				return;
-			}
-			
-			navigator.clipboard.writeText(text.trim()).then(() => {
-				showToast('📋 Składy skopiowane do schowka!');
-			}).catch(() => {
-				const textarea = document.createElement('textarea');
-				textarea.value = text.trim();
-				document.body.appendChild(textarea);
-				textarea.select();
-				document.execCommand('copy');
-				document.body.removeChild(textarea);
-				showToast('📋 Składy skopiowane do schowka!');
-			});
-		}
-		
-		function saveKreatorToMemory() {
-			const formations = [];
-			let hasContent = false;
-			
-			for (let i = 1; i <= kreatorCount; i++) {
-				const formation = getKreatorFormation(i);
-				if (formation.heroes.some(h => h) || formation.pet) {
-					hasContent = true;
-				}
-				formations.push(formation);
-			}
-			
-			if (!hasContent) {
-				showToast('Wpisz przynajmniej jednego bohatera!', true);
-				return;
-			}
-			
-			const defaultName = `Skład ${kreatorSaved.length + 1}`;
-			const name = prompt('Nazwa dla tego zestawu:', defaultName);
-			if (name === null) return;
-			
-			const saved = {
-				id: Date.now(),
-				name: name || defaultName,
-				count: kreatorCount,
-				formations: formations,
-				timestamp: new Date().toISOString()
-			};
-			
-			kreatorSaved.unshift(saved);
-			if (kreatorSaved.length > 20) kreatorSaved = kreatorSaved.slice(0, 20);
-			
-			storage.setJson('souls_kreator_saved', kreatorSaved);
-			renderKreatorSaved();
-			showToast('💾 Skład zapisany!');
-		}
-		
-		function loadKreatorSaved(id) {
-			const saved = kreatorSaved.find(s => s.id === id);
-			if (!saved) return;
-			
-			// Ustaw liczbę składów
-			setKreatorCount(saved.count);
-			
-			// Wypełnij pola
-			saved.formations.forEach((formation, idx) => {
-				const formIdx = idx + 1;
-				formation.heroes.forEach((hero, hIdx) => {
-					const el = $(`kreator-${formIdx}-h${hIdx + 1}`);
-					if (el) {
-						el.value = hero;
-						updateInputHeroColor(el, false);
-					}
-				});
-				const petEl = $(`kreator-${formIdx}-pet`);
-				if (petEl) {
-					petEl.value = formation.pet || '';
-					updateInputHeroColor(petEl, true);
-				}
-			});
-			
-			updateKreatorTagsSelection();
-			showToast(`Załadowano: ${saved.name}`);
-		}
-		
-		function deleteKreatorSaved(id, event) {
-			event.stopPropagation();
-			if (!confirm('Usunąć ten zapis?')) return;
-			
-			kreatorSaved = kreatorSaved.filter(s => s.id !== id);
-			storage.setJson('souls_kreator_saved', kreatorSaved);
-			renderKreatorSaved();
-			showToast('Usunięto');
-		}
-		
-		function clearAllKreatorSaved() {
-			if (!kreatorSaved.length) return;
-			if (!confirm('Usunąć WSZYSTKIE zapisane składy?')) return;
-			
-			kreatorSaved = [];
-			storage.setJson('souls_kreator_saved', kreatorSaved);
-			renderKreatorSaved();
-			showToast('Wszystkie zapisy usunięte');
-		}
-		
-		function clearKreator() {
-			for (let i = 1; i <= 3; i++) {
-				for (let h = 1; h <= 8; h++) {
-					const el = $(`kreator-${i}-h${h}`);
-					if (el) {
-						el.value = '';
-						el.classList.remove('hero-race-dark', 'hero-race-light', 'hero-race-human', 
-							'hero-race-fire', 'hero-race-elf', 'hero-race-undead');
-					}
-				}
-				const petEl = $(`kreator-${i}-pet`);
-				if (petEl) {
-					petEl.value = '';
-					petEl.classList.remove('hero-race-pet');
-				}
-			}
-			updateKreatorTagsSelection();
-			showToast('Wyczyszczono');
-		}
-		
-		function renderKreatorSaved() {
-			const section = $('kreator-saved-section');
-			const list = $('kreator-saved-list');
-			
-			if (!kreatorSaved.length) {
-				section.style.display = 'none';
-				return;
-			}
-			
-			section.style.display = 'block';
-			list.innerHTML = kreatorSaved.map(saved => {
-				const preview = saved.formations
-					.map((f, idx) => {
-						const heroes = f.heroes.filter(h => h);
-						if (!heroes.length && !f.pet) return '';
-						return `<div style="margin-top:4px;"><strong>Skład ${idx + 1}:</strong> ${heroes.join(', ') || '-'}${f.pet ? ` + ${f.pet}` : ''}</div>`;
-					})
-					.filter(p => p)
-					.join('');
-				
-				return `
-					<div class="kreator-saved-item" onclick="loadKreatorSaved(${saved.id})">
-						<div class="kreator-saved-item-header">
-							<span class="kreator-saved-item-name">${saved.name}</span>
-							<div style="display:flex;align-items:center;gap:8px;">
-								<span class="kreator-saved-item-date">${getTimeAgo(new Date(saved.timestamp))}</span>
-								<button class="btn btn-small btn-secondary" onclick="deleteKreatorSaved(${saved.id}, event)" title="Usuń">🗑️</button>
-							</div>
-						</div>
-						<div class="kreator-saved-item-content">${preview}</div>
-					</div>
-				`;
-			}).join('');
-		}
-		
-		function initKreator() {
-			setKreatorCount(3); // Domyślnie 3 składy
-			renderKreatorSaved();
-			initKreatorFields();
-			initKreatorExcluded();
-		}
-		
-		function initKreatorFields() {
-			// Dodaj listenery do wszystkich pól Kreatora
-			for (let s = 1; s <= 3; s++) {
-				for (let h = 1; h <= 8; h++) {
-					const input = $(`kreator-${s}-h${h}`);
-					if (input) {
-						input.addEventListener('focus', () => { activeKreatorField = `kreator-${s}-h${h}`; });
-						input.addEventListener('input', () => { 
-							updateKreatorTagsSelection(); 
-							updateInputHeroColor(input, false);
-						});
-						input.addEventListener('blur', () => { updateInputHeroColor(input, false); });
-					}
-				}
-				const petInput = $(`kreator-${s}-pet`);
-				if (petInput) {
-					petInput.addEventListener('input', () => { 
-						updateKreatorTagsSelection(); 
-						updateInputHeroColor(petInput, true);
-					});
-					petInput.addEventListener('blur', () => { updateInputHeroColor(petInput, true); });
-				}
-			}
-		}
-		
 		function clearWarPlanner(keepStorage = false) {
 			for (let e = 1; e <= 3; e++) {
 				for (let h = 1; h <= 8; h++) {
@@ -5206,7 +4213,172 @@
 			// Ale zaktualizuj info
 			updateWarAutosaveInfo();
 		}
-        
+
+		function toggleWarHistory() {
+			const dropdown = $('war-history-dropdown');
+			dropdown.classList.toggle('hidden');
+			
+			if (!dropdown.classList.contains('hidden')) {
+				renderWarHistory();
+				setTimeout(() => {
+					document.addEventListener('click', closeWarHistoryOnClickOutside);
+				}, 10);
+			} else {
+				document.removeEventListener('click', closeWarHistoryOnClickOutside);
+			}
+		}
+
+		function closeWarHistoryOnClickOutside(e) {
+			const dropdown = $('war-history-dropdown');
+			const wrapper = e.target.closest('.search-history-wrapper');
+			
+			if (!wrapper && !dropdown.classList.contains('hidden')) {
+				dropdown.classList.add('hidden');
+				document.removeEventListener('click', closeWarHistoryOnClickOutside);
+			}
+		}
+
+		function saveWarToHistory() {
+			const enemies = [];
+			let hasAnyData = false;
+			
+			for (let e = 1; e <= 3; e++) {
+				const enemy = { heroes: [], pet: '' };
+				for (let h = 1; h <= 8; h++) {
+					const val = $(`war-e${e}-h${h}`)?.value.trim() || '';
+					enemy.heroes.push(val); // Zachowaj pozycję (nawet puste)
+					if (val) hasAnyData = true;
+				}
+				enemy.pet = $(`war-e${e}-pet`)?.value.trim() || '';
+				if (enemy.pet) hasAnyData = true;
+				enemies.push(enemy);
+			}
+			
+			if (!hasAnyData) return;
+			
+			const entry = {
+				enemies: enemies,
+				timestamp: new Date().toISOString()
+			};
+			
+			// Sprawdź czy takie samo wyszukiwanie już istnieje
+			const existingIndex = warSearchHistory.findIndex(h => {
+				return JSON.stringify(h.enemies) === JSON.stringify(enemies);
+			});
+			
+			if (existingIndex > -1) {
+				warSearchHistory.splice(existingIndex, 1);
+			}
+			
+			warSearchHistory.unshift(entry);
+			
+			// Limit do 15 wpisów
+			if (warSearchHistory.length > 15) {
+				warSearchHistory = warSearchHistory.slice(0, 15);
+			}
+			
+			storage.setJson('souls_war_history', warSearchHistory);
+		}
+
+		function renderWarHistory() {
+			const list = $('war-history-list');
+			
+			if (!warSearchHistory.length) {
+				list.innerHTML = `<div class="search-history-empty">${t('search.historyEmpty')}</div>`;
+				return;
+			}
+			
+			list.innerHTML = warSearchHistory.map((entry, idx) => {
+				const timeAgo = getTimeAgo(new Date(entry.timestamp));
+				
+				// Generuj podgląd 3 składów
+				const enemiesHtml = entry.enemies.map((enemy, eIdx) => {
+					const heroesText = enemy.heroes.filter(h => h).slice(0, 3).join(', ');
+					const moreCount = enemy.heroes.filter(h => h).length - 3;
+					const petText = enemy.pet ? `+ 🐾${enemy.pet}` : '';
+					
+					if (!heroesText && !enemy.pet) return '';
+					
+					return `
+						<div class="war-history-enemy">
+							<strong>W${eIdx + 1}:</strong>
+							<span class="heroes">${heroesText || '—'}${moreCount > 0 ? ` +${moreCount}` : ''}</span>
+							${petText ? `<span class="pet">${petText}</span>` : ''}
+						</div>
+					`;
+				}).filter(h => h).join('');
+				
+				if (!enemiesHtml) return '';
+				
+				return `
+					<div class="search-history-item" onclick="loadWarFromHistory(${idx})">
+						<button class="search-history-item-remove" onclick="event.stopPropagation(); removeWarHistoryItem(${idx})" title="${t('common.delete')}">✕</button>
+						<div class="war-history-item-enemies">
+							${enemiesHtml}
+						</div>
+						<div class="search-history-item-time">🕐 ${timeAgo}</div>
+					</div>
+				`;
+			}).filter(h => h).join('');
+			
+			if (!list.innerHTML.trim()) {
+				list.innerHTML = `<div class="search-history-empty">${t('search.historyEmpty')}</div>`;
+			}
+		}
+
+		function loadWarFromHistory(idx) {
+			const entry = warSearchHistory[idx];
+			if (!entry) return;
+			
+			// Wypełnij wszystkie pola
+			for (let e = 1; e <= 3; e++) {
+				const enemy = entry.enemies[e - 1];
+				if (!enemy) continue;
+				
+				for (let h = 1; h <= 8; h++) {
+					const el = $(`war-e${e}-h${h}`);
+					if (el) {
+						el.value = enemy.heroes[h - 1] || '';
+						updateInputHeroColor(el);
+					}
+				}
+				
+				const petEl = $(`war-e${e}-pet`);
+				if (petEl) {
+					petEl.value = enemy.pet || '';
+					updateInputHeroColor(petEl, true);
+				}
+			}
+			
+			updateWarTagsSelection();
+			
+			// Zamknij dropdown
+			$('war-history-dropdown').classList.add('hidden');
+			document.removeEventListener('click', closeWarHistoryOnClickOutside);
+			
+			// Aktualizuj info
+			updateWarAutosaveInfo();
+			
+			const timeAgo = getTimeAgo(new Date(entry.timestamp));
+			showToast(`📜 ${t('search.loadedFromHistory')} (${timeAgo})`);
+		}
+
+		function removeWarHistoryItem(idx) {
+			warSearchHistory.splice(idx, 1);
+			storage.setJson('souls_war_history', warSearchHistory);
+			renderWarHistory();
+			showToast(t('common.formationDeleted'));
+		}
+
+		function clearWarHistory() {
+			if (!confirm(t('war.historyConfirmClear'))) return;
+			
+			warSearchHistory = [];
+			storage.setJson('souls_war_history', warSearchHistory);
+			renderWarHistory();
+			showToast(t('common.historyCleared'));
+		}
+
         function showWarPreview(comboIndex) {
             const combo = window.warResults?.[comboIndex];
             if (!combo) return;
@@ -5217,52 +4389,7 @@
             switchTab('war-preview');
             renderWarPreview();
         }
-        
-		function renderCompactGridFromArray(heroesArr, matchedHeroes, showConflicts, conflictSet, isEnemy = false) {
-			const slot = (name) => {
-				if (!name) return `<div class="compact-slot empty">—</div>`;
-				const hero = heroes.find(h => h.name.toLowerCase() === name.toLowerCase());
-				const race = hero?.race?.toLowerCase() || '';
-				const normName = normalize(name);
-				
-				// Sprawdź czy to trafiony bohater (zielone tło)
-				const isMatched = matchedHeroes.some(mh => mh === normName || mh.startsWith(normName) || normName.startsWith(mh));
-				
-				// Sprawdź czy to konflikt (pomarańczowe obramowanie)
-				const isConflict = showConflicts && conflictSet && conflictSet.has(normName);
-				
-				let classes = 'compact-slot filled';
-				if (race) classes += ` race-${race}`;
-				if (isMatched) classes += ' matched';
-				if (isConflict) classes += ' conflict';
-				
-				let style = race ? `border-color:var(--race-${race});color:var(--race-${race})` : '';
-				
-				return `<div class="${classes}" style="${style}">${name}</div>`;
-			};
-			
-			// Użyj tablicy z zachowaniem pozycji (8 slotów)
-			const h = [];
-			for (let i = 0; i < 8; i++) {
-				h.push(heroesArr[i] || '');
-			}
-			
-			// Układ 3-2-3 - odwrócony dla wroga
-			if (isEnemy) {
-				return `
-					<div class="compact-row">${slot(h[5])}${slot(h[6])}${slot(h[7])}</div>
-					<div class="compact-row">${slot(h[3])}${slot(h[4])}</div>
-					<div class="compact-row">${slot(h[0])}${slot(h[1])}${slot(h[2])}</div>
-				`;
-			} else {
-				return `
-					<div class="compact-row">${slot(h[0])}${slot(h[1])}${slot(h[2])}</div>
-					<div class="compact-row">${slot(h[3])}${slot(h[4])}</div>
-					<div class="compact-row">${slot(h[5])}${slot(h[6])}${slot(h[7])}</div>
-				`;
-			}
-		}
-		
+
 		function renderWarPreview() {
 			const combo = window.currentWarCombo;
 			if (!combo) {
@@ -5525,6 +4652,51 @@
 			$('war-preview-content').innerHTML = html;
 		}
 
+		function renderCompactGridFromArray(heroesArr, matchedHeroes, showConflicts, conflictSet, isEnemy = false) {
+			const slot = (name) => {
+				if (!name) return `<div class="compact-slot empty">—</div>`;
+				const hero = heroes.find(h => h.name.toLowerCase() === name.toLowerCase());
+				const race = hero?.race?.toLowerCase() || '';
+				const normName = normalize(name);
+				
+				// Sprawdź czy to trafiony bohater (zielone tło)
+				const isMatched = matchedHeroes.some(mh => mh === normName || mh.startsWith(normName) || normName.startsWith(mh));
+				
+				// Sprawdź czy to konflikt (pomarańczowe obramowanie)
+				const isConflict = showConflicts && conflictSet && conflictSet.has(normName);
+				
+				let classes = 'compact-slot filled';
+				if (race) classes += ` race-${race}`;
+				if (isMatched) classes += ' matched';
+				if (isConflict) classes += ' conflict';
+				
+				let style = race ? `border-color:var(--race-${race});color:var(--race-${race})` : '';
+				
+				return `<div class="${classes}" style="${style}">${name}</div>`;
+			};
+			
+			// Użyj tablicy z zachowaniem pozycji (8 slotów)
+			const h = [];
+			for (let i = 0; i < 8; i++) {
+				h.push(heroesArr[i] || '');
+			}
+			
+			// Układ 3-2-3 - odwrócony dla wroga
+			if (isEnemy) {
+				return `
+					<div class="compact-row">${slot(h[5])}${slot(h[6])}${slot(h[7])}</div>
+					<div class="compact-row">${slot(h[3])}${slot(h[4])}</div>
+					<div class="compact-row">${slot(h[0])}${slot(h[1])}${slot(h[2])}</div>
+				`;
+			} else {
+				return `
+					<div class="compact-row">${slot(h[0])}${slot(h[1])}${slot(h[2])}</div>
+					<div class="compact-row">${slot(h[3])}${slot(h[4])}</div>
+					<div class="compact-row">${slot(h[5])}${slot(h[6])}${slot(h[7])}</div>
+				`;
+			}
+		}
+
 		// Analiza dopasowania między szukanym a bazą
 		function analyzeWarMatch(searched, formation) {
 			const searchedHeroes = searched.heroesRaw.filter(h => h); // Oryginalne nazwy
@@ -5728,201 +4900,1044 @@
 				btn.className = `btn btn-small ${isFav ? 'btn-favorite-active' : 'btn-secondary'}`;
 			}
 		}
-        
-		function setupAutocomplete() {
-			document.querySelectorAll('input[data-type]').forEach(input => {
-				const list = $('list-' + input.id);
-				const type = input.dataset.type;
 
-				const isWarField = input.id.startsWith('war-');
-				const isEditField = input.id.startsWith('edit-') && !['edit-name', 'edit-comment', 'edit-id'].includes(input.id);
-				let dynamicList = null;
-				
-				if (isWarField && !list) {
-					dynamicList = document.createElement('div');
-					dynamicList.className = 'autocomplete-list';
-					dynamicList.id = 'list-' + input.id;
-					input.parentNode.style.position = 'relative';
-					input.parentNode.appendChild(dynamicList);
-				}
-				
-				const targetList = list || dynamicList;
-				if (!targetList) return;
-				
-				// Zmienna do śledzenia zaznaczonego elementu
-				let selectedIndex = -1;
-				
-				function updateSelection() {
-					const items = targetList.querySelectorAll('.autocomplete-item');
-					items.forEach((item, idx) => {
-						item.classList.toggle('selected', idx === selectedIndex);
-					});
-					// Scroll do widoczności
-					if (selectedIndex >= 0 && items[selectedIndex]) {
-						items[selectedIndex].scrollIntoView({ block: 'nearest' });
-					}
-				}
-				
-				function selectItem(value) {
-					input.value = value;
-					targetList.classList.remove('show');
-					selectedIndex = -1;
-					
-					// Obsługa pól wykluczeń - automatyczne dodanie
-					if (input.id === 'war-excluded-input') {
-						addWarExcludedHero(value);
+        function exportWarPlanAsText() {
+            const combo = window.currentWarCombo;
+            if (!combo || !combo.formations) {
+                showToast(t('war.selectPlanFirst'), true);
+                return;
+            }
+            
+            let text = '';
+            
+            combo.formations.forEach((match, idx) => {
+                const f = match.formation;
+                const myHeroes = f.my || [];
+                const myPet = f.myPet || '';
+                
+                text += `Walka ${idx + 1}\n`;
+                text += formatFormationAsText(myHeroes, myPet);
+                text += '\n';
+            });
+            
+            // Kopiuj do schowka
+            navigator.clipboard.writeText(text.trim()).then(() => {
+                showToast(t('clipboard.formationCopied'));
+            }).catch(() => {
+                const textarea = document.createElement('textarea');
+                textarea.value = text.trim();
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                showToast(t('clipboard.formationCopied'));
+            });
+        }
+
+        // Wspólna funkcja formatowania składu jako tekst
+        function formatFormationAsText(heroes, pet) {
+            const row1 = [heroes[0] || 'x', heroes[1] || 'x', heroes[2] || 'x'];
+            const row2 = [heroes[3] || 'x', heroes[4] || 'x'];
+            const row3 = [heroes[5] || 'x', heroes[6] || 'x', heroes[7] || 'x'];
+            
+            const maxLen = Math.max(
+                ...row1.map(h => h.length),
+                ...row2.map(h => h.length),
+                ...row3.map(h => h.length),
+                1
+            );
+            
+            const pad = (str) => str.padEnd(maxLen, ' ');
+            
+            let text = '';
+            text += `${pad(row1[0])}  ${pad(row1[1])}  ${row1[2]}\n`;
+            text += `   ${pad(row2[0])}  ${row2[1]}\n`;
+            text += `${pad(row3[0])}  ${pad(row3[1])}  ${row3[2]}\n`;
+            
+            if (pet) {
+                text += `Pet: ${pet}\n`;
+            }
+            
+            return text;
+        }
+
+        function collectWarPlanData() {
+            // Zbierz dane o wrogach z inputów
+            const battles = [];
+            
+            for (let i = 1; i <= 3; i++) {
+                const enemyHeroes = [];
+                for (let j = 1; j <= 5; j++) {
+                    const val = $(`war-e${i}-h${j}`)?.value.trim();
+                    if (val) enemyHeroes.push(val);
+                }
+                const enemyPet = $(`war-e${i}-pet`)?.value.trim();
+                
+                // Szukaj kontry w wynikach (jeśli jest)
+                const counterData = currentWarResults?.[i-1];
+                
+                battles.push({
+                    enemy: { heroes: enemyHeroes, pet: enemyPet },
+                    counter: counterData ? {
+                        heroes: counterData.formation.my.filter(h => h),
+                        pet: counterData.formation.myPet,
+                        comment: counterData.formation.comment
+                    } : { heroes: [], pet: '', comment: '' }
+                });
+            }
+            
+            return battles;
+        }
+
+
+        // ═══════════════════════════════════════════════════════════
+        // TAB: KREATOR — ręczny builder 3 składów, zapisane
+        // ═══════════════════════════════════════════════════════════
+
+		function initKreatorExcluded() {
+			renderKreatorExcludedChips();
+			updateKreatorExcludedCount();
+			
+			// Obsługa inputa
+			const input = $('kreator-excluded-input');
+			if (input) {
+				input.addEventListener('keydown', (e) => {
+					if (e.key === 'Enter') {
+						e.preventDefault();
+						addKreatorExcludedHero(input.value.trim());
 						input.value = '';
-						return;
-					}
-					if (input.id === 'kreator-excluded-input') {
-						addKreatorExcludedHero(value);
-						input.value = '';
-						return;
-					}
-					
-					// Aktualizuj kolor inputa dla War Planner i Kreator
-					if (input.id.startsWith('war-') || input.id.startsWith('kreator-')) {
-						const isPet = input.id.includes('-pet');
-						updateInputHeroColor(input, isPet);
-					}
-					
-					// Walidacja dla formularza dodawania
-					if (input.id.startsWith('add-') && !['add-name', 'add-comment'].includes(input.id)) {
-						setValidation(input, true);
-					}
-					updateAddFormTagsSelection();
-					updateSearchTagsSelection();
-					updateWarTagsSelection();
-					updateKreatorTagsSelection();
-					
-					// 🆕 UNIWERSALNE AUTO-PRZESKAKIWANIE
-					const sectionKey = getFieldSection(input.id);
-					if (sectionKey) {
-						const nextFieldId = getNextEmptyField(input.id);
-						if (nextFieldId) {
-							setTimeout(() => {
-								const nextField = $(nextFieldId);
-								if (nextField) {
-									nextField.focus();
-									// Aktualizuj aktywne pole w zależności od sekcji
-									if (input.id.startsWith('add-')) {
-										activeAddField = nextFieldId;
-									}
-									if (input.id.startsWith('kreator-')) {
-										activeKreatorField = nextFieldId;
-									}
-									if (input.id.startsWith('war-')) {
-										activeWarField = nextFieldId;
-									}
-								}
-							}, 50);
-						}
-					}
-				}
-				
-				input.addEventListener('input', () => {
-					selectedIndex = -1; // Reset selection on input
-					
-					if (input.id.startsWith('add-') && !['add-name', 'add-comment'].includes(input.id)) {
-						validateInput(input);
-						updateAddFormTagsSelection();
-					}
-					if (input.id.startsWith('search-')) updateSearchTagsSelection();
-					if (input.id.startsWith('war-')) {
-						updateWarTagsSelection();
-						updateInputHeroColor(input, input.id.includes('-pet'));
-					}
-					if (input.id.startsWith('kreator-')) {
-						updateKreatorTagsSelection();
-						updateInputHeroColor(input, input.id.includes('-pet'));
-					}
-					
-					const val = input.value.toLowerCase();
-					if (val.length < 1) { targetList.classList.remove('show'); return; }
-					
-					const items = type === 'pet' ? pets : heroes;
-					const filtered = type === 'pet' ? items.filter(p => p.toLowerCase().startsWith(val)).slice(0, 6) :
-						items.filter(h => h.name.toLowerCase().startsWith(val)).slice(0, 6);
-					
-					if (!filtered.length) { targetList.classList.remove('show'); return; }
-					
-					targetList.innerHTML = filtered.map(item => type === 'pet' ?
-						`<div class="autocomplete-item" data-value="${item}">${item}</div>` :
-						`<div class="autocomplete-item race-${item.race.toLowerCase()}" data-value="${item.name}">${item.name} <span class="race">(${item.race})</span></div>`
-					).join('');
-					
-					targetList.classList.add('show');
-					
-					// Kliknięcie w element
-					targetList.querySelectorAll('.autocomplete-item').forEach((item, idx) => {
-						item.addEventListener('click', () => selectItem(item.dataset.value));
-						item.addEventListener('mouseenter', () => {
-							selectedIndex = idx;
-							updateSelection();
-						});
-					});
-				});
-				
-				// Obsługa klawiszy
-				input.addEventListener('keydown', e => {
-					const items = targetList.querySelectorAll('.autocomplete-item');
-					const isListVisible = targetList.classList.contains('show') && items.length > 0;
-					
-					if (e.key === 'ArrowDown') {
-						if (isListVisible) {
-							e.preventDefault();
-							selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
-							updateSelection();
-						}
-					} else if (e.key === 'ArrowUp') {
-						if (isListVisible) {
-							e.preventDefault();
-							selectedIndex = Math.max(selectedIndex - 1, 0);
-							updateSelection();
-						}
-					} else if (e.key === 'Enter') {
-						if (isListVisible && selectedIndex >= 0 && items[selectedIndex]) {
-							e.preventDefault();
-							e.stopPropagation();
-							selectItem(items[selectedIndex].dataset.value);
-						}
-						// Jeśli nic nie zaznaczone, pozwól na domyślne zachowanie (np. szukaj)
-					} else if (e.key === 'Escape') {
-						targetList.classList.remove('show');
-						selectedIndex = -1;
-					} else if (e.key === 'Tab') {
-						// Tab też wybiera jeśli coś zaznaczone
-						if (isListVisible && selectedIndex >= 0 && items[selectedIndex]) {
-							selectItem(items[selectedIndex].dataset.value);
-						}
 					}
 				});
-				
-				input.addEventListener('blur', () => setTimeout(() => {
-					targetList.classList.remove('show');
-					selectedIndex = -1;
-					if (input.id.startsWith('search-')) updateSearchTagsSelection();
-					if (input.id.startsWith('add-') && !['add-name', 'add-comment'].includes(input.id)) updateAddFormTagsSelection();
-				}, 200));
-			});
+			}
 		}
+
+		function addKreatorExcludedHero(heroName) {
+			if (!heroName) return;
+
+			const finalName = findCanonicalHeroName(heroName);
+
+			if (isHeroInList(kreatorExcludedHeroes, finalName)) {
+				showToast(t('kreator.hide.alreadyHidden'), true);
+				return;
+			}
+
+			kreatorExcludedHeroes.push(finalName);
+			storage.setJson('souls_kreator_excluded_heroes', kreatorExcludedHeroes);
+			renderKreatorExcludedChips();
+			updateKreatorExcludedCount();
+			generateKreatorTags();
+			showToast(t('kreator.hide.hiddenFrom', { name: finalName }));
+		}
+
+		function removeKreatorExcludedHero(heroName) {
+			const n = normalize(heroName);
+			kreatorExcludedHeroes = kreatorExcludedHeroes.filter(h => normalize(h) !== n);
+			storage.setJson('souls_kreator_excluded_heroes', kreatorExcludedHeroes);
+			renderKreatorExcludedChips();
+			updateKreatorExcludedCount();
+			generateKreatorTags();
+		}
+
+		function clearKreatorExcludedHeroes() {
+			if (!kreatorExcludedHeroes.length) return;
+			if (!confirm(t('kreator.hide.confirmClear'))) return;
+			kreatorExcludedHeroes = [];
+			storage.setJson('souls_kreator_excluded_heroes', kreatorExcludedHeroes);
+			renderKreatorExcludedChips();
+			updateKreatorExcludedCount();
+			generateKreatorTags();
+			showToast(t('kreator.hide.cleared'));
+		}
+
+		function renderKreatorExcludedChips() {
+			const container = $('kreator-excluded-chips');
+			if (!container) return;
+			
+			if (!kreatorExcludedHeroes.length) {
+				container.innerHTML = `<span id="kreator-excluded-empty" style="color: var(--text-muted); font-size: 0.75rem; font-style: italic; width: 100%; text-align: center;">${t('kreator.hide.empty')}</span>`;
+				return;
+			}
+
+			container.innerHTML = kreatorExcludedHeroes.map(hero => `
+				<span class="excluded-chip" style="display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; background: rgba(244, 67, 54, 0.2); border: 1px solid rgba(244, 67, 54, 0.4); border-radius: 12px; font-size: 0.75rem; color: #f44336;">
+					${hero}
+					<button onclick="removeKreatorExcludedHero('${hero.replace(/'/g, "\\'")}')" style="background: none; border: none; color: #f44336; cursor: pointer; font-size: 0.8rem; padding: 0 2px; opacity: 0.7;" title="${t('common.remove')}">✕</button>
+				</span>
+			`).join('');
+		}
+
+		function updateKreatorExcludedCount() {
+			const countEl = $('kreator-excluded-count');
+			if (countEl) countEl.textContent = `(${kreatorExcludedHeroes.length})`;
+		}
+
+        // ===== TAGI DLA KREATORA =====
+        let activeKreatorField = null;
+
+        function addToKreator(heroName, event) {
+            // Ctrl+klik = ukryj bohatera
+            if (event && event.ctrlKey) {
+                addKreatorExcludedHero(heroName);
+                return;
+            }
+            
+            // Znajdź wszystkie pola w kreatorze (tylko widoczne składy)
+            const allFields = [];
+            for (let s = 1; s <= kreatorCount; s++) {
+                for (let h = 1; h <= 8; h++) {
+                    allFields.push(`kreator-${s}-h${h}`);
+                }
+            }
+            
+            // Sprawdź czy już jest - jeśli tak, usuń (toggle)
+            for (const fieldId of allFields) {
+                const input = $(fieldId);
+                if (input && input.value.trim().toLowerCase() === heroName.toLowerCase()) {
+                    input.value = '';
+                    input.classList.remove('hero-race-dark', 'hero-race-light', 'hero-race-human', 
+                        'hero-race-fire', 'hero-race-elf', 'hero-race-undead');
+                    updateKreatorTagsSelection();
+                    return;
+                }
+            }
+            
+            // Funkcja wpisująca do pola i przeskakująca dalej
+            function fillFieldAndJump(fieldId) {
+                const input = $(fieldId);
+                if (!input) return false;
+                input.value = heroName;
+                updateInputHeroColor(input, false);
+                updateKreatorTagsSelection();
+                const nextField = getNextEmptyKreatorField(fieldId);
+                if (nextField) {
+                    setTimeout(() => {
+                        $(nextField)?.focus();
+                        activeKreatorField = nextField;
+                    }, 10);
+                }
+                return true;
+            }
+            
+            // Jeśli jest aktywne pole
+            if (activeKreatorField) {
+                const activeInput = $(activeKreatorField);
+                // Jeśli aktywne pole jest puste - wpisz tam
+                if (activeInput && !activeInput.value.trim()) {
+                    fillFieldAndJump(activeKreatorField);
+                    return;
+                }
+                // Jeśli aktywne pole jest zajęte - znajdź następne puste PO nim
+                const nextEmpty = getNextEmptyKreatorField(activeKreatorField);
+                if (nextEmpty) {
+                    fillFieldAndJump(nextEmpty);
+                    return;
+                }
+            }
+            
+            // Brak aktywnego pola lub wszystkie po nim zajęte - szukaj od początku
+            for (const fieldId of allFields) {
+                const input = $(fieldId);
+                if (input && !input.value.trim()) {
+                    fillFieldAndJump(fieldId);
+                    return;
+                }
+            }
+            showToast(t('search.allSlotsFull'), true);
+        }
+
+        function addPetToKreator(petName) {
+            const petFields = [];
+            for (let s = 1; s <= kreatorCount; s++) {
+                petFields.push(`kreator-${s}-pet`);
+            }
+            
+            // Toggle - jeśli już jest, usuń
+            for (const fieldId of petFields) {
+                const input = $(fieldId);
+                if (input && input.value.trim().toLowerCase() === petName.toLowerCase()) {
+                    input.value = '';
+                    input.classList.remove('hero-race-pet');
+                    updateKreatorTagsSelection();
+                    return;
+                }
+            }
+            
+            // Dodaj do pierwszego wolnego pola pet
+            for (const fieldId of petFields) {
+                const input = $(fieldId);
+                if (input && !input.value.trim()) {
+                    input.value = petName;
+                    input.classList.add('hero-race-pet');
+                    updateKreatorTagsSelection();
+                    return;
+                }
+            }
+            showToast('Wszystkie pola Pet są zajęte!', true);
+        }
+
+        function getNextEmptyKreatorField(currentFieldId) {
+            const allFields = [];
+            for (let s = 1; s <= kreatorCount; s++) {
+                for (let h = 1; h <= 8; h++) {
+                    allFields.push(`kreator-${s}-h${h}`);
+                }
+            }
+            const currentIdx = allFields.indexOf(currentFieldId);
+            for (let i = currentIdx + 1; i < allFields.length; i++) {
+                const input = $(allFields[i]);
+                if (input && !input.value.trim()) return allFields[i];
+            }
+            return null;
+        }
+
+        function updateKreatorTagsSelection() {
+            const container = $('kreator-quick-tags-container');
+            if (!container) return;
+            
+            // Zbierz wszystkie wartości z pól
+            const values = new Set();
+            for (let s = 1; s <= kreatorCount; s++) {
+                for (let h = 1; h <= 8; h++) {
+                    const val = $(`kreator-${s}-h${h}`)?.value.trim().toLowerCase();
+                    if (val) values.add(val);
+                }
+                const pet = $(`kreator-${s}-pet`)?.value.trim().toLowerCase();
+                if (pet) values.add(pet);
+            }
+            
+            // Zaznacz tagi
+            container.querySelectorAll('.quick-tag').forEach(tag => {
+                const tagValue = tag.textContent.trim().toLowerCase();
+                tag.classList.toggle('selected', values.has(tagValue));
+            });
+        }
+
+		// =====================================================
+		// KREATOR SKŁADÓW
+		// =====================================================
 		
-		function copyFormationLink(id) {
-			const url = `${window.location.origin}${window.location.pathname}?formation=${id}`;
-			navigator.clipboard.writeText(url).then(() => {
-				showToast(t('clipboard.linkCopied'));
+		let kreatorCount = 3;
+		let kreatorSaved = storage.getJson('souls_kreator_saved', []);
+
+		function setKreatorCount(count) {
+			kreatorCount = count;
+			const grid = $('kreator-grid');
+			
+			// Aktualizuj przyciski
+			for (let i = 1; i <= 3; i++) {
+				const btn = $(`kreator-count-${i}`);
+				if (btn) {
+					btn.classList.remove('btn-success');
+					if (i === count) btn.classList.add('btn-success');
+				}
+			}
+			
+			// Pokaż/ukryj sekcje
+			$('kreator-section-1').style.display = 'block';
+			$('kreator-section-2').style.display = count >= 2 ? 'block' : 'none';
+			$('kreator-section-3').style.display = count >= 3 ? 'block' : 'none';
+			
+			// Zmień grid
+			grid.classList.remove('count-1', 'count-2');
+			if (count === 1) grid.classList.add('count-1');
+			if (count === 2) grid.classList.add('count-2');
+		}
+
+		function getKreatorFormation(idx) {
+			const heroes = [];
+			for (let h = 1; h <= 8; h++) {
+				heroes.push($(`kreator-${idx}-h${h}`)?.value.trim() || '');
+			}
+			const pet = $(`kreator-${idx}-pet`)?.value.trim() || '';
+			return { heroes, pet };
+		}
+
+		function copyKreatorAsText() {
+			let text = '';
+			let hasContent = false;
+			
+			for (let i = 1; i <= kreatorCount; i++) {
+				const formation = getKreatorFormation(i);
+				const filledHeroes = formation.heroes.filter(h => h);
+				
+				if (filledHeroes.length > 0 || formation.pet) {
+					hasContent = true;
+					if (kreatorCount > 1) {
+						text += `Skład ${i}\n`;
+					}
+					text += formatFormationAsText(formation.heroes, formation.pet);
+					text += '\n';
+				}
+			}
+			
+			if (!hasContent) {
+				showToast('Wpisz przynajmniej jednego bohatera!', true);
+				return;
+			}
+			
+			navigator.clipboard.writeText(text.trim()).then(() => {
+				showToast('📋 Składy skopiowane do schowka!');
 			}).catch(() => {
-				// Fallback dla starszych przeglądarek
-				const input = document.createElement('input');
-				input.value = url;
-				document.body.appendChild(input);
-				input.select();
+				const textarea = document.createElement('textarea');
+				textarea.value = text.trim();
+				document.body.appendChild(textarea);
+				textarea.select();
 				document.execCommand('copy');
-				document.body.removeChild(input);
-				showToast(t('clipboard.linkCopied'));
+				document.body.removeChild(textarea);
+				showToast('📋 Składy skopiowane do schowka!');
 			});
 		}
-        
+
+		function saveKreatorToMemory() {
+			const formations = [];
+			let hasContent = false;
+			
+			for (let i = 1; i <= kreatorCount; i++) {
+				const formation = getKreatorFormation(i);
+				if (formation.heroes.some(h => h) || formation.pet) {
+					hasContent = true;
+				}
+				formations.push(formation);
+			}
+			
+			if (!hasContent) {
+				showToast('Wpisz przynajmniej jednego bohatera!', true);
+				return;
+			}
+			
+			const defaultName = `Skład ${kreatorSaved.length + 1}`;
+			const name = prompt('Nazwa dla tego zestawu:', defaultName);
+			if (name === null) return;
+			
+			const saved = {
+				id: Date.now(),
+				name: name || defaultName,
+				count: kreatorCount,
+				formations: formations,
+				timestamp: new Date().toISOString()
+			};
+			
+			kreatorSaved.unshift(saved);
+			if (kreatorSaved.length > 20) kreatorSaved = kreatorSaved.slice(0, 20);
+			
+			storage.setJson('souls_kreator_saved', kreatorSaved);
+			renderKreatorSaved();
+			showToast('💾 Skład zapisany!');
+		}
+
+		function loadKreatorSaved(id) {
+			const saved = kreatorSaved.find(s => s.id === id);
+			if (!saved) return;
+			
+			// Ustaw liczbę składów
+			setKreatorCount(saved.count);
+			
+			// Wypełnij pola
+			saved.formations.forEach((formation, idx) => {
+				const formIdx = idx + 1;
+				formation.heroes.forEach((hero, hIdx) => {
+					const el = $(`kreator-${formIdx}-h${hIdx + 1}`);
+					if (el) {
+						el.value = hero;
+						updateInputHeroColor(el, false);
+					}
+				});
+				const petEl = $(`kreator-${formIdx}-pet`);
+				if (petEl) {
+					petEl.value = formation.pet || '';
+					updateInputHeroColor(petEl, true);
+				}
+			});
+			
+			updateKreatorTagsSelection();
+			showToast(`Załadowano: ${saved.name}`);
+		}
+
+		function deleteKreatorSaved(id, event) {
+			event.stopPropagation();
+			if (!confirm('Usunąć ten zapis?')) return;
+			
+			kreatorSaved = kreatorSaved.filter(s => s.id !== id);
+			storage.setJson('souls_kreator_saved', kreatorSaved);
+			renderKreatorSaved();
+			showToast('Usunięto');
+		}
+
+		function clearAllKreatorSaved() {
+			if (!kreatorSaved.length) return;
+			if (!confirm('Usunąć WSZYSTKIE zapisane składy?')) return;
+			
+			kreatorSaved = [];
+			storage.setJson('souls_kreator_saved', kreatorSaved);
+			renderKreatorSaved();
+			showToast('Wszystkie zapisy usunięte');
+		}
+
+		function clearKreator() {
+			for (let i = 1; i <= 3; i++) {
+				for (let h = 1; h <= 8; h++) {
+					const el = $(`kreator-${i}-h${h}`);
+					if (el) {
+						el.value = '';
+						el.classList.remove('hero-race-dark', 'hero-race-light', 'hero-race-human', 
+							'hero-race-fire', 'hero-race-elf', 'hero-race-undead');
+					}
+				}
+				const petEl = $(`kreator-${i}-pet`);
+				if (petEl) {
+					petEl.value = '';
+					petEl.classList.remove('hero-race-pet');
+				}
+			}
+			updateKreatorTagsSelection();
+			showToast('Wyczyszczono');
+		}
+
+		function renderKreatorSaved() {
+			const section = $('kreator-saved-section');
+			const list = $('kreator-saved-list');
+			
+			if (!kreatorSaved.length) {
+				section.style.display = 'none';
+				return;
+			}
+			
+			section.style.display = 'block';
+			list.innerHTML = kreatorSaved.map(saved => {
+				const preview = saved.formations
+					.map((f, idx) => {
+						const heroes = f.heroes.filter(h => h);
+						if (!heroes.length && !f.pet) return '';
+						return `<div style="margin-top:4px;"><strong>Skład ${idx + 1}:</strong> ${heroes.join(', ') || '-'}${f.pet ? ` + ${f.pet}` : ''}</div>`;
+					})
+					.filter(p => p)
+					.join('');
+				
+				return `
+					<div class="kreator-saved-item" onclick="loadKreatorSaved(${saved.id})">
+						<div class="kreator-saved-item-header">
+							<span class="kreator-saved-item-name">${saved.name}</span>
+							<div style="display:flex;align-items:center;gap:8px;">
+								<span class="kreator-saved-item-date">${getTimeAgo(new Date(saved.timestamp))}</span>
+								<button class="btn btn-small btn-secondary" onclick="deleteKreatorSaved(${saved.id}, event)" title="Usuń">🗑️</button>
+							</div>
+						</div>
+						<div class="kreator-saved-item-content">${preview}</div>
+					</div>
+				`;
+			}).join('');
+		}
+
+		function initKreator() {
+			setKreatorCount(3); // Domyślnie 3 składy
+			renderKreatorSaved();
+			initKreatorFields();
+			initKreatorExcluded();
+		}
+
+		function initKreatorFields() {
+			// Dodaj listenery do wszystkich pól Kreatora
+			for (let s = 1; s <= 3; s++) {
+				for (let h = 1; h <= 8; h++) {
+					const input = $(`kreator-${s}-h${h}`);
+					if (input) {
+						input.addEventListener('focus', () => { activeKreatorField = `kreator-${s}-h${h}`; });
+						input.addEventListener('input', () => { 
+							updateKreatorTagsSelection(); 
+							updateInputHeroColor(input, false);
+						});
+						input.addEventListener('blur', () => { updateInputHeroColor(input, false); });
+					}
+				}
+				const petInput = $(`kreator-${s}-pet`);
+				if (petInput) {
+					petInput.addEventListener('input', () => { 
+						updateKreatorTagsSelection(); 
+						updateInputHeroColor(petInput, true);
+					});
+					petInput.addEventListener('blur', () => { updateInputHeroColor(petInput, true); });
+				}
+			}
+		}
+
+
+        // ═══════════════════════════════════════════════════════════
+        // TAB: SETTINGS + ADMIN — import/export CSV, zarządzanie bazą, duplikaty
+        // ═══════════════════════════════════════════════════════════
+
+        // =====================================================
+        // IMPORT / EKSPORT
+        // =====================================================
+		function exportToCSV() {
+			const headers = [
+				'Lp', 'Nazwa',
+				'moja1', 'moja2', 'moja3', 'moja4', 'moja5', 'moja6', 'moja7', 'moja8', 'mojPet',
+				'enemy1', 'enemy2', 'enemy3', 'enemy4', 'enemy5', 'enemy6', 'enemy7', 'enemy8', 'enemyPet',
+				'Komentarz', 'CzyBazowa'
+			];
+			
+			const escapeCSV = (val) => {
+				const str = String(val || '');
+				// Jeśli zawiera przecinek, średnik, cudzysłów lub nową linię - owijamy w cudzysłowy
+				if (str.includes(';') || str.includes(',') || str.includes('"') || str.includes('\n')) {
+					return `"${str.replace(/"/g, '""')}"`;
+				}
+				return str;
+			};
+			
+			const rows = allFormations.map(f => {
+				// Upewnij się że my i enemy mają 8 elementów
+				const myArr = f.my || [];
+				const enemyArr = f.enemy || [];
+				while (myArr.length < 8) myArr.push('');
+				while (enemyArr.length < 8) enemyArr.push('');
+				
+				return [
+					f.id,
+					escapeCSV(f.name),
+					...myArr.map(h => escapeCSV(h)),
+					escapeCSV(f.myPet),
+					...enemyArr.map(h => escapeCSV(h)),
+					escapeCSV(f.enemyPet),
+					escapeCSV(f.comment),
+					f.isBase ? '1' : '0'
+				].join(';');
+			});
+			
+			const blob = new Blob(['\ufeff' + [headers.join(';'), ...rows].join('\n')], { type: 'text/csv;charset=utf-8;' });
+			const a = document.createElement('a');
+			a.href = URL.createObjectURL(blob);
+			a.download = `TABELA_${new Date().toISOString().slice(0,10)}.csv`;
+			a.click();
+			showToast(`${t('settings.exported')} ${allFormations.length} ${t('status.formations')}`);
+		}
+
+        function parseCSVLine(line, sep = ';') {
+            const result = [];
+            let current = '', inQuotes = false;
+            for (const char of line) {
+                if (char === '"') inQuotes = !inQuotes;
+                else if (char === sep && !inQuotes) { result.push(current); current = ''; }
+                else current += char;
+            }
+            result.push(current);
+            return result;
+        }
+
+		async function importFromCSV(event) {
+			const file = event.target.files[0];
+			if (!file) return;
+			if (!isOnline) { showToast(t('common.noConnection'), true); return; }
+			
+			const reader = new FileReader();
+			reader.onload = async e => {
+				try {
+					const lines = e.target.result.split('\n').filter(l => l.trim());
+					if (lines.length < 2) { showToast('Plik jest pusty lub ma tylko nagłówki', true); return; }
+					
+					const sep = lines[0].includes(';') ? ';' : ',';
+					const headers = parseCSVLine(lines[0], sep).map(h => h.toLowerCase().trim());
+					
+					// Sprawdź czy mamy nowy format (z komentarzem) czy stary
+					const hasComment = headers.includes('komentarz') || headers.length >= 22;
+					
+					let imported = 0, skipped = 0;
+					let maxId = allFormations.length ? Math.max(...allFormations.map(f => f.id)) : 0;
+					const existingIds = allFormations.map(f => f.id);
+					
+					for (let i = 1; i < lines.length; i++) {
+						const vals = parseCSVLine(lines[i], sep);
+						if (vals.length < 20) { skipped++; continue; }
+						
+						// Określ czy pierwsza kolumna to ID
+						const startIdx = vals[0].match(/^\d+$/) ? 1 : 0;
+						
+						// Generuj nowe unikalne ID
+						while (existingIds.includes(++maxId));
+						existingIds.push(maxId);
+						
+						// Parsuj pola
+						const myHeroes = vals.slice(startIdx + 1, startIdx + 9).map(cleanVal);
+						const myPet = cleanVal(vals[startIdx + 9]);
+						const enemyHeroes = vals.slice(startIdx + 10, startIdx + 18).map(cleanVal);
+						const enemyPet = cleanVal(vals[startIdx + 18]);
+						
+						// Komentarz i isBase (jeśli dostępne)
+						let comment = '';
+						let isBase = false;
+						
+						if (hasComment && vals.length >= startIdx + 21) {
+							comment = cleanVal(vals[startIdx + 19]);
+							isBase = cleanVal(vals[startIdx + 20]) === '1';
+						}
+						
+						await formationsRef.child(String(maxId)).set({
+							id: maxId,
+							name: cleanVal(vals[startIdx]) || `Import #${maxId}`,
+							my: myHeroes,
+							myPet: myPet,
+							enemy: enemyHeroes,
+							enemyPet: enemyPet,
+							comment: comment,
+							isBase: isBase,
+							dateAdded: new Date().toISOString()
+						});
+						imported++;
+					}
+					
+					let msg = `${t('settings.imported')} ${imported} ${t('status.formations')}!`;
+					if (skipped > 0) msg += ` (${skipped} pominięto)`;
+					showToast(msg);
+					
+				} catch (e) { 
+					console.error('Import error:', e);
+					showToast(`${t('common.error')}: ${e.message}`, true); 
+				}
+			};
+			reader.readAsText(file);
+			event.target.value = '';
+		}
+
+        function renderHeroesList() {
+            $('heroes-count').textContent = heroes.length;
+            const byRace = {};
+            heroes.forEach(h => { (byRace[h.race] = byRace[h.race] || []).push(h); });
+            
+            $('heroes-list').innerHTML = Object.keys(byRace).sort().map(r =>
+                `<div style="font-size:0.7rem;color:var(--accent-gold);margin:10px 0 5px;border-bottom:1px solid var(--border);padding-bottom:3px;">${r} (${byRace[r].length})</div>` +
+                byRace[r].map(h => `<div class="entity-item"><span class="entity-name">${h.name}</span><button class="btn btn-danger btn-small" onclick="deleteHero('${h.name}')">🗑️</button></div>`).join('')
+            ).join('') || `<p style="color:var(--text-muted);text-align:center;">${t('database.noFormations')}</p>`;
+        }
+
+        function renderPetsList() {
+            $('pets-count').textContent = pets.length;
+            $('pets-list').innerHTML = pets.map(p => `<div class="entity-item"><span class="entity-name">🐾 ${p}</span><button class="btn btn-danger btn-small" onclick="deletePet('${p}')">🗑️</button></div>`).join('') ||
+                `<p style="color:var(--text-muted);text-align:center;">${t('database.noFormations')}</p>`;
+        }
+
+        async function addHero() {
+            const name = $('new-hero-name').value.trim();
+            const race = $('new-hero-race').value;
+            if (!name) { showToast(t('admin.enterHeroName'), true); return; }
+            if (heroes.some(h => h.name.toLowerCase() === name.toLowerCase())) { showToast(t('admin.heroExists'), true); return; }
+            try {
+                await heroesRef.child(name).set({ name, race });
+                $('new-hero-name').value = '';
+                showToast(`${t('admin.heroAdded')}: ${name}`);
+            } catch (e) { showToast(`${t('common.error')}: ${e.message}`, true); }
+        }
+
+        async function deleteHero(name) {
+            if (!confirm(`${t('admin.confirmDeleteHero')} "${name}"?`)) return;
+            try { await heroesRef.child(name).remove(); showToast(`${t('admin.heroDeleted')}: ${name}`); }
+            catch (e) { showToast(`${t('common.error')}: ${e.message}`, true); }
+        }
+
+        async function addPet() {
+            const name = $('new-pet-name').value.trim();
+            if (!name) { showToast(t('admin.enterPetName'), true); return; }
+            if (pets.some(p => p.toLowerCase() === name.toLowerCase())) { showToast(t('admin.petExists'), true); return; }
+            try {
+                await petsRef.child(name).set({ name });
+                $('new-pet-name').value = '';
+                showToast(`${t('admin.petAdded')}: ${name}`);
+            } catch (e) { showToast(`${t('common.error')}: ${e.message}`, true); }
+        }
+
+        async function deletePet(name) {
+            if (!confirm(`${t('admin.confirmDeletePet')} "${name}"?`)) return;
+            try { await petsRef.child(name).remove(); showToast(`${t('admin.heroDeleted')}: ${name}`); }
+            catch (e) { showToast(`${t('common.error')}: ${e.message}`, true); }
+        }
+
+		function scanDuplicates() {
+			const duplicates = findDuplicates();
+			renderDuplicatesModal(duplicates);
+			$('duplicates-modal').classList.remove('hidden');
+		}
+
+		function closeDuplicatesModal() {
+			$('duplicates-modal').classList.add('hidden');
+		}
+
+		function findDuplicates() {
+			const results = {
+				identical: [],      // 5/5 enemy + 5/5 my + oba pety
+				almostIdentical: [] // 5/5 enemy + 5/5 my (pety mogą się różnić)
+			};
+			
+			const formations = allFormations;
+			
+			for (let i = 0; i < formations.length; i++) {
+				for (let j = i + 1; j < formations.length; j++) {
+					const a = formations[i];
+					const b = formations[j];
+					
+					const similarity = compareFormations(a, b);
+					
+					if (similarity.type === 'identical') {
+						addToGroup(results.identical, a, b, similarity);
+					} else if (similarity.type === 'almostIdentical') {
+						addToGroup(results.almostIdentical, a, b, similarity);
+					}
+				}
+			}
+			
+			return results;
+		}
+
+		function compareFormations(a, b) {
+			// Porównaj enemy
+			const enemyA = a.enemy.filter(h => h).map(h => h.toLowerCase()).sort();
+			const enemyB = b.enemy.filter(h => h).map(h => h.toLowerCase()).sort();
+			const enemyMatch = enemyA.length === enemyB.length && enemyA.every((h, i) => h === enemyB[i]);
+			
+			// Porównaj my
+			const myA = a.my.filter(h => h).map(h => h.toLowerCase()).sort();
+			const myB = b.my.filter(h => h).map(h => h.toLowerCase()).sort();
+			const myMatch = myA.length === myB.length && myA.every((h, i) => h === myB[i]);
+			
+			// Porównaj pety
+			const enemyPetSame = (a.enemyPet || '').toLowerCase() === (b.enemyPet || '').toLowerCase();
+			const myPetSame = (a.myPet || '').toLowerCase() === (b.myPet || '').toLowerCase();
+			
+			// Określ typ
+			if (enemyMatch && myMatch) {
+				if (enemyPetSame && myPetSame) {
+					return { type: 'identical' };
+				}
+				return { type: 'almostIdentical' };
+			}
+			
+			return { type: 'none' };
+		}
+
+		function addToGroup(groups, a, b, similarity) {
+			// Szukaj istniejącej grupy zawierającej a lub b
+			let foundGroup = null;
+			for (const group of groups) {
+				if (group.formations.some(f => f.id === a.id || f.id === b.id)) {
+					foundGroup = group;
+					break;
+				}
+			}
+			
+			if (foundGroup) {
+				if (!foundGroup.formations.some(f => f.id === a.id)) foundGroup.formations.push(a);
+				if (!foundGroup.formations.some(f => f.id === b.id)) foundGroup.formations.push(b);
+			} else {
+				groups.push({
+					formations: [a, b],
+					similarity: similarity
+				});
+			}
+		}
+
+		function renderDuplicatesModal(duplicates) {
+			const totalGroups = duplicates.identical.length + duplicates.almostIdentical.length;
+			
+			if (totalGroups === 0) {
+				$('duplicates-results').innerHTML = `
+					<div class="duplicates-empty">
+						<div class="duplicates-empty-icon">✅</div>
+						<h3>${t('duplicates.noDuplicates')}</h3>
+						<p style="color: var(--text-muted);">${t('duplicates.allUnique')}</p>
+					</div>
+				`;
+				return;
+			}
+			
+			let html = `
+				<div class="duplicates-summary">
+					<strong>${t('duplicates.found')}: ${totalGroups} ${t('duplicates.groups')}</strong><br>
+					<span style="font-size: 0.8rem; color: var(--text-muted);">
+						🔴 ${t('duplicates.identical')}: ${duplicates.identical.length} | 
+						🟠 ${t('duplicates.almostIdentical')}: ${duplicates.almostIdentical.length}
+					</span>
+				</div>
+			`;
+			
+			if (duplicates.identical.length > 0) {
+				html += `<h4 style="color: #d32f2f; margin: 20px 0 10px;">🔴 ${t('duplicates.identical')} (100%)</h4>`;
+				html += renderDuplicateGroups(duplicates.identical, 'identical');
+			}
+			
+			if (duplicates.almostIdentical.length > 0) {
+				html += `<h4 style="color: #f57c00; margin: 20px 0 10px;">🟠 ${t('duplicates.almostIdentical')}</h4>`;
+				html += renderDuplicateGroups(duplicates.almostIdentical, 'almostIdentical');
+			}
+			
+			$('duplicates-results').innerHTML = html;
+		}
+
+		function renderDuplicateGroups(groups, type) {
+			return groups.map((group, groupIndex) => {
+				const first = group.formations[0];
+				const enemyList = first.enemy.filter(h => h).join(', ') || '—';
+				const myList = first.my.filter(h => h).join(', ') || '—';
+				
+				return `
+					<div class="duplicate-group ${type}">
+						<div class="duplicate-group-header">
+							<strong>👹 ${t('duplicates.enemy')}:</strong> ${enemyList} ${first.enemyPet ? '+ ' + first.enemyPet : ''}<br>
+							<strong>⚔️ ${t('duplicates.counter')}:</strong> ${myList} ${first.myPet ? '+ ' + first.myPet : ''}
+						</div>
+						${group.formations.map(f => `
+							<div class="duplicate-item">
+								<div class="duplicate-item-info">
+									<span class="duplicate-item-name">${f.name}</span>
+									<span class="duplicate-item-id">#${f.id} ${f.isBase ? '👑 BAZA' : ''}</span>
+								</div>
+								<div class="duplicate-item-actions">
+									<button class="btn btn-small" onclick="openDuplicatePreview(${f.id})" title="${t('duplicates.preview')}">👁️</button>
+									<button class="btn btn-small btn-danger" onclick="deleteDuplicateFormation(${f.id})" title="${t('common.delete')}">🗑️</button>
+								</div>
+							</div>
+						`).join('')}
+					</div>
+				`;
+			}).join('');
+		}
+
+		function openDuplicatePreview(id) {
+			const f = allFormations.find(x => x.id === id);
+			if (!f) return;
+			
+			$('dup-preview-title').innerHTML = `👁️ #${f.id} - ${f.name} ${f.isBase ? '<span style="color: var(--accent-gold);">👑 BAZA</span>' : ''}`;
+			
+			$('dup-preview-content').innerHTML = `
+				<div class="formation-preview" style="margin-top: 15px;">
+					<div class="battle-section enemy">
+						<div class="battle-title enemy-title"><span class="title-icon">👹</span>${t('preview.enemy')}</div>
+						<div style="text-align:center">${renderBattlePet(f.enemyPet)}</div>
+						${renderBattleGrid(f.enemy, true)}
+					</div>
+					
+					<div class="vs-separator"><span class="vs-badge">VS</span></div>
+					
+					<div class="battle-section player">
+						${renderBattleGrid(f.my, false)}
+						<div style="text-align:center">${renderBattlePet(f.myPet)}</div>
+						<div class="battle-title player-title"><span class="title-icon">⚔️</span>${t('preview.yourTeam')}</div>
+					</div>
+					
+					${f.comment ? `<div class="preview-comment"><span class="comment-icon">💬</span>${f.comment}</div>` : ''}
+				</div>
+				
+				<div style="margin-top: 20px; display: flex; gap: 10px; justify-content: center;">
+					<button class="btn btn-secondary" onclick="closeDuplicatePreviewModal()">✖️ ${t('common.close')}</button>
+					<button class="btn btn-danger" onclick="closeDuplicatePreviewModal(); deleteDuplicateFormation(${f.id});">🗑️ ${t('common.delete')}</button>
+				</div>
+			`;
+			
+			$('duplicate-preview-modal').classList.remove('hidden');
+		}
+
+		function closeDuplicatePreviewModal() {
+			$('duplicate-preview-modal').classList.add('hidden');
+		}
+
+		async function deleteDuplicateFormation(id) {
+			const f = allFormations.find(x => x.id === id);
+			if (!f) return;
+			
+			if (!confirm(`${t('duplicates.confirmDelete')} #${id} "${f.name}"?`)) return;
+			
+			try {
+				await formationsRef.child(String(id)).remove();
+				showToast(`🗑️ ${t('database.deleted')} #${id}`);
+				// Odśwież wyniki skanera
+				scanDuplicates();
+			} catch (e) {
+				showToast(`${t('common.error')}: ${e.message}`, true);
+			}
+		}
+
+		function confirmDeleteAllUserFormations() {
+			const userFormations = allFormations.filter(f => !f.isBase);
+			
+			if (userFormations.length === 0) {
+				showToast(t('admin.noUserFormations') || 'Brak formacji użytkowników do usunięcia!');
+				return;
+			}
+			
+			// Pierwsze potwierdzenie
+			if (!confirm(`⚠️ ${t('admin.deleteAllConfirm1')} ${userFormations.length} ${t('admin.formations')}?`)) return;
+			
+			// Drugie potwierdzenie - wpisanie liczby
+			const confirmNumber = prompt(`${t('admin.deleteAllConfirm2')} ${userFormations.length}:`);
+			
+			if (confirmNumber !== String(userFormations.length)) {
+				showToast('❌ ' + t('admin.deleteAllCancelled'), true);
+				return;
+			}
+			
+			// Wykonaj usunięcie
+			deleteAllUserFormationsConfirmed(userFormations);
+		}
+
+		async function deleteAllUserFormationsConfirmed(userFormations) {
+			if (!isOnline) { showToast(t('common.noConnection'), true); return; }
+			
+			try {
+				for (const f of userFormations) {
+					await formationsRef.child(String(f.id)).remove();
+				}
+				showToast(`✅ ${t('admin.deletedAll')} ${userFormations.length} ${t('admin.formations')}!`);
+			} catch (e) {
+				showToast(`${t('common.error')}: ${e.message}`, true);
+			}
+		}
+
+
+        // ═══════════════════════════════════════════════════════════
+        // FIREBASE INIT — realtime listenery formacji/heroes/pets
+        // ═══════════════════════════════════════════════════════════
+
+        // FIREBASE
+        try {
+            firebase.initializeApp(firebaseConfig);
+            db = firebase.database();
+            formationsRef = db.ref('formations');
+            heroesRef = db.ref('heroes');
+            petsRef = db.ref('pets');
+            
+            formationsRef.on('value', snap => {
+                allFormations = snap.val() ? Object.values(snap.val()).sort((a, b) => a.id - b.id) : [];
+                updateUI();
+                $('loading').classList.add('hidden');
+                setOnlineStatus(true);
+            }, () => { setOnlineStatus(false); $('loading').classList.add('hidden'); });
+            
+            heroesRef.on('value', snap => {
+                if (snap.val()) {
+                    heroes = Object.values(snap.val()).sort((a, b) => a.name.localeCompare(b.name));
+                    if (isAdmin) renderHeroesList();
+                    // Regeneruj tagi po załadowaniu bohaterów z bazy
+                    generateWarTags();
+                    generateKreatorTags();
+                    generateAddFormTags();
+                }
+            });
+            
+            petsRef.on('value', snap => {
+                if (snap.val()) {
+                    pets = Object.values(snap.val()).map(getPetName).sort();
+                    if (isAdmin) renderPetsList();
+                    // Regeneruj tagi po załadowaniu petów z bazy
+                    generateWarTags();
+                    generateKreatorTags();
+                    generateAddFormTags();
+                }
+            });
+            
+            db.ref('.info/connected').on('value', snap => setOnlineStatus(snap.val() === true));
+        } catch (e) {
+            console.error('Firebase error:', e);
+            setOnlineStatus(false);
+            $('loading').classList.add('hidden');
+        }
+
         // =====================================================
         // INICJALIZACJA
         // =====================================================
