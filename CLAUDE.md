@@ -14,9 +14,9 @@ Produkcyjna wersja aplikacji żyje w osobnym repo `Souls-war` (publiczne, https:
 
 Aplikacja rozbita na trzy pliki serwowane statycznie (GitHub Pages, bez build systemu, bez menedżera pakietów, bez testów):
 
-- `souls-war.html` — szkielet HTML (~880 linii): `<head>`, modale, zakładki jako `<div>`, pasek nawigacji
-- `souls-war.css` — wszystkie style (~2600 linii)
-- `souls-war.js` — całość logiki (~6050 linii): init Firebase, stan globalny, tłumaczenia, wszystkie funkcje
+- `souls-war.html` — szkielet HTML (~900 linii): `<head>`, modale, zakładki jako `<div>`, pasek nawigacji. Każda zakładka i grupa modali poprzedzona wyraźnym separatorem `<!-- ═══ TAB: X ═══ -->`.
+- `souls-war.css` — wszystkie style (~2630 linii). Na górze spis treści z numerowanymi sekcjami (1. TOKENS … 25. MEDIA QUERIES) — używaj go do orientacji zamiast `Ctrl+F` po nazwach klas.
+- `souls-war.js` — całość logiki (~6180 linii). Po bloku top-levelu (config, hashe, fallbacki, translations, helpery, FORM_FIELD_CONFIG) funkcje są pogrupowane w 11 nazwanych sekcji z nagłówkami: `AUTH`, `UI CORE`, `SHARED HELPERS`, `RACE ORDER + QUICK TAGS`, `TAB: SEARCH`, `TAB: DATABASE`, `TAB: VIEW`, `TAB: ADD`, `TAB: WAR + WAR-PREVIEW`, `TAB: KREATOR`, `TAB: SETTINGS + ADMIN`, potem `FIREBASE INIT` i na końcu `DOMContentLoaded` + event listenery. Dodając nową funkcję, wrzucaj ją do właściwej sekcji — nie dopisuj „na końcu pliku".
 - `README.md` — dokumentacja użytkownika (po polsku, identyczna z produkcją)
 - `SOULS_Heroes_Database.xlsx` — arkusz referencyjny (nie ładowany przez aplikację)
 
