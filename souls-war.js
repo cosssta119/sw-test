@@ -2369,7 +2369,7 @@
             
             $('quick-select-tags').innerHTML = isPet ? 
                 `<div class="quick-tags-section"><div class="quick-tags-header expanded" onclick="toggleQuickTagSection(this)"><span class="toggle-icon">▶</span> 🐾 ${t('quickTags.pets')}</div><div class="quick-tags-content show"><div class="quick-tags">${pets.map(p => `<span class="quick-tag tag-pet" onclick="selectQuickItem('${getPetName(p)}')">${getPetName(p)}</span>`).join('')}</div></div></div>` :
-                RACE_ORDER.filter(r => raceGroups[r].length).map(r => `<div class="quick-tags-section"><div class="quick-tags-header expanded" onclick="toggleQuickTagSection(this)"><span class="toggle-icon">▶</span>${RACE_EMOJI[r]} ${r} (${raceGroups[r].length})</div><div class="quick-tags-content show"><div class="quick-tags">${raceGroups[r].map(n => `<span class="quick-tag tag-${r.toLowerCase()}" onclick="selectQuickItem('${n}')">${n}</span>`).join('')}</div></div></div>`).join('');
+                RACE_ORDER.filter(r => raceGroups[r].length).map(r => `<div class="quick-tags-section"><div class="quick-tags-header expanded" onclick="toggleQuickTagSection(this)"><span class="toggle-icon">▶</span>${RACE_EMOJI[r]} ${raceLabel(r)} (${raceGroups[r].length})</div><div class="quick-tags-content show"><div class="quick-tags">${raceGroups[r].map(n => `<span class="quick-tag tag-${r.toLowerCase()}" onclick="selectQuickItem('${n}')">${n}</span>`).join('')}</div></div></div>`).join('');
             
             $('quick-select-modal').classList.remove('hidden');
         }
@@ -6243,7 +6243,7 @@
             heroes.forEach(h => { (byRace[h.race] = byRace[h.race] || []).push(h); });
             
             $('heroes-list').innerHTML = Object.keys(byRace).sort().map(r =>
-                `<div style="font-size:0.7rem;color:var(--accent-gold);margin:10px 0 5px;border-bottom:1px solid var(--border);padding-bottom:3px;">${r} (${byRace[r].length})</div>` +
+                `<div style="font-size:0.7rem;color:var(--accent-gold);margin:10px 0 5px;border-bottom:1px solid var(--border);padding-bottom:3px;">${raceLabel(r)} (${byRace[r].length})</div>` +
                 byRace[r].map(h => `<div class="entity-item"><span class="entity-name">${h.name}</span><button class="btn btn-danger btn-small" onclick="deleteHero('${h.name}')">🗑️</button></div>`).join('')
             ).join('') || `<p style="color:var(--text-muted);text-align:center;">${t('database.noFormations')}</p>`;
         }
