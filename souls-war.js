@@ -41,7 +41,7 @@
         let favorites = storage.getJson('souls_favorites', []);
         let currentLang = localStorage.getItem('souls_lang') || 'pl';
         let currentDbFilter = 'all';
-		let currentDbSort = 'date-desc';
+		let currentDbSort = 'id-desc';
         let quickSelectTarget = null, activeAddField = null, activeSearchField = null, editingFormationId = null;
 		let currentTheme = localStorage.getItem('souls_theme') || 'dark';
 		let isGuildAuthenticated = false;
@@ -239,7 +239,51 @@
 				'kreator.hide.hiddenFrom': '🚫 {name} ukryty w tagach',
 				'kreator.hide.empty': 'Brak ukrytych',
 				'common.remove': 'Usuń',
-                'badge.base': 'BAZA', 'badge.user': 'DODANA'
+                'badge.base': 'BAZA', 'badge.user': 'DODANA',
+				'nav.defense': 'Obrona',
+				'defense.title': 'Obrona gildii',
+				'defense.viewPlayers': 'Gracze', 'defense.viewFormations': 'Składy', 'defense.viewAdd': 'Dodaj skład',
+				'defense.newPlayerPlaceholder': 'Nazwa gracza...', 'defense.addPlayer': 'Dodaj gracza',
+				'defense.statsPlayers': 'Graczy', 'defense.statsFormations': 'Składów', 'defense.statsAssigned': 'Aktywnych przypięć',
+				'defense.noPlayers': 'Brak graczy. Dodaj pierwszego powyżej.',
+				'defense.noFormations': 'Brak składów. Dodaj pierwszy w zakładce "Dodaj skład".',
+				'defense.searchPlaceholder': '🔍 Szukaj po nazwie/bohaterze...',
+				'defense.formationNameLabel': 'Nazwa składu (opcjonalnie)', 'defense.formationNamePlaceholder': 'np. Anti-Fire v2',
+				'defense.formationTeam': 'Skład obronny',
+				'defense.assignToPlayerLabel': 'Przypisz od razu do gracza (opcjonalnie)', 'defense.noAssign': '— Nie przypisuj —',
+				'defense.commentLabel': 'Komentarz (opcjonalnie)', 'defense.commentPlaceholder': 'np. używany od marca 2026',
+				'defense.saveBtn': 'ZAPISZ SKŁAD',
+				'defense.backToPlayers': 'Wróć do graczy', 'defense.deletePlayer': 'Usuń gracza',
+				'defense.assignTitle': 'Przypisz skład do gracza', 'defense.assignFormationLabel': 'Skład',
+				'defense.assignPickPlayer': 'Wybierz gracza', 'defense.assignConfirm': 'Przypisz',
+				'defense.playerExists': 'Gracz o tej nazwie już istnieje!',
+				'defense.playerNameRequired': 'Podaj nazwę gracza!',
+				'defense.playerAdded': 'Dodano gracza',
+				'defense.confirmDeletePlayer': 'Usunąć gracza {name}? (Składy zostaną, przypięcia będą oznaczone jako odpięte)',
+				'defense.playerDeleted': 'Gracz usunięty',
+				'defense.formationEmpty': 'Skład musi mieć przynajmniej jednego bohatera!',
+				'defense.unknownHero': 'Nieznany bohater',
+				'defense.unknownPet': 'Nieznany pet',
+				'defense.formationSaved': 'Skład zapisany',
+				'defense.formationReused': 'Identyczny skład już istnieje — używam tego samego rekordu',
+				'defense.assignSuccess': 'Skład przypięty do gracza',
+				'defense.maxAssignmentsReached': 'Gracz ma już 3 aktywne składy! Najpierw odepnij jeden.',
+				'defense.duplicateHeroes': 'Konflikt — bohater {name} jest już w innym aktywnym składzie tego gracza',
+				'defense.duplicatePet': 'Konflikt — pet {name} jest już w innym aktywnym składzie tego gracza',
+				'defense.alreadyAssigned': 'Ten skład jest już przypięty do tego gracza',
+				'defense.unassignBtn': 'Odepnij', 'defense.unassignSuccess': 'Odpięto skład',
+				'defense.confirmUnassign': 'Odpiąć ten skład od gracza? (Skład zostanie w bazie)',
+				'defense.slot': 'Skład', 'defense.emptySlot': 'Pusty slot — dodaj kolejny skład w "Dodaj"',
+				'defense.assignedAt': 'Przypięto', 'defense.formationCreatedAt': 'Skład utworzony',
+				'defense.usersCount': 'Używa', 'defense.usersZero': 'Nikt nie używa',
+				'defense.historyTitle': 'Historia przypięć gracza',
+				'defense.historyEmpty': 'Brak historii przypięć',
+				'defense.historyActive': 'AKTYWNE', 'defense.historyUnpinned': 'odpięte',
+				'defense.viewInDb': 'Otwórz w bazie składów',
+				'defense.deleteFormation': 'Usuń skład',
+				'defense.confirmDeleteFormation': 'Usunąć skład #{id}? Tej operacji nie da się cofnąć. Wszystkie przypięcia (aktywne i historyczne) zostaną też usunięte.',
+				'defense.formationDeleted': 'Skład usunięty',
+				'defense.cannotDeleteFormationInUse': 'Nie można usunąć — skład jest aktywnie przypięty do {n} graczy. Najpierw odepnij.'
             },
             en: {
                 'loading': 'Loading data...', 'common.loading': 'Loading...', 'common.cancel': 'Cancel', 'common.clear': 'Clear',
@@ -392,7 +436,51 @@
 				'kreator.hide.hiddenFrom': '🚫 {name} hidden from tags',
 				'kreator.hide.empty': 'None hidden',
 				'common.remove': 'Remove',
-                'badge.base': 'BASE', 'badge.user': 'ADDED'
+                'badge.base': 'BASE', 'badge.user': 'ADDED',
+				'nav.defense': 'Defense',
+				'defense.title': 'Guild defense',
+				'defense.viewPlayers': 'Players', 'defense.viewFormations': 'Formations', 'defense.viewAdd': 'Add formation',
+				'defense.newPlayerPlaceholder': 'Player name...', 'defense.addPlayer': 'Add player',
+				'defense.statsPlayers': 'Players', 'defense.statsFormations': 'Formations', 'defense.statsAssigned': 'Active pins',
+				'defense.noPlayers': 'No players. Add the first one above.',
+				'defense.noFormations': 'No formations. Add one in the "Add formation" tab.',
+				'defense.searchPlaceholder': '🔍 Search by name/hero...',
+				'defense.formationNameLabel': 'Formation name (optional)', 'defense.formationNamePlaceholder': 'e.g. Anti-Fire v2',
+				'defense.formationTeam': 'Defense formation',
+				'defense.assignToPlayerLabel': 'Assign to player right away (optional)', 'defense.noAssign': '— Do not assign —',
+				'defense.commentLabel': 'Comment (optional)', 'defense.commentPlaceholder': 'e.g. used since March 2026',
+				'defense.saveBtn': 'SAVE FORMATION',
+				'defense.backToPlayers': 'Back to players', 'defense.deletePlayer': 'Delete player',
+				'defense.assignTitle': 'Assign formation to player', 'defense.assignFormationLabel': 'Formation',
+				'defense.assignPickPlayer': 'Pick a player', 'defense.assignConfirm': 'Assign',
+				'defense.playerExists': 'A player with this name already exists!',
+				'defense.playerNameRequired': 'Enter a player name!',
+				'defense.playerAdded': 'Player added',
+				'defense.confirmDeletePlayer': 'Delete player {name}? (Formations stay; pins will be marked as unpinned)',
+				'defense.playerDeleted': 'Player deleted',
+				'defense.formationEmpty': 'Formation must have at least one hero!',
+				'defense.unknownHero': 'Unknown hero',
+				'defense.unknownPet': 'Unknown pet',
+				'defense.formationSaved': 'Formation saved',
+				'defense.formationReused': 'Identical formation already exists — reusing the same record',
+				'defense.assignSuccess': 'Formation pinned to player',
+				'defense.maxAssignmentsReached': 'Player already has 3 active formations! Unpin one first.',
+				'defense.duplicateHeroes': 'Conflict — hero {name} is already in another active formation for this player',
+				'defense.duplicatePet': 'Conflict — pet {name} is already in another active formation for this player',
+				'defense.alreadyAssigned': 'This formation is already pinned to this player',
+				'defense.unassignBtn': 'Unpin', 'defense.unassignSuccess': 'Unpinned',
+				'defense.confirmUnassign': 'Unpin this formation from the player? (Formation stays in the database)',
+				'defense.slot': 'Formation', 'defense.emptySlot': 'Empty slot — add another formation in "Add"',
+				'defense.assignedAt': 'Pinned', 'defense.formationCreatedAt': 'Formation created',
+				'defense.usersCount': 'Used by', 'defense.usersZero': 'Nobody uses this',
+				'defense.historyTitle': 'Player pin history',
+				'defense.historyEmpty': 'No pin history',
+				'defense.historyActive': 'ACTIVE', 'defense.historyUnpinned': 'unpinned',
+				'defense.viewInDb': 'Open in formations list',
+				'defense.deleteFormation': 'Delete formation',
+				'defense.confirmDeleteFormation': 'Delete formation #{id}? This cannot be undone. All pins (active and historical) will also be removed.',
+				'defense.formationDeleted': 'Formation deleted',
+				'defense.cannotDeleteFormationInUse': 'Cannot delete — formation is actively pinned to {n} players. Unpin first.'
             }
         };
         
@@ -525,6 +613,7 @@
 			$('nav-admin').classList.add('show');
 			$('nav-settings').classList.add('show');
 			$('nav-war').classList.add('show');
+			$('nav-defense')?.classList.add('show');
 			// Pokaż opcję "formacja bazowa" w formularzu dodawania
 			const baseOption = $('add-base-option');
 			if (baseOption) baseOption.style.display = 'block';
@@ -540,6 +629,7 @@
 			$('nav-admin').classList.remove('show');
 			$('nav-settings').classList.remove('show');
 			$('nav-war').classList.remove('show');
+			$('nav-defense')?.classList.remove('show');
 			// Ukryj opcję "formacja bazowa" w formularzu dodawania
 			const baseOption = $('add-base-option');
 			if (baseOption) baseOption.style.display = 'none';
@@ -641,7 +731,7 @@
 			document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
 			document.querySelector(`.nav-btn[onclick="switchTab('${name}')"]`)?.classList.add('active');
 			$(`tab-${name}`)?.classList.add('active');
-			
+
 			// Pokaż/ukryj sekcję wykluczonych na wybranych zakładkach
 			const excludedSection = $('excluded-section');
 			if (excludedSection) {
@@ -654,6 +744,9 @@
 					excludedSection.style.display = 'none';
 				}
 			}
+
+			// Defense: zawsze rerenduj bieżący pod-widok przy wejściu (świeże liczniki/listy)
+			if (name === 'defense') switchDefenseView(currentDefenseView);
 		}
 
 		// Formatuj datę do czytelnego formatu (z godziną jeśli != 00:00)
@@ -1049,6 +1142,11 @@
 			'kreator-3': {
 				fields: ['kreator-3-h1', 'kreator-3-h2', 'kreator-3-h3', 'kreator-3-h4', 'kreator-3-h5', 'kreator-3-h6', 'kreator-3-h7', 'kreator-3-h8', 'kreator-3-pet'],
 				tabId: 'tab-kreator'
+			},
+			// Obrona - dodawanie nowego składu obronnego
+			'defense-add': {
+				fields: ['defense-my1', 'defense-my2', 'defense-my3', 'defense-my4', 'defense-my5', 'defense-my6', 'defense-my7', 'defense-my8', 'defense-myPet'],
+				tabId: 'tab-defense'
 			}
 		};
 
@@ -1071,6 +1169,7 @@
 			if (fieldId.startsWith('kreator-1')) return 'kreator-1';
 			if (fieldId.startsWith('kreator-2')) return 'kreator-2';
 			if (fieldId.startsWith('kreator-3')) return 'kreator-3';
+			if (fieldId.startsWith('defense-my')) return 'defense-add';
 			return null;
 		}
 
@@ -5462,6 +5561,542 @@
 
 
         // ═══════════════════════════════════════════════════════════
+        // TAB: DEFENSE — składy obronne gildii + gracze + przypięcia
+        // ═══════════════════════════════════════════════════════════
+
+        // Stan zakładki Obrona (cache + widoki).
+        let defenseFormationsRef = null, defensePlayersRef = null, defenseAssignmentsRef = null;
+        let allDefenseFormations = [];   // { id, my[8], myPet, name, comment, createdAt, fingerprint }
+        let allDefensePlayers = [];      // { id, name, createdAt, deletedAt }
+        let allDefenseAssignments = [];  // { id, playerId, formationId, assignedAt, unassignedAt }
+        let currentDefenseView = 'players';
+        let currentDefensePlayerId = null;
+        let pendingAssignFormationId = null;
+        let currentDefenseSort = 'id-desc'; // id-desc | id-asc | date-desc | date-asc | users-desc | users-asc
+
+        // Fingerprint slot-by-slot — pozwala wykryć identyczne składy (te same hero NA tych samych pozycjach + ten sam pet).
+        function defenseFingerprint(my, pet) {
+            const slots = [];
+            for (let i = 0; i < 8; i++) slots.push(normalize(my[i] || ''));
+            return slots.join('|') + '||' + normalize(pet || '');
+        }
+
+        function findDefenseFormationByFingerprint(fp) {
+            return allDefenseFormations.find(f => f.fingerprint === fp) || null;
+        }
+
+        // Aktywne (nie odpięte i nie do skasowanego gracza) przypięcia danego gracza.
+        function getActiveAssignmentsForPlayer(playerId) {
+            return allDefenseAssignments.filter(a => a.playerId === playerId && !a.unassignedAt);
+        }
+
+        // Wszystkie aktywne przypięcia danego składu — z odfiltrowaniem skasowanych graczy.
+        function getActiveAssignmentsForFormation(formationId) {
+            const livePlayerIds = new Set(allDefensePlayers.filter(p => !p.deletedAt).map(p => p.id));
+            return allDefenseAssignments.filter(a => a.formationId === formationId && !a.unassignedAt && livePlayerIds.has(a.playerId));
+        }
+
+        function getDefensePlayer(playerId) {
+            return allDefensePlayers.find(p => p.id === playerId) || null;
+        }
+
+        function getDefenseFormation(formationId) {
+            return allDefenseFormations.find(f => f.id === formationId) || null;
+        }
+
+        // Generator ID — Firebase push() byłby ładniejszy, ale trzymamy się stylu istniejących formacji.
+        function nextDefenseId(collection) {
+            return collection.length ? Math.max(...collection.map(x => x.id)) + 1 : 1;
+        }
+
+        // ─── Akcje: gracze ───────────────────────────────────────
+
+        async function addDefensePlayer() {
+            if (!isAdmin) return;
+            const input = $('defense-new-player-name');
+            const name = (input?.value || '').trim();
+            if (!name) { showToast('❌ ' + t('defense.playerNameRequired'), true); return; }
+
+            const exists = allDefensePlayers.some(p => !p.deletedAt && p.name.toLowerCase() === name.toLowerCase());
+            if (exists) { showToast('⚠️ ' + t('defense.playerExists'), true); return; }
+
+            if (!defensePlayersRef) { showToast('❌ ' + t('common.noConnection'), true); return; }
+
+            const id = nextDefenseId(allDefensePlayers);
+            try {
+                await defensePlayersRef.child(String(id)).set({
+                    id, name, createdAt: new Date().toISOString()
+                });
+                input.value = '';
+                showToast('✅ ' + t('defense.playerAdded') + ': ' + name);
+                renderDefensePlayersList();
+                refreshDefenseAssignDropdown();
+            } catch (e) {
+                showToast(t('common.error') + ': ' + e.message, true);
+            }
+        }
+
+        async function deleteDefensePlayer() {
+            if (!isAdmin || !currentDefensePlayerId) return;
+            const player = getDefensePlayer(currentDefensePlayerId);
+            if (!player) return;
+            const msg = t('defense.confirmDeletePlayer').replace('{name}', player.name);
+            if (!confirm(msg)) return;
+
+            try {
+                await defensePlayersRef.child(String(player.id)).update({
+                    deletedAt: new Date().toISOString()
+                });
+                // Soft-delete: aktywne przypięcia oznaczamy jako odpięte (zostaje historia)
+                const active = getActiveAssignmentsForPlayer(player.id);
+                const now = new Date().toISOString();
+                await Promise.all(active.map(a =>
+                    defenseAssignmentsRef.child(String(a.id)).update({ unassignedAt: now })
+                ));
+                showToast('🗑️ ' + t('defense.playerDeleted'));
+                switchDefenseView('players');
+            } catch (e) {
+                showToast(t('common.error') + ': ' + e.message, true);
+            }
+        }
+
+        // ─── Akcje: składy ───────────────────────────────────────
+
+        // Zwraca { ok: true, formation, reused } LUB { ok: false } po toast-błędzie.
+        // Wyciągnięte z saveDefenseFormation żeby zadziałało też przy przypisaniu od razu.
+        async function persistDefenseFormation({ name, my, myPet, comment }) {
+            if (!defenseFormationsRef) { showToast('❌ ' + t('common.noConnection'), true); return { ok: false }; }
+
+            const hasAnyHero = my.some(h => h && h.trim());
+            if (!hasAnyHero && !myPet) { showToast('❌ ' + t('defense.formationEmpty'), true); return { ok: false }; }
+
+            // Walidacja istnienia bohaterów/petów (twardo, jak w add).
+            const unknownHero = my.find(h => h && !heroes.some(x => x.name.toLowerCase() === h.toLowerCase()));
+            if (unknownHero) { showToast('❌ ' + t('defense.unknownHero') + ': ' + unknownHero, true); return { ok: false }; }
+            if (myPet && !pets.some(p => getPetName(p).toLowerCase() === myPet.toLowerCase())) {
+                showToast('❌ ' + t('defense.unknownPet') + ': ' + myPet, true); return { ok: false };
+            }
+
+            const fp = defenseFingerprint(my, myPet);
+            const existing = findDefenseFormationByFingerprint(fp);
+            if (existing) {
+                showToast('ℹ️ ' + t('defense.formationReused') + ' #' + existing.id);
+                return { ok: true, formation: existing, reused: true };
+            }
+
+            const id = nextDefenseId(allDefenseFormations);
+            const record = {
+                id,
+                my,
+                myPet: myPet || '',
+                name: (name || '').trim() || `Skład #${id}`,
+                comment: (comment || '').trim(),
+                createdAt: new Date().toISOString(),
+                fingerprint: fp
+            };
+            try {
+                await defenseFormationsRef.child(String(id)).set(record);
+                showToast('💾 ' + t('defense.formationSaved') + ' #' + id);
+                return { ok: true, formation: record, reused: false };
+            } catch (e) {
+                showToast(t('common.error') + ': ' + e.message, true);
+                return { ok: false };
+            }
+        }
+
+        async function saveDefenseFormation() {
+            if (!isAdmin) return;
+            const name = $('defense-add-name').value.trim();
+            const comment = $('defense-add-comment').value.trim();
+            const my = [];
+            for (let i = 1; i <= 8; i++) my.push(($(`defense-my${i}`).value || '').trim());
+            const myPet = ($('defense-myPet').value || '').trim();
+            const assignPlayerId = $('defense-add-assign-player').value;
+
+            const result = await persistDefenseFormation({ name, my, myPet, comment });
+            if (!result.ok) return;
+
+            if (assignPlayerId) {
+                const ok = await assignDefenseFormation(result.formation.id, Number(assignPlayerId));
+                if (!ok) return; // Toast już pokazany; nie zerujemy formularza, żeby user mógł poprawić
+            }
+            clearDefenseAddForm();
+        }
+
+        function clearDefenseAddForm() {
+            $('defense-add-name').value = '';
+            $('defense-add-comment').value = '';
+            for (let i = 1; i <= 8; i++) {
+                const el = $(`defense-my${i}`);
+                if (el) { el.value = ''; setValidation(el, null); }
+            }
+            const petEl = $('defense-myPet');
+            if (petEl) { petEl.value = ''; setValidation(petEl, null); }
+            $('defense-add-assign-player').value = '';
+        }
+
+        async function deleteDefenseFormation(formationId) {
+            if (!isAdmin) return;
+            const f = getDefenseFormation(formationId);
+            if (!f) return;
+            const activeCount = getActiveAssignmentsForFormation(formationId).length;
+            if (activeCount > 0) {
+                showToast('⚠️ ' + t('defense.cannotDeleteFormationInUse').replace('{n}', activeCount), true);
+                return;
+            }
+            if (!confirm(t('defense.confirmDeleteFormation').replace('{id}', formationId))) return;
+
+            try {
+                // Skasuj wszystkie przypięcia (też historyczne odpięte) tego składu, bo inaczej zostawią sieroty.
+                const orphanAssignments = allDefenseAssignments.filter(a => a.formationId === formationId);
+                await Promise.all(orphanAssignments.map(a => defenseAssignmentsRef.child(String(a.id)).remove()));
+                await defenseFormationsRef.child(String(formationId)).remove();
+                showToast('🗑️ ' + t('defense.formationDeleted'));
+            } catch (e) {
+                showToast(t('common.error') + ': ' + e.message, true);
+            }
+        }
+
+        // ─── Akcje: przypisania ──────────────────────────────────
+
+        // Reguły: max 3 aktywne, żaden hero/pet się nie powtarza, ten sam skład nie przypięty 2x.
+        function validateDefenseAssignment(formationId, playerId) {
+            const formation = getDefenseFormation(formationId);
+            if (!formation) return { ok: false, msg: t('common.error') };
+            const active = getActiveAssignmentsForPlayer(playerId);
+
+            if (active.some(a => a.formationId === formationId)) {
+                return { ok: false, msg: t('defense.alreadyAssigned') };
+            }
+            if (active.length >= 3) {
+                return { ok: false, msg: t('defense.maxAssignmentsReached') };
+            }
+
+            const existingHeroes = new Set();
+            const existingPets = new Set();
+            for (const a of active) {
+                const f = getDefenseFormation(a.formationId);
+                if (!f) continue;
+                f.my.forEach(h => { if (h) existingHeroes.add(h.toLowerCase()); });
+                if (f.myPet) existingPets.add(f.myPet.toLowerCase());
+            }
+            for (const h of formation.my) {
+                if (h && existingHeroes.has(h.toLowerCase())) {
+                    return { ok: false, msg: t('defense.duplicateHeroes').replace('{name}', h) };
+                }
+            }
+            if (formation.myPet && existingPets.has(formation.myPet.toLowerCase())) {
+                return { ok: false, msg: t('defense.duplicatePet').replace('{name}', formation.myPet) };
+            }
+            return { ok: true };
+        }
+
+        async function assignDefenseFormation(formationId, playerId) {
+            if (!isAdmin) return false;
+            const check = validateDefenseAssignment(formationId, playerId);
+            if (!check.ok) { showToast('⚠️ ' + check.msg, true); return false; }
+
+            const id = nextDefenseId(allDefenseAssignments);
+            try {
+                await defenseAssignmentsRef.child(String(id)).set({
+                    id, playerId, formationId, assignedAt: new Date().toISOString()
+                });
+                showToast('🔗 ' + t('defense.assignSuccess'));
+                return true;
+            } catch (e) {
+                showToast(t('common.error') + ': ' + e.message, true);
+                return false;
+            }
+        }
+
+        async function unassignDefenseFormation(assignmentId) {
+            if (!isAdmin) return;
+            if (!confirm(t('defense.confirmUnassign'))) return;
+            try {
+                await defenseAssignmentsRef.child(String(assignmentId)).update({
+                    unassignedAt: new Date().toISOString()
+                });
+                showToast('✂️ ' + t('defense.unassignSuccess'));
+            } catch (e) {
+                showToast(t('common.error') + ': ' + e.message, true);
+            }
+        }
+
+        // ─── Modal: przypisz skład → gracz ───────────────────────
+
+        function openDefenseAssignModal(formationId) {
+            if (!isAdmin) return;
+            const f = getDefenseFormation(formationId);
+            if (!f) return;
+            pendingAssignFormationId = formationId;
+            $('defense-assign-formation-name').textContent = f.name + ' (#' + formationId + ')';
+            const select = $('defense-assign-player-select');
+            const livePlayers = allDefensePlayers.filter(p => !p.deletedAt);
+            select.innerHTML = livePlayers.length
+                ? livePlayers.map(p => `<option value="${p.id}">${p.name}</option>`).join('')
+                : `<option value="" disabled>${t('defense.noPlayers')}</option>`;
+            $('defense-assign-modal').classList.remove('hidden');
+        }
+
+        function closeDefenseAssignModal() {
+            $('defense-assign-modal').classList.add('hidden');
+            pendingAssignFormationId = null;
+        }
+
+        async function confirmDefenseAssign() {
+            const select = $('defense-assign-player-select');
+            const playerId = Number(select.value);
+            if (!playerId || !pendingAssignFormationId) return;
+            const ok = await assignDefenseFormation(pendingAssignFormationId, playerId);
+            if (ok) closeDefenseAssignModal();
+        }
+
+        // ─── Sub-tab routing ─────────────────────────────────────
+
+        function switchDefenseView(view, playerId = null) {
+            currentDefenseView = view;
+            if (view === 'player' && playerId != null) currentDefensePlayerId = playerId;
+
+            document.querySelectorAll('.defense-subnav-btn').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+            document.querySelectorAll('.defense-view').forEach(el => el.style.display = 'none');
+
+            const viewId = view === 'player' ? 'defense-view-player' : `defense-view-${view}`;
+            const el = $(viewId);
+            if (el) el.style.display = 'block';
+
+            if (view === 'players') renderDefensePlayersList();
+            else if (view === 'formations') renderDefenseFormations();
+            else if (view === 'add') refreshDefenseAssignDropdown();
+            else if (view === 'player') renderDefensePlayerDetail();
+        }
+
+        // ─── Render: lista graczy ────────────────────────────────
+
+        function renderDefensePlayersList() {
+            const list = $('defense-players-list');
+            if (!list) return;
+            const livePlayers = allDefensePlayers.filter(p => !p.deletedAt).sort((a, b) => a.name.localeCompare(b.name, 'pl'));
+            const activeAssignments = allDefenseAssignments.filter(a => !a.unassignedAt);
+
+            $('defense-stat-players').textContent = livePlayers.length;
+            $('defense-stat-formations').textContent = allDefenseFormations.length;
+            $('defense-stat-assigned').textContent = activeAssignments.filter(a => livePlayers.some(p => p.id === a.playerId)).length;
+
+            if (livePlayers.length === 0) {
+                list.innerHTML = `<div class="empty-state"><p>${t('defense.noPlayers')}</p></div>`;
+                return;
+            }
+
+            list.innerHTML = livePlayers.map(p => {
+                const count = getActiveAssignmentsForPlayer(p.id).length;
+                const badgeClass = count === 0 ? 'empty' : (count === 3 ? 'full' : '');
+                return `
+                    <div class="defense-player-card" onclick="switchDefenseView('player', ${p.id})">
+                        <div class="defense-player-card-name">${escapeHtml(p.name)}</div>
+                        <div class="defense-player-card-meta">
+                            <span>📅 ${formatDate(p.createdAt) || '—'}</span>
+                            <span class="defense-player-card-badge ${badgeClass}">${count}/3</span>
+                        </div>
+                    </div>`;
+            }).join('');
+        }
+
+        // ─── Render: lista składów ───────────────────────────────
+
+        function setDefenseSort(sort) {
+            currentDefenseSort = sort;
+            document.querySelectorAll('.sort-btn[data-defense-sort]').forEach(b =>
+                b.classList.toggle('active', b.dataset.defenseSort === sort));
+            renderDefenseFormations();
+        }
+
+        function renderDefenseFormations() {
+            const list = $('defense-formations-list');
+            if (!list) return;
+            const query = ($('defense-formation-search')?.value || '').toLowerCase().trim();
+
+            // Liczba aktywnych przypięć dla każdego składu (jednorazowo, żeby sortowanie po users było tanie)
+            const usersCount = new Map();
+            for (const f of allDefenseFormations) {
+                usersCount.set(f.id, getActiveAssignmentsForFormation(f.id).length);
+            }
+
+            const sorters = {
+                'id-desc':    (a, b) => b.id - a.id,
+                'id-asc':     (a, b) => a.id - b.id,
+                'date-desc':  (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
+                'date-asc':   (a, b) => new Date(a.createdAt) - new Date(b.createdAt),
+                'users-desc': (a, b) => usersCount.get(b.id) - usersCount.get(a.id) || b.id - a.id,
+                'users-asc':  (a, b) => usersCount.get(a.id) - usersCount.get(b.id) || a.id - b.id,
+            };
+            let formations = [...allDefenseFormations].sort(sorters[currentDefenseSort] || sorters['id-desc']);
+            if (query) {
+                formations = formations.filter(f => {
+                    if (f.name.toLowerCase().includes(query)) return true;
+                    if ((f.comment || '').toLowerCase().includes(query)) return true;
+                    return f.my.some(h => (h || '').toLowerCase().includes(query)) || (f.myPet || '').toLowerCase().includes(query);
+                });
+            }
+
+            if (formations.length === 0) {
+                list.innerHTML = `<div class="empty-state"><p>${t('defense.noFormations')}</p></div>`;
+                return;
+            }
+
+            list.innerHTML = formations.map(f => {
+                const active = getActiveAssignmentsForFormation(f.id);
+                const usersHtml = active.length === 0
+                    ? `<span style="color: var(--text-muted); font-style: italic;">${t('defense.usersZero')}</span>`
+                    : active.map(a => {
+                        const p = getDefensePlayer(a.playerId);
+                        if (!p) return '';
+                        return `<span class="defense-formation-row-user-chip" onclick="switchDefenseView('player', ${p.id})" title="${t('defense.assignedAt')}: ${formatDate(a.assignedAt)}">${escapeHtml(p.name)}</span>`;
+                    }).join('');
+                return `
+                    <div class="defense-formation-row">
+                        <div class="defense-formation-row-header">
+                            <div>
+                                <div class="defense-formation-row-name">${escapeHtml(f.name)} <span style="color: var(--text-muted); font-weight: 400;">#${f.id}</span></div>
+                                <div class="defense-formation-row-meta">
+                                    <span>📅 ${t('defense.formationCreatedAt')}: ${formatDate(f.createdAt) || '—'}</span>
+                                    <span>👥 ${t('defense.usersCount')}: <strong>${active.length}</strong></span>
+                                </div>
+                            </div>
+                            <div class="defense-formation-row-actions">
+                                <button class="btn btn-small btn-success" onclick="openDefenseAssignModal(${f.id})">🔗 ${t('defense.assignConfirm')}</button>
+                                <button class="btn btn-small btn-danger" onclick="deleteDefenseFormation(${f.id})" title="${t('defense.deleteFormation')}">🗑️</button>
+                            </div>
+                        </div>
+                        ${renderDefenseMiniFormation(f.my, f.myPet)}
+                        ${f.comment ? `<div class="defense-formation-row-meta" style="margin-bottom: 6px;">💬 ${escapeHtml(f.comment)}</div>` : ''}
+                        <div class="defense-formation-row-users">${usersHtml}</div>
+                    </div>`;
+            }).join('');
+        }
+
+        // ─── Render: dropdown w formularzu „Dodaj" ───────────────
+
+        function refreshDefenseAssignDropdown() {
+            const sel = $('defense-add-assign-player');
+            if (!sel) return;
+            const prev = sel.value;
+            const livePlayers = allDefensePlayers.filter(p => !p.deletedAt).sort((a, b) => a.name.localeCompare(b.name, 'pl'));
+            sel.innerHTML = `<option value="">${t('defense.noAssign')}</option>` +
+                livePlayers.map(p => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
+            if (prev && livePlayers.some(p => String(p.id) === prev)) sel.value = prev;
+        }
+
+        // ─── Render: widok gracza (3 składy obok siebie + historia) ───
+
+        function renderDefensePlayerDetail() {
+            const player = getDefensePlayer(currentDefensePlayerId);
+            if (!player) {
+                $('defense-player-content').innerHTML = `<div class="empty-state"><p>${t('preview.notFound')}</p></div>`;
+                return;
+            }
+            $('defense-player-name').textContent = player.name;
+
+            const active = getActiveAssignmentsForPlayer(player.id)
+                .sort((a, b) => new Date(a.assignedAt) - new Date(b.assignedAt));
+
+            // Trzymamy zawsze 3 sloty (puste do dolepienia kolejnego składu).
+            const slots = [];
+            for (let i = 0; i < 3; i++) slots.push(active[i] || null);
+
+            const slotsHtml = `
+                <div class="defense-player-slots">
+                    ${slots.map((a, idx) => {
+                        if (!a) {
+                            return `<div class="defense-player-slot empty">
+                                <div>${t('defense.slot')} ${idx + 1}</div>
+                                <div style="margin-top: 8px;">${t('defense.emptySlot')}</div>
+                            </div>`;
+                        }
+                        const f = getDefenseFormation(a.formationId);
+                        if (!f) return `<div class="defense-player-slot empty"><div>?</div></div>`;
+                        return `
+                            <div class="defense-player-slot">
+                                <div class="defense-player-slot-header">
+                                    <span class="defense-player-slot-title">${t('defense.slot')} ${idx + 1} · #${f.id}</span>
+                                </div>
+                                <div style="font-weight: 600; color: var(--accent-gold); font-size: 0.85rem;">${escapeHtml(f.name)}</div>
+                                ${renderDefenseMiniFormation(f.my, f.myPet)}
+                                <div class="defense-player-slot-meta">
+                                    📅 ${t('defense.assignedAt')}: ${formatDate(a.assignedAt) || '—'}<br>
+                                    🛠️ ${t('defense.formationCreatedAt')}: ${formatDate(f.createdAt) || '—'}
+                                </div>
+                                ${f.comment ? `<div class="defense-player-slot-meta">💬 ${escapeHtml(f.comment)}</div>` : ''}
+                                <div class="defense-player-slot-actions">
+                                    <button class="btn btn-small btn-secondary" onclick="unassignDefenseFormation(${a.id})">✂️ ${t('defense.unassignBtn')}</button>
+                                </div>
+                            </div>`;
+                    }).join('')}
+                </div>`;
+
+            // Historia: wszystkie przypięcia gracza, od najnowszego
+            const history = allDefenseAssignments
+                .filter(a => a.playerId === player.id)
+                .sort((a, b) => new Date(b.assignedAt) - new Date(a.assignedAt));
+
+            const historyHtml = `
+                <div class="defense-history-section">
+                    <div class="defense-history-title">📜 ${t('defense.historyTitle')}</div>
+                    ${history.length === 0
+                        ? `<div style="color: var(--text-muted); font-size: 0.8rem;">${t('defense.historyEmpty')}</div>`
+                        : history.map(a => {
+                            const f = getDefenseFormation(a.formationId);
+                            const isActive = !a.unassignedAt;
+                            const statusCls = isActive ? 'status-active' : 'status-unpinned';
+                            const statusLbl = isActive ? t('defense.historyActive') : t('defense.historyUnpinned');
+                            return `
+                                <div class="defense-history-row">
+                                    <div><strong>${f ? escapeHtml(f.name) : '?'}</strong> <span style="color: var(--text-muted);">#${a.formationId}</span></div>
+                                    <div>📅 ${formatDate(a.assignedAt) || '—'} ${a.unassignedAt ? '→ ' + (formatDate(a.unassignedAt) || '—') : ''}</div>
+                                    <div class="${statusCls}">${statusLbl}</div>
+                                </div>`;
+                        }).join('')}
+                </div>`;
+
+            $('defense-player-content').innerHTML = slotsHtml + historyHtml;
+        }
+
+        // ─── Helpery ─────────────────────────────────────────────
+
+        function escapeHtml(str) {
+            return String(str || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+        }
+
+        // Mini-grid składu obronnego (3-2-3 + pet) — kompaktowa wizualizacja do listy i kafelków gracza.
+        function renderDefenseMiniFormation(my, pet) {
+            const slot = i => {
+                const name = my[i] || '';
+                if (!name) return `<div class="defense-mini-slot empty"></div>`;
+                const hero = heroes.find(h => h.name.toLowerCase() === name.toLowerCase());
+                const rc = hero ? `race-${hero.race.toLowerCase()}` : '';
+                return `<div class="defense-mini-slot"><span class="${rc}">${escapeHtml(name)}</span></div>`;
+            };
+            const petHtml = pet
+                ? `<div class="defense-mini-pet">🐾 ${escapeHtml(pet)}</div>`
+                : `<div class="defense-mini-pet empty">🐾 —</div>`;
+            return `
+                <div class="defense-mini-grid">
+                    <div class="defense-mini-row">${slot(0)}${slot(1)}${slot(2)}</div>
+                    <div class="defense-mini-row">${slot(3)}${slot(4)}</div>
+                    <div class="defense-mini-row">${slot(5)}${slot(6)}${slot(7)}</div>
+                    ${petHtml}
+                </div>`;
+        }
+
+        // Pełny rerender po jakimkolwiek update — tanio, bo dane gildii są małe.
+        function rerenderDefenseCurrent() {
+            if (currentDefenseView === 'players') renderDefensePlayersList();
+            else if (currentDefenseView === 'formations') renderDefenseFormations();
+            else if (currentDefenseView === 'player') renderDefensePlayerDetail();
+            else if (currentDefenseView === 'add') refreshDefenseAssignDropdown();
+        }
+
+
+        // ═══════════════════════════════════════════════════════════
         // TAB: SETTINGS + ADMIN — import/export CSV, zarządzanie bazą, duplikaty
         // ═══════════════════════════════════════════════════════════
 
@@ -5931,6 +6566,24 @@
                 }
             });
             
+            // ─── Defense (obrona gildii) ───
+            defenseFormationsRef = db.ref('defenseFormations');
+            defensePlayersRef = db.ref('defensePlayers');
+            defenseAssignmentsRef = db.ref('defenseAssignments');
+
+            defenseFormationsRef.on('value', snap => {
+                allDefenseFormations = snap.val() ? Object.values(snap.val()).sort((a, b) => a.id - b.id) : [];
+                if (isAdmin) rerenderDefenseCurrent();
+            });
+            defensePlayersRef.on('value', snap => {
+                allDefensePlayers = snap.val() ? Object.values(snap.val()).sort((a, b) => a.id - b.id) : [];
+                if (isAdmin) rerenderDefenseCurrent();
+            });
+            defenseAssignmentsRef.on('value', snap => {
+                allDefenseAssignments = snap.val() ? Object.values(snap.val()).sort((a, b) => a.id - b.id) : [];
+                if (isAdmin) rerenderDefenseCurrent();
+            });
+
             db.ref('.info/connected').on('value', snap => setOnlineStatus(snap.val() === true));
         } catch (e) {
             console.error('Firebase error:', e);
@@ -5974,12 +6627,17 @@
             
 			$('quick-select-modal').addEventListener('click', e => { if (e.target === $('quick-select-modal')) closeQuickSelect(); });
 			$('edit-modal')?.addEventListener('click', e => { if (e.target === $('edit-modal')) closeEditModal(); });
-			document.addEventListener('keydown', e => { 
+			$('defense-assign-modal')?.addEventListener('click', e => { if (e.target === $('defense-assign-modal')) closeDefenseAssignModal(); });
+			document.addEventListener('keydown', e => {
 				if (e.key === 'Escape') {
 					if (!$('quick-select-modal').classList.contains('hidden')) closeQuickSelect();
 					if (!$('edit-modal').classList.contains('hidden')) closeEditModal();
+					if (!$('defense-assign-modal').classList.contains('hidden')) closeDefenseAssignModal();
 				}
 			});
+
+			// Defense: Enter w polu nazwy gracza = dodaj
+			$('defense-new-player-name')?.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addDefensePlayer(); } });
             
 			// Inicjalizacja wykluczonych
 			renderExcludedHeroes();

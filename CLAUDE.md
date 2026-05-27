@@ -44,6 +44,7 @@ Zakładki i ich role:
 | `tab-kreator` | Ręczny builder 3 składów z tagami | |
 | `tab-settings` | **Admin**. Import/eksport CSV + ręczne odświeżanie | |
 | `tab-admin` | **Admin**. Zarządzanie bohaterami/petami, oznaczanie bazowych, operacje masowe | Ukryta bez admina |
+| `tab-defense` | **Admin**. Składy obronne gildii + gracze + przypięcia (3 składy/gracza). Ma własne pod-zakładki (Gracze / Składy / Dodaj / widok gracza) przełączane przez `switchDefenseView(view, playerId?)` | Osobny model danych — nie miesza się z `formations` |
 
 ### Warstwa danych (Firebase Realtime Database)
 
@@ -53,12 +54,22 @@ Config Firebase jest na górze `souls-war.js` (`firebaseConfig`). Przy inicjaliz
 - `allFormations` to jedyne źródło prawdy po załadowaniu — większość funkcji filtruje/scoruje na nim w pamięci zamiast odpytywać Firebase ponownie.
 - Kształt danych (szczegóły w README): `formations/{id}` ma `enemy[8]`, `enemyPet`, `my[8]`, `myPet`, `isBase`, plus metadane.
 
+**Zakładka Obrona — osobne nody Firebase (nie miesza się z `/formations`):**
+
+- `/defenseFormations/{id}` — `{ id, my[8], myPet, name, comment, createdAt, fingerprint }`. **Niezmienne** — żadnych edycji slot-by-slot. Zmiana ustawienia = nowy rekord.
+- `/defensePlayers/{id}` — `{ id, name, createdAt, deletedAt? }`. Soft delete (`deletedAt`) — gracz znika z UI, ale historia przypięć zostaje.
+- `/defenseAssignments/{id}` — `{ id, playerId, formationId, assignedAt, unassignedAt? }`. Aktywne = `!unassignedAt`. Każde przypięcie / odpięcie / usunięcie gracza dorzuca rekord lub stempluje `unassignedAt` — nigdy nie kasujemy historii.
+- Cache w pamięci: `allDefenseFormations`, `allDefensePlayers`, `allDefenseAssignments`. Po każdym `.on('value')` wołamy `rerenderDefenseCurrent()` (re-render bieżącego pod-widoku jest tani — dane gildii są małe).
+- **`defenseFingerprint(my, pet)`** — slot-by-slot (`normalize(my[0])|...|normalize(my[7])||normalize(pet)`). Przy zapisie sprawdzamy `findDefenseFormationByFingerprint(fp)`: jeśli identyczny skład już istnieje, reużywamy ID zamiast tworzyć duplikat. Liczenie "ilu graczy używa składu" = `getActiveAssignmentsForFormation(id).length` (bez liczenia identyczności w locie).
+- **Walidacja `validateDefenseAssignment`** przed każdym przypięciem: max 3 aktywne przypięcia / gracza, żaden hero ani pet nie powtarza się w aktywnych składach gracza, ten sam skład nie jest już aktywny dla tego gracza.
+- **`deleteDefenseFormation`** odmawia jeśli skład ma aktywne przypięcia — najpierw odepnij. Wtedy hard-delete + kasuje też historyczne assignmenty, żeby nie zostawały sieroty.
+
 ### Model autoryzacji
 
 Dwa hashe SHA-256 haseł siedzą w kodzie klienta (`GUILD_PASSWORD_HASH`, `ADMIN_PASSWORD_HASH` w `souls-war.js`):
 
 - `GUILD_PASSWORD_HASH` chroni wejście; odblokowanie jest persystowane jako `localStorage['souls_guild_access']`.
-- `ADMIN_PASSWORD_HASH` odblokowuje zakładki admina (`nav-settings`, `nav-admin`, funkcje Planera Wojny). Formularz loginu admina pokazuje się po kliknięciu nagłówka strony **5 razy w ciągu 2 sekund** (logika `headerClickCount`). Tak ma być — nie refaktoruj tego.
+- `ADMIN_PASSWORD_HASH` odblokowuje zakładki admina (`nav-settings`, `nav-admin`, `nav-defense`, funkcje Planera Wojny). Formularz loginu admina pokazuje się po kliknięciu nagłówka strony **5 razy w ciągu 2 sekund** (logika `headerClickCount`). Tak ma być — nie refaktoruj tego.
 - Nie ma autoryzacji po stronie serwera. Wszystkie akcje "admin" są gated tylko po stronie klienta; reguły bezpieczeństwa Firebase to jedyna realna granica autoryzacji.
 
 ### Algorytmy scoringu (nieoczywiste elementy)
@@ -92,7 +103,7 @@ Słownik dwujęzyczny (`translations.pl`, `translations.en`) w `souls-war.js`. E
 
 ### Tag pickery i auto-skok między polami
 
-Każda zakładka z dużą ilością inputów (search, add, war-e1/e2/e3, kreator-1/2/3, edit) rejestruje swoje pola pozycji w `FORM_FIELD_CONFIG` w `souls-war.js`. Auto-skok do następnego pustego pola, wybór tagu i flow "next section" — wszystko czyta z tej mapy. **Gdy dodajesz nową zakładkę lub sekcję z inputami, zarejestruj ją w `FORM_FIELD_CONFIG`** — inaczej kliknięcia tagów i nawigacja klawiaturą cicho przestają działać.
+Każda zakładka z dużą ilością inputów (search, add, war-e1/e2/e3, kreator-1/2/3, edit, defense-add) rejestruje swoje pola pozycji w `FORM_FIELD_CONFIG` w `souls-war.js`. Auto-skok do następnego pustego pola, wybór tagu i flow "next section" — wszystko czyta z tej mapy. **Gdy dodajesz nową zakładkę lub sekcję z inputami, zarejestruj ją w `FORM_FIELD_CONFIG` i dopisz do `getFieldSection`** — inaczej kliknięcia tagów i nawigacja klawiaturą cicho przestają działać.
 
 ## Konwencje do zachowania
 

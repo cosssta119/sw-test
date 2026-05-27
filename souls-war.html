@@ -213,10 +213,10 @@
 			<div class="sort-bar">
 				<span class="sort-label" data-i18n="database.sortLabel">Sortuj:</span>
 				<button class="sort-btn" data-sort="id-asc" onclick="setDbSort('id-asc')" title="ID rosnąco">ID ↑</button>
-				<button class="sort-btn" data-sort="id-desc" onclick="setDbSort('id-desc')" title="ID malejąco">ID ↓</button>
+				<button class="sort-btn active" data-sort="id-desc" onclick="setDbSort('id-desc')" title="ID malejąco">ID ↓</button>
 				<button class="sort-btn" data-sort="name-asc" onclick="setDbSort('name-asc')" title="Nazwa A-Z">A-Z</button>
 				<button class="sort-btn" data-sort="name-desc" onclick="setDbSort('name-desc')" title="Nazwa Z-A">Z-A</button>
-				<button class="sort-btn active" data-sort="date-desc" onclick="setDbSort('date-desc')" title="Najnowsze">🕐 ↓</button>
+				<button class="sort-btn" data-sort="date-desc" onclick="setDbSort('date-desc')" title="Najnowsze">🕐 ↓</button>
 				<button class="sort-btn" data-sort="date-asc" onclick="setDbSort('date-asc')" title="Najstarsze">🕐 ↑</button>
 			</div>
             
@@ -775,6 +775,128 @@
         </div>
     </div>
     
+    <!-- ═══════════════════════════════════════════════════════
+         TAB: DEFENSE (Admin) — Składy obronne gildii + gracze
+         ═══════════════════════════════════════════════════════ -->
+    <div id="tab-defense" class="tab-content">
+        <div class="section">
+            <h2>🛡️ <span data-i18n="defense.title">Obrona gildii</span></h2>
+
+            <!-- Pasek pod-zakładek wewnętrznych -->
+            <div class="defense-subnav">
+                <button class="defense-subnav-btn active" data-view="players" onclick="switchDefenseView('players')">👥 <span data-i18n="defense.viewPlayers">Gracze</span></button>
+                <button class="defense-subnav-btn" data-view="formations" onclick="switchDefenseView('formations')">📋 <span data-i18n="defense.viewFormations">Składy</span></button>
+                <button class="defense-subnav-btn" data-view="add" onclick="switchDefenseView('add')">➕ <span data-i18n="defense.viewAdd">Dodaj skład</span></button>
+            </div>
+
+            <!-- VIEW: GRACZE -->
+            <div class="defense-view" id="defense-view-players">
+                <div class="defense-add-player-bar">
+                    <input type="text" id="defense-new-player-name" data-i18n-placeholder="defense.newPlayerPlaceholder" placeholder="Nazwa gracza...">
+                    <button class="btn btn-small btn-success" onclick="addDefensePlayer()">➕ <span data-i18n="defense.addPlayer">Dodaj gracza</span></button>
+                </div>
+                <div class="defense-players-stats">
+                    <span><span data-i18n="defense.statsPlayers">Graczy</span>: <strong id="defense-stat-players">0</strong></span>
+                    <span><span data-i18n="defense.statsFormations">Składów</span>: <strong id="defense-stat-formations">0</strong></span>
+                    <span><span data-i18n="defense.statsAssigned">Aktywnych przypięć</span>: <strong id="defense-stat-assigned">0</strong></span>
+                </div>
+                <div class="defense-players-list" id="defense-players-list">
+                    <div class="empty-state"><p data-i18n="defense.noPlayers">Brak graczy. Dodaj pierwszego powyżej.</p></div>
+                </div>
+            </div>
+
+            <!-- VIEW: SKŁADY -->
+            <div class="defense-view" id="defense-view-formations" style="display: none;">
+                <input type="text" class="search-input" id="defense-formation-search" data-i18n-placeholder="defense.searchPlaceholder" placeholder="🔍 Szukaj po nazwie/bohaterze..." oninput="renderDefenseFormations()" style="margin-bottom: 12px;">
+                <div class="sort-bar" style="margin-bottom: 12px;">
+                    <span class="sort-label" data-i18n="database.sortLabel">Sortuj:</span>
+                    <button class="sort-btn active" data-defense-sort="id-desc" onclick="setDefenseSort('id-desc')" title="ID malejąco">ID ↓</button>
+                    <button class="sort-btn" data-defense-sort="id-asc" onclick="setDefenseSort('id-asc')" title="ID rosnąco">ID ↑</button>
+                    <button class="sort-btn" data-defense-sort="date-desc" onclick="setDefenseSort('date-desc')" title="Najnowsze">🕐 ↓</button>
+                    <button class="sort-btn" data-defense-sort="date-asc" onclick="setDefenseSort('date-asc')" title="Najstarsze">🕐 ↑</button>
+                    <button class="sort-btn" data-defense-sort="users-desc" onclick="setDefenseSort('users-desc')" title="Najwięcej przypisań">👥 ↓</button>
+                    <button class="sort-btn" data-defense-sort="users-asc" onclick="setDefenseSort('users-asc')" title="Najmniej przypisań">👥 ↑</button>
+                </div>
+                <div class="defense-formations-list" id="defense-formations-list">
+                    <div class="empty-state"><p data-i18n="defense.noFormations">Brak składów. Dodaj pierwszy w zakładce "Dodaj skład".</p></div>
+                </div>
+            </div>
+
+            <!-- VIEW: DODAJ SKŁAD -->
+            <div class="defense-view" id="defense-view-add" style="display: none;">
+                <div class="autocomplete-wrapper full-width" style="margin-bottom: 15px;">
+                    <label data-i18n="defense.formationNameLabel">Nazwa składu (opcjonalnie)</label>
+                    <input type="text" id="defense-add-name" data-i18n-placeholder="defense.formationNamePlaceholder" placeholder="np. Anti-Fire v2">
+                </div>
+
+                <div class="add-form-section">
+                    <h3>🛡️ <span data-i18n="defense.formationTeam">Skład obronny</span></h3>
+                    <div class="form-row">
+                        <div class="autocomplete-wrapper"><label>Poz 1</label><input type="text" id="defense-my1" data-type="hero" autocomplete="off"><div class="autocomplete-list" id="list-defense-my1"></div></div>
+                        <div class="autocomplete-wrapper"><label>Poz 2</label><input type="text" id="defense-my2" data-type="hero" autocomplete="off"><div class="autocomplete-list" id="list-defense-my2"></div></div>
+                        <div class="autocomplete-wrapper"><label>Poz 3</label><input type="text" id="defense-my3" data-type="hero" autocomplete="off"><div class="autocomplete-list" id="list-defense-my3"></div></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="autocomplete-wrapper"><label>Poz 4</label><input type="text" id="defense-my4" data-type="hero" autocomplete="off"><div class="autocomplete-list" id="list-defense-my4"></div></div>
+                        <div class="autocomplete-wrapper"><label>Poz 5</label><input type="text" id="defense-my5" data-type="hero" autocomplete="off"><div class="autocomplete-list" id="list-defense-my5"></div></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="autocomplete-wrapper"><label>Poz 6</label><input type="text" id="defense-my6" data-type="hero" autocomplete="off"><div class="autocomplete-list" id="list-defense-my6"></div></div>
+                        <div class="autocomplete-wrapper"><label>Poz 7</label><input type="text" id="defense-my7" data-type="hero" autocomplete="off"><div class="autocomplete-list" id="list-defense-my7"></div></div>
+                        <div class="autocomplete-wrapper"><label>Poz 8</label><input type="text" id="defense-my8" data-type="hero" autocomplete="off"><div class="autocomplete-list" id="list-defense-my8"></div></div>
+                    </div>
+                    <div class="autocomplete-wrapper" style="max-width: 200px; margin: 10px auto 0;">
+                        <label>🐾 Pet</label>
+                        <input type="text" id="defense-myPet" data-type="pet" autocomplete="off">
+                        <div class="autocomplete-list" id="list-defense-myPet"></div>
+                    </div>
+                </div>
+
+                <div class="autocomplete-wrapper full-width" style="margin-top: 15px;">
+                    <label data-i18n="defense.assignToPlayerLabel">Przypisz od razu do gracza (opcjonalnie)</label>
+                    <select id="defense-add-assign-player" class="defense-select">
+                        <option value="" data-i18n="defense.noAssign">— Nie przypisuj —</option>
+                    </select>
+                </div>
+
+                <div class="autocomplete-wrapper full-width" style="margin-top: 12px;">
+                    <label>💬 <span data-i18n="defense.commentLabel">Komentarz (opcjonalnie)</span></label>
+                    <input type="text" id="defense-add-comment" data-i18n-placeholder="defense.commentPlaceholder" placeholder="np. używany od marca 2026">
+                </div>
+
+                <button class="btn btn-success" onclick="saveDefenseFormation()" style="margin-top: 15px;">💾 <span data-i18n="defense.saveBtn">ZAPISZ SKŁAD</span></button>
+                <button class="btn btn-secondary" onclick="clearDefenseAddForm()" style="margin-top: 8px;">✖ <span data-i18n="common.clear">Wyczyść</span></button>
+            </div>
+
+            <!-- VIEW: SZCZEGÓŁY GRACZA (otwierany po kliknięciu w gracza) -->
+            <div class="defense-view" id="defense-view-player" style="display: none;">
+                <div class="defense-breadcrumb">
+                    <button class="btn btn-small btn-secondary" onclick="switchDefenseView('players')">← <span data-i18n="defense.backToPlayers">Wróć do graczy</span></button>
+                    <span class="defense-breadcrumb-sep">›</span>
+                    <strong id="defense-player-name">—</strong>
+                    <button class="btn btn-small btn-danger" id="defense-delete-player-btn" onclick="deleteDefensePlayer()" style="margin-left: auto;">🗑️ <span data-i18n="defense.deletePlayer">Usuń gracza</span></button>
+                </div>
+
+                <div id="defense-player-content"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: przypisz skład do gracza -->
+    <div class="modal hidden" id="defense-assign-modal">
+        <div class="modal-content" style="max-width: 500px;">
+            <span class="close-btn" onclick="closeDefenseAssignModal()">&times;</span>
+            <h2>🔗 <span data-i18n="defense.assignTitle">Przypisz skład do gracza</span></h2>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 15px;">
+                <span data-i18n="defense.assignFormationLabel">Skład</span>: <strong id="defense-assign-formation-name">—</strong>
+            </p>
+            <label data-i18n="defense.assignPickPlayer">Wybierz gracza</label>
+            <select id="defense-assign-player-select" class="defense-select" style="margin-bottom: 15px;"></select>
+            <button class="btn btn-success" onclick="confirmDefenseAssign()">✓ <span data-i18n="defense.assignConfirm">Przypisz</span></button>
+            <button class="btn btn-secondary" onclick="closeDefenseAssignModal()" style="margin-top: 8px;"><span data-i18n="common.cancel">Anuluj</span></button>
+        </div>
+    </div>
+
     <nav class="bottom-nav">
         <button class="nav-btn active" onclick="switchTab('search')"><span class="icon">🔍</span><span data-i18n="nav.search">Szukaj</span></button>
         <button class="nav-btn" onclick="switchTab('database')"><span class="icon">📚</span><span data-i18n="nav.database">Baza</span></button>
@@ -783,6 +905,7 @@
         <button class="nav-btn admin-only" id="nav-settings" onclick="switchTab('settings')"><span class="icon">⚙️</span><span data-i18n="nav.import">Import</span></button>
         <button class="nav-btn" id="nav-war" onclick="switchTab('war')"><span class="icon">⚔️</span><span>Wojna</span></button>
         <button class="nav-btn" id="nav-kreator" onclick="switchTab('kreator')"><span class="icon">🎯</span><span>Kreator</span></button>
+        <button class="nav-btn admin-only" id="nav-defense" onclick="switchTab('defense')"><span class="icon">🛡️</span><span data-i18n="nav.defense">Obrona</span></button>
         <button class="nav-btn admin-only" id="nav-admin" onclick="switchTab('admin')"><span class="icon">👑</span><span>Admin</span></button>
     </nav>
     

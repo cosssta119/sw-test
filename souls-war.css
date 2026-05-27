@@ -2252,6 +2252,315 @@
 		.search-option-label:hover { background: rgba(212, 175, 55, 0.1); color: var(--text-light); }
 		.search-option-label input { width: 14px; height: 14px; accent-color: var(--accent-gold); cursor: pointer; }
 
+		/* ===== DEFENSE TAB ===== */
+		.defense-subnav {
+			display: flex;
+			gap: 6px;
+			margin-bottom: 15px;
+			padding: 6px;
+			background: var(--bg-input);
+			border-radius: 8px;
+			border: 1px solid var(--border);
+			flex-wrap: wrap;
+		}
+		.defense-subnav-btn {
+			flex: 1;
+			min-width: 100px;
+			padding: 10px 12px;
+			background: transparent;
+			color: var(--text-secondary, var(--text-light));
+			border: 1px solid transparent;
+			border-radius: 6px;
+			font-size: 0.85rem;
+			font-weight: 600;
+			cursor: pointer;
+			transition: background 0.15s, color 0.15s, border-color 0.15s;
+		}
+		.defense-subnav-btn:hover {
+			background: rgba(212, 175, 55, 0.08);
+			color: var(--accent-gold);
+		}
+		.defense-subnav-btn.active {
+			background: var(--accent-gold);
+			color: #000;
+			border-color: var(--accent-gold);
+		}
+
+		.defense-add-player-bar {
+			display: flex;
+			gap: 8px;
+			margin-bottom: 12px;
+			align-items: stretch;
+		}
+		.defense-add-player-bar input {
+			flex: 1;
+			padding: 10px 12px;
+			background: var(--bg-input);
+			color: var(--text-light);
+			border: 1px solid var(--border);
+			border-radius: 6px;
+			font-size: 0.9rem;
+		}
+
+		.defense-players-stats {
+			display: flex;
+			gap: 18px;
+			flex-wrap: wrap;
+			padding: 10px 12px;
+			background: rgba(212, 175, 55, 0.05);
+			border: 1px solid var(--border);
+			border-radius: 6px;
+			margin-bottom: 12px;
+			font-size: 0.8rem;
+			color: var(--text-muted);
+		}
+		.defense-players-stats strong { color: var(--accent-gold); }
+
+		.defense-players-list {
+			display: grid;
+			grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+			gap: 10px;
+		}
+		.defense-player-card {
+			padding: 12px 14px;
+			background: var(--bg-card);
+			border: 1px solid var(--border);
+			border-radius: 8px;
+			cursor: pointer;
+			transition: transform 0.1s, border-color 0.15s, box-shadow 0.15s;
+			display: flex;
+			flex-direction: column;
+			gap: 6px;
+		}
+		.defense-player-card:hover {
+			border-color: var(--accent-gold);
+			box-shadow: 0 0 0 1px rgba(212, 175, 55, 0.25);
+			transform: translateY(-1px);
+		}
+		.defense-player-card-name {
+			font-weight: 700;
+			color: var(--accent-gold);
+			font-size: 0.95rem;
+		}
+		.defense-player-card-meta {
+			font-size: 0.75rem;
+			color: var(--text-muted);
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+		}
+		.defense-player-card-badge {
+			background: var(--accent-purple);
+			color: #fff;
+			padding: 2px 8px;
+			border-radius: 10px;
+			font-weight: 700;
+			font-size: 0.7rem;
+		}
+		.defense-player-card-badge.empty { background: var(--border); color: var(--text-muted); }
+		.defense-player-card-badge.full { background: var(--accent-green); }
+
+		.defense-formations-list {
+			display: flex;
+			flex-direction: column;
+			gap: 10px;
+		}
+		.defense-formation-row {
+			padding: 12px;
+			background: var(--bg-card);
+			border: 1px solid var(--border);
+			border-radius: 8px;
+		}
+		.defense-formation-row-header {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			gap: 10px;
+			flex-wrap: wrap;
+			margin-bottom: 8px;
+		}
+		.defense-formation-row-name { font-weight: 700; color: var(--accent-gold); font-size: 0.9rem; }
+		.defense-formation-row-meta { font-size: 0.7rem; color: var(--text-muted); display: flex; gap: 10px; flex-wrap: wrap; }
+		.defense-formation-row-heroes { font-size: 0.8rem; color: var(--text-light); margin-bottom: 6px; }
+		.defense-formation-row-users { font-size: 0.75rem; color: var(--text-muted); display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+		.defense-formation-row-user-chip {
+			background: var(--accent-blue);
+			color: #fff;
+			padding: 2px 8px;
+			border-radius: 10px;
+			font-size: 0.7rem;
+			cursor: pointer;
+		}
+		.defense-formation-row-user-chip:hover { background: var(--accent-gold); color: #000; }
+		.defense-formation-row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+
+		.defense-select {
+			width: 100%;
+			padding: 10px 12px;
+			background: var(--bg-input);
+			color: var(--text-light);
+			border: 1px solid var(--border);
+			border-radius: 6px;
+			font-size: 0.9rem;
+		}
+
+		.defense-breadcrumb {
+			display: flex;
+			align-items: center;
+			gap: 10px;
+			padding: 10px 12px;
+			background: var(--bg-input);
+			border-radius: 6px;
+			margin-bottom: 15px;
+			flex-wrap: wrap;
+		}
+		.defense-breadcrumb-sep { color: var(--text-muted); }
+		.defense-breadcrumb strong { color: var(--accent-gold); font-size: 0.95rem; }
+
+		.defense-player-slots {
+			display: grid;
+			grid-template-columns: repeat(3, 1fr);
+			gap: 12px;
+		}
+		.defense-player-slot {
+			background: var(--bg-card);
+			border: 1px solid var(--border);
+			border-radius: 8px;
+			padding: 10px;
+			display: flex;
+			flex-direction: column;
+			gap: 8px;
+			min-height: 200px;
+		}
+		.defense-player-slot.empty {
+			background: rgba(0, 0, 0, 0.15);
+			border-style: dashed;
+			align-items: center;
+			justify-content: center;
+			color: var(--text-muted);
+			font-size: 0.8rem;
+			text-align: center;
+		}
+		.defense-player-slot-header {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			gap: 6px;
+		}
+		.defense-player-slot-title {
+			font-weight: 700;
+			color: var(--accent-gold);
+			font-size: 0.85rem;
+		}
+		.defense-player-slot-meta {
+			font-size: 0.7rem;
+			color: var(--text-muted);
+		}
+		.defense-player-slot-heroes {
+			font-size: 0.8rem;
+			color: var(--text-light);
+			line-height: 1.4;
+		}
+		.defense-player-slot-actions {
+			display: flex;
+			gap: 6px;
+			justify-content: flex-end;
+			margin-top: auto;
+		}
+
+		.defense-history-section {
+			margin-top: 20px;
+			padding: 12px;
+			background: var(--bg-input);
+			border-radius: 8px;
+			border: 1px solid var(--border);
+		}
+		.defense-history-title {
+			font-size: 0.85rem;
+			color: var(--text-muted);
+			margin-bottom: 10px;
+			font-weight: 700;
+		}
+		.defense-history-row {
+			display: flex;
+			justify-content: space-between;
+			gap: 10px;
+			padding: 6px 0;
+			border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+			font-size: 0.75rem;
+			color: var(--text-muted);
+			flex-wrap: wrap;
+		}
+		.defense-history-row:last-child { border-bottom: none; }
+		.defense-history-row strong { color: var(--text-light); }
+		.defense-history-row .status-active { color: #4caf50; }
+		.defense-history-row .status-unpinned { color: var(--text-muted); }
+
+		/* ── Mini-grid składu (3-2-3) ── */
+		.defense-mini-grid {
+			display: flex;
+			flex-direction: column;
+			gap: 3px;
+			align-items: center;
+			margin: 6px 0;
+		}
+		.defense-mini-row {
+			display: flex;
+			gap: 3px;
+			justify-content: center;
+			width: 100%;
+		}
+		.defense-mini-slot {
+			flex: 1;
+			min-width: 0;
+			max-width: 90px;
+			height: 26px;
+			padding: 0 4px;
+			background: var(--bg-input);
+			border: 1px solid var(--border);
+			border-radius: 4px;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			font-size: 0.7rem;
+			font-weight: 600;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+			line-height: 1;
+		}
+		.defense-mini-slot.empty {
+			border-style: dashed;
+			background: transparent;
+			opacity: 0.4;
+		}
+		.defense-mini-pet {
+			display: inline-flex;
+			align-items: center;
+			gap: 4px;
+			padding: 3px 8px;
+			margin-top: 4px;
+			background: rgba(212, 175, 55, 0.12);
+			border: 1px solid rgba(212, 175, 55, 0.3);
+			border-radius: 10px;
+			font-size: 0.7rem;
+			color: var(--accent-gold);
+			font-weight: 600;
+		}
+		.defense-mini-pet.empty {
+			background: transparent;
+			border-style: dashed;
+			color: var(--text-muted);
+			opacity: 0.6;
+		}
+
+		/* W kafelku slotu gracza grid jest węższy */
+		.defense-player-slot .defense-mini-slot { max-width: 70px; font-size: 0.65rem; height: 22px; }
+
+		@media (max-width: 700px) {
+			.defense-player-slots { grid-template-columns: 1fr; }
+		}
+
 		/* ===== SCROLLBAR ===== */
 		::-webkit-scrollbar { width: 6px; }
 		::-webkit-scrollbar-track { background: var(--bg-dark); }
