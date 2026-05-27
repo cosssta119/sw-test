@@ -1274,6 +1274,10 @@
         const DEFAULT_RACE_ORDER = ['Human', 'Fire', 'Elf', 'Undead', 'Dark', 'Light'];
         let RACE_ORDER = storage.getJson('souls_race_order', null) || [...DEFAULT_RACE_ORDER];
         const RACE_EMOJI = { Dark: '🌑', Light: '☀️', Human: '👤', Fire: '🔥', Elf: '🌿', Undead: '💀' };
+        // Display labels — pozwala renomować rasę w UI bez ruszania danych/CSS/Firebase.
+        // Klucz = identyfikator wewnętrzny (jak w hero.race), wartość = co user widzi.
+        const RACE_LABEL = { Fire: 'Horde' };
+        const raceLabel = race => RACE_LABEL[race] || race;
 
         // Funkcje zarządzania kolejnością ras
         function moveRaceUp(race) {
@@ -1342,7 +1346,7 @@
 			
 			RACE_ORDER.forEach(race => {
 				if (raceGroups[race]?.length) {
-					html += `<div class="quick-tags-section"><div class="quick-tags-header" onclick="toggleQuickTagSection(this)"><span class="toggle-icon">▶</span>${RACE_EMOJI[race]} ${race} (${raceGroups[race].length})</div><div class="quick-tags-content"><div class="quick-tags">${raceGroups[race].map(h => `<span class="quick-tag tag-${race.toLowerCase()}" onclick="${clickHandler}('${h.name || h}', event)"${showCounts && h.count ? ` title="${h.count}x"` : ''}>${h.name || h}</span>`).join('')}</div></div></div>`;
+					html += `<div class="quick-tags-section"><div class="quick-tags-header" onclick="toggleQuickTagSection(this)"><span class="toggle-icon">▶</span>${RACE_EMOJI[race]} ${raceLabel(race)} (${raceGroups[race].length})</div><div class="quick-tags-content"><div class="quick-tags">${raceGroups[race].map(h => `<span class="quick-tag tag-${race.toLowerCase()}" onclick="${clickHandler}('${h.name || h}', event)"${showCounts && h.count ? ` title="${h.count}x"` : ''}>${h.name || h}</span>`).join('')}</div></div></div>`;
 				}
 			});
 			
@@ -1367,7 +1371,7 @@
 		function renderRaceOrderConfigIn(container) {
 			container.innerHTML = RACE_ORDER.map((race, idx) => `
 				<div class="race-order-item">
-					<span class="race-order-label">${RACE_EMOJI[race]} ${race}</span>
+					<span class="race-order-label">${RACE_EMOJI[race]} ${raceLabel(race)}</span>
 					<div class="race-order-buttons">
 						<button class="btn btn-tiny" onclick="moveRaceUp('${race}')" ${idx === 0 ? 'disabled' : ''}>▲</button>
 						<button class="btn btn-tiny" onclick="moveRaceDown('${race}')" ${idx === RACE_ORDER.length - 1 ? 'disabled' : ''}>▼</button>
