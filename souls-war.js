@@ -295,7 +295,9 @@
 				'defense.editImpactMetaOnly': 'Tylko metadane (nazwa/komentarz) — update w miejscu, gracze bez zmian',
 				'defense.editImpactSlots': 'Sloty zmienione → {action}. Przepięcie {n} aktywnych graczy.',
 				'defense.editImpactActionNew': 'utworzymy nowy rekord',
-				'defense.editImpactActionReuse': 'reużyjemy istniejący #{id}'
+				'defense.editImpactActionReuse': 'reużyjemy istniejący #{id}',
+				'defense.alsoUsedBy': 'Też używa',
+				'defense.uniqueToPlayer': 'Tylko ten gracz'
             },
             en: {
                 'loading': 'Loading data...', 'common.loading': 'Loading...', 'common.cancel': 'Cancel', 'common.clear': 'Clear',
@@ -504,7 +506,9 @@
 				'defense.editImpactMetaOnly': 'Only metadata (name/comment) — in-place update, no player impact',
 				'defense.editImpactSlots': 'Slots changed → {action}. Will migrate {n} active players.',
 				'defense.editImpactActionNew': 'create a new record',
-				'defense.editImpactActionReuse': 'reuse existing #{id}'
+				'defense.editImpactActionReuse': 'reuse existing #{id}',
+				'defense.alsoUsedBy': 'Also used by',
+				'defense.uniqueToPlayer': 'Unique to this player'
             }
         };
         
@@ -6256,6 +6260,21 @@
                         }
                         const f = getDefenseFormation(a.formationId);
                         if (!f) return `<div class="defense-player-slot empty"><div>?</div></div>`;
+                        // Inni gracze używający tego samego składu (poza tym widokiem)
+                        const otherUsers = getActiveAssignmentsForFormation(f.id)
+                            .filter(o => o.playerId !== player.id);
+                        const othersHtml = otherUsers.length === 0
+                            ? `<div class="defense-player-slot-meta" style="font-style: italic;">👤 ${t('defense.uniqueToPlayer')}</div>`
+                            : `<div class="defense-player-slot-others">
+                                <span style="font-size: 0.7rem; color: var(--text-muted); display: block; margin-bottom: 4px;">👥 ${t('defense.alsoUsedBy')} (${otherUsers.length}):</span>
+                                <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                                    ${otherUsers.map(o => {
+                                        const p = getDefensePlayer(o.playerId);
+                                        if (!p) return '';
+                                        return `<span class="defense-formation-row-user-chip" onclick="switchDefenseView('player', ${p.id})" title="${t('defense.assignedAt')}: ${formatDate(o.assignedAt)}">${escapeHtml(p.name)}</span>`;
+                                    }).join('')}
+                                </div>
+                            </div>`;
                         return `
                             <div class="defense-player-slot">
                                 <div class="defense-player-slot-header">
@@ -6268,6 +6287,7 @@
                                     🛠️ ${t('defense.formationCreatedAt')}: ${formatDate(f.createdAt) || '—'}
                                 </div>
                                 ${f.comment ? `<div class="defense-player-slot-meta">💬 ${escapeHtml(f.comment)}</div>` : ''}
+                                ${othersHtml}
                                 <div class="defense-player-slot-actions">
                                     <button class="btn btn-small btn-secondary" onclick="unassignDefenseFormation(${a.id})">✂️ ${t('defense.unassignBtn')}</button>
                                 </div>
