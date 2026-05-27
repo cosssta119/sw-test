@@ -1050,7 +1050,7 @@
 					
 					targetList.innerHTML = filtered.map(item => type === 'pet' ?
 						`<div class="autocomplete-item" data-value="${item}">${item}</div>` :
-						`<div class="autocomplete-item race-${item.race.toLowerCase()}" data-value="${item.name}">${item.name} <span class="race">(${item.race})</span></div>`
+						`<div class="autocomplete-item race-${item.race.toLowerCase()}" data-value="${item.name}">${item.name} <span class="race">(${raceLabel(item.race)})</span></div>`
 					).join('');
 					
 					targetList.classList.add('show');
@@ -1874,7 +1874,7 @@
 				}
 				
 				list.innerHTML = filtered.map(h => 
-					`<div class="autocomplete-item race-${h.race.toLowerCase()}" data-value="${h.name}">${h.name} <span class="race">(${h.race})</span></div>`
+					`<div class="autocomplete-item race-${h.race.toLowerCase()}" data-value="${h.name}">${h.name} <span class="race">(${raceLabel(h.race)})</span></div>`
 				).join('');
 				
 				list.classList.add('show');
