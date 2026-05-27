@@ -283,7 +283,19 @@
 				'defense.deleteFormation': 'Usuń skład',
 				'defense.confirmDeleteFormation': 'Usunąć skład #{id}? Tej operacji nie da się cofnąć. Wszystkie przypięcia (aktywne i historyczne) zostaną też usunięte.',
 				'defense.formationDeleted': 'Skład usunięty',
-				'defense.cannotDeleteFormationInUse': 'Nie można usunąć — skład jest aktywnie przypięty do {n} graczy. Najpierw odepnij.'
+				'defense.cannotDeleteFormationInUse': 'Nie można usunąć — skład jest aktywnie przypięty do {n} graczy. Najpierw odepnij.',
+				'defense.editTitle': 'Edytuj skład', 'defense.editBtn': 'Edytuj', 'defense.editSaveBtn': 'ZAPISZ ZMIANY',
+				'defense.editHint': 'Zmiana slotów lub peta = nowy rekord, gracze zostaną automatycznie przepięci ze starego na nowy. Zmiana samej nazwy/komentarza = update w miejscu.',
+				'defense.editNoChange': 'Nic się nie zmieniło',
+				'defense.editMetaSaved': 'Zapisano zmiany (nazwa/komentarz)',
+				'defense.editMigratedNew': 'Skład zmieniony → nowy rekord #{id}. Przepięto: {ok}/{total}',
+				'defense.editMigratedReused': 'Skład zmieniony → reużyto istniejący #{id} (twoja nazwa zignorowana). Przepięto: {ok}/{total}',
+				'defense.editConflicts': 'Konflikty u: {names} — zostali przy starym składzie #{id}',
+				'defense.editImpactNoChange': 'Brak zmian',
+				'defense.editImpactMetaOnly': 'Tylko metadane (nazwa/komentarz) — update w miejscu, gracze bez zmian',
+				'defense.editImpactSlots': 'Sloty zmienione → {action}. Przepięcie {n} aktywnych graczy.',
+				'defense.editImpactActionNew': 'utworzymy nowy rekord',
+				'defense.editImpactActionReuse': 'reużyjemy istniejący #{id}'
             },
             en: {
                 'loading': 'Loading data...', 'common.loading': 'Loading...', 'common.cancel': 'Cancel', 'common.clear': 'Clear',
@@ -480,7 +492,19 @@
 				'defense.deleteFormation': 'Delete formation',
 				'defense.confirmDeleteFormation': 'Delete formation #{id}? This cannot be undone. All pins (active and historical) will also be removed.',
 				'defense.formationDeleted': 'Formation deleted',
-				'defense.cannotDeleteFormationInUse': 'Cannot delete — formation is actively pinned to {n} players. Unpin first.'
+				'defense.cannotDeleteFormationInUse': 'Cannot delete — formation is actively pinned to {n} players. Unpin first.',
+				'defense.editTitle': 'Edit formation', 'defense.editBtn': 'Edit', 'defense.editSaveBtn': 'SAVE CHANGES',
+				'defense.editHint': 'Changing slots or pet = new record, players are auto-migrated from the old to the new. Changing only name/comment = in-place update.',
+				'defense.editNoChange': 'Nothing changed',
+				'defense.editMetaSaved': 'Saved (name/comment)',
+				'defense.editMigratedNew': 'Formation changed → new record #{id}. Migrated: {ok}/{total}',
+				'defense.editMigratedReused': 'Formation changed → reused existing #{id} (your name ignored). Migrated: {ok}/{total}',
+				'defense.editConflicts': 'Conflicts for: {names} — left on old formation #{id}',
+				'defense.editImpactNoChange': 'No changes',
+				'defense.editImpactMetaOnly': 'Only metadata (name/comment) — in-place update, no player impact',
+				'defense.editImpactSlots': 'Slots changed → {action}. Will migrate {n} active players.',
+				'defense.editImpactActionNew': 'create a new record',
+				'defense.editImpactActionReuse': 'reuse existing #{id}'
             }
         };
         
@@ -1147,6 +1171,11 @@
 			'defense-add': {
 				fields: ['defense-my1', 'defense-my2', 'defense-my3', 'defense-my4', 'defense-my5', 'defense-my6', 'defense-my7', 'defense-my8', 'defense-myPet'],
 				tabId: 'tab-defense'
+			},
+			// Obrona - edycja składu (modal)
+			'defense-edit': {
+				fields: ['defense-edit-my1', 'defense-edit-my2', 'defense-edit-my3', 'defense-edit-my4', 'defense-edit-my5', 'defense-edit-my6', 'defense-edit-my7', 'defense-edit-my8', 'defense-edit-myPet'],
+				tabId: 'defense-edit-modal'
 			}
 		};
 
@@ -1169,6 +1198,7 @@
 			if (fieldId.startsWith('kreator-1')) return 'kreator-1';
 			if (fieldId.startsWith('kreator-2')) return 'kreator-2';
 			if (fieldId.startsWith('kreator-3')) return 'kreator-3';
+			if (fieldId.startsWith('defense-edit-my')) return 'defense-edit';
 			if (fieldId.startsWith('defense-my')) return 'defense-add';
 			return null;
 		}
@@ -5576,6 +5606,7 @@
         let currentDefenseView = 'players';
         let currentDefensePlayerId = null;
         let pendingAssignFormationId = null;
+        let editingDefenseFormationId = null;
         let currentDefenseSort = 'id-desc'; // id-desc | id-asc | date-desc | date-asc | users-desc | users-asc
 
         // Fingerprint slot-by-slot — pozwala wykryć identyczne składy (te same hero NA tych samych pozycjach + ten sam pet).
@@ -5737,6 +5768,212 @@
             const petEl = $('defense-myPet');
             if (petEl) { petEl.value = ''; setValidation(petEl, null); }
             $('defense-add-assign-player').value = '';
+        }
+
+        // ─── Edycja składu (z auto-migracją przypięć) ──────────
+
+        function openDefenseEditModal(formationId) {
+            if (!isAdmin) return;
+            const f = getDefenseFormation(formationId);
+            if (!f) return;
+            editingDefenseFormationId = formationId;
+            $('defense-edit-id').textContent = formationId;
+            $('defense-edit-name').value = f.name || '';
+            $('defense-edit-comment').value = f.comment || '';
+            for (let i = 1; i <= 8; i++) {
+                const el = $(`defense-edit-my${i}`);
+                if (el) { el.value = f.my[i - 1] || ''; setValidation(el, null); }
+            }
+            $('defense-edit-myPet').value = f.myPet || '';
+            setValidation($('defense-edit-myPet'), null);
+            updateDefenseEditImpact();
+            $('defense-edit-modal').classList.remove('hidden');
+        }
+
+        function closeDefenseEditModal() {
+            $('defense-edit-modal').classList.add('hidden');
+            editingDefenseFormationId = null;
+        }
+
+        // Live podgląd "co się stanie po zapisie" — czytamy z formularza i mówimy user-friendly co planujemy.
+        function updateDefenseEditImpact() {
+            const el = $('defense-edit-impact');
+            if (!el || !editingDefenseFormationId) return;
+            const old = getDefenseFormation(editingDefenseFormationId);
+            if (!old) { el.textContent = ''; return; }
+
+            const newMy = [];
+            for (let i = 1; i <= 8; i++) newMy.push(($(`defense-edit-my${i}`).value || '').trim());
+            const newPet = ($('defense-edit-myPet').value || '').trim();
+            const newName = ($('defense-edit-name').value || '').trim();
+            const newComment = ($('defense-edit-comment').value || '').trim();
+
+            const oldFp = old.fingerprint;
+            const newFp = defenseFingerprint(newMy, newPet);
+
+            if (oldFp === newFp) {
+                const metaChanged = (newName !== (old.name || '')) || (newComment !== (old.comment || ''));
+                el.textContent = metaChanged ? '📝 ' + t('defense.editImpactMetaOnly') : '— ' + t('defense.editImpactNoChange');
+                return;
+            }
+            // sloty zmienione
+            const existing = findDefenseFormationByFingerprint(newFp);
+            const action = existing
+                ? t('defense.editImpactActionReuse').replace('{id}', existing.id)
+                : t('defense.editImpactActionNew');
+            const activeCount = getActiveAssignmentsForFormation(old.id).length;
+            el.textContent = '⚠️ ' + t('defense.editImpactSlots').replace('{action}', action).replace('{n}', activeCount);
+        }
+
+        async function saveDefenseEditModal() {
+            if (!isAdmin || !editingDefenseFormationId) return;
+            const old = getDefenseFormation(editingDefenseFormationId);
+            if (!old) return;
+
+            const newName = $('defense-edit-name').value.trim();
+            const newComment = $('defense-edit-comment').value.trim();
+            const newMy = [];
+            for (let i = 1; i <= 8; i++) newMy.push(($(`defense-edit-my${i}`).value || '').trim());
+            const newPet = ($('defense-edit-myPet').value || '').trim();
+
+            // Walidacja (jak przy persistDefenseFormation)
+            const hasAnyHero = newMy.some(h => h && h.trim());
+            if (!hasAnyHero && !newPet) { showToast('❌ ' + t('defense.formationEmpty'), true); return; }
+            const unknownHero = newMy.find(h => h && !heroes.some(x => x.name.toLowerCase() === h.toLowerCase()));
+            if (unknownHero) { showToast('❌ ' + t('defense.unknownHero') + ': ' + unknownHero, true); return; }
+            if (newPet && !pets.some(p => getPetName(p).toLowerCase() === newPet.toLowerCase())) {
+                showToast('❌ ' + t('defense.unknownPet') + ': ' + newPet, true); return;
+            }
+
+            const oldFp = old.fingerprint;
+            const newFp = defenseFingerprint(newMy, newPet);
+
+            // CASE A: tylko metadane — update in place
+            if (oldFp === newFp) {
+                const metaChanged = (newName !== (old.name || '')) || (newComment !== (old.comment || ''));
+                if (!metaChanged) { showToast('ℹ️ ' + t('defense.editNoChange')); closeDefenseEditModal(); return; }
+                try {
+                    await defenseFormationsRef.child(String(old.id)).update({
+                        name: newName || old.name,
+                        comment: newComment
+                    });
+                    showToast('💾 ' + t('defense.editMetaSaved'));
+                    closeDefenseEditModal();
+                } catch (e) {
+                    showToast(t('common.error') + ': ' + e.message, true);
+                }
+                return;
+            }
+
+            // CASE B: sloty/pet zmienione — migracja
+            // B1: znajdź lub utwórz docelowy rekord
+            let target = findDefenseFormationByFingerprint(newFp);
+            const reused = !!target;
+            try {
+                if (!target) {
+                    const newId = nextDefenseId(allDefenseFormations);
+                    target = {
+                        id: newId,
+                        my: newMy,
+                        myPet: newPet || '',
+                        name: newName || `Skład #${newId}`,
+                        comment: newComment,
+                        createdAt: new Date().toISOString(),
+                        fingerprint: newFp
+                    };
+                    await defenseFormationsRef.child(String(newId)).set(target);
+                    // wpchnij lokalnie, żeby kolejne lookupy w tej funkcji (allDefenseFormations) widziały nowy rekord
+                    // zanim listener z .on('value') asynchronicznie podmieni cache
+                    allDefenseFormations.push(target);
+                }
+            } catch (e) {
+                showToast(t('common.error') + ': ' + e.message, true); return;
+            }
+
+            // B2: aktywne przypięcia starego (tylko żywi gracze)
+            const livePlayerIds = new Set(allDefensePlayers.filter(p => !p.deletedAt).map(p => p.id));
+            const activeOld = allDefenseAssignments.filter(a =>
+                a.formationId === old.id && !a.unassignedAt && livePlayerIds.has(a.playerId)
+            );
+
+            const successful = [];
+            const conflicted = []; // { player, reason }
+
+            for (const oldA of activeOld) {
+                // "Symulujemy" odpięcie starego: liczymy aktywne bez tego konkretnego przypięcia
+                const playerActiveOthers = getActiveAssignmentsForPlayer(oldA.playerId)
+                    .filter(a => a.id !== oldA.id);
+
+                // Już pinned do target (rzadkie, ale możliwe gdy reused === true)
+                if (playerActiveOthers.some(a => a.formationId === target.id)) {
+                    conflicted.push({ player: getDefensePlayer(oldA.playerId), reason: 'already' });
+                    continue;
+                }
+                if (playerActiveOthers.length >= 3) {
+                    conflicted.push({ player: getDefensePlayer(oldA.playerId), reason: 'max' });
+                    continue;
+                }
+                // Konflikt heroes/pet z innymi aktywnymi gracza
+                const existHeroes = new Set();
+                const existPets = new Set();
+                for (const a of playerActiveOthers) {
+                    const f = getDefenseFormation(a.formationId);
+                    if (!f) continue;
+                    f.my.forEach(h => { if (h) existHeroes.add(h.toLowerCase()); });
+                    if (f.myPet) existPets.add(f.myPet.toLowerCase());
+                }
+                let conflict = false;
+                for (const h of target.my) {
+                    if (h && existHeroes.has(h.toLowerCase())) {
+                        conflicted.push({ player: getDefensePlayer(oldA.playerId), reason: 'hero:' + h });
+                        conflict = true; break;
+                    }
+                }
+                if (conflict) continue;
+                if (target.myPet && existPets.has(target.myPet.toLowerCase())) {
+                    conflicted.push({ player: getDefensePlayer(oldA.playerId), reason: 'pet:' + target.myPet });
+                    continue;
+                }
+                successful.push(oldA);
+            }
+
+            // B3: wykonaj — odpięcie starych + przypięcie do target
+            const now = new Date().toISOString();
+            let nextId = nextDefenseId(allDefenseAssignments);
+            const writes = [];
+            for (const oldA of successful) {
+                writes.push(defenseAssignmentsRef.child(String(oldA.id)).update({ unassignedAt: now }));
+                const id = nextId++;
+                const newAssignment = { id, playerId: oldA.playerId, formationId: target.id, assignedAt: now };
+                writes.push(defenseAssignmentsRef.child(String(id)).set(newAssignment));
+                // wpychamy lokalnie, żeby kolejne iteracje pętli (jeśli ten sam gracz miał 2x — niemożliwe ale safe)
+                // i kolejne walidacje widziały świeży stan
+                allDefenseAssignments.push(newAssignment);
+                const idxOld = allDefenseAssignments.findIndex(a => a.id === oldA.id);
+                if (idxOld >= 0) allDefenseAssignments[idxOld] = { ...allDefenseAssignments[idxOld], unassignedAt: now };
+            }
+            try {
+                await Promise.all(writes);
+            } catch (e) {
+                showToast(t('common.error') + ': ' + e.message, true);
+                return;
+            }
+
+            // B4: summary
+            const okN = successful.length;
+            const total = activeOld.length;
+            const msgKey = reused ? 'defense.editMigratedReused' : 'defense.editMigratedNew';
+            showToast('🔄 ' + t(msgKey)
+                .replace('{id}', target.id)
+                .replace('{ok}', okN)
+                .replace('{total}', total));
+            if (conflicted.length > 0) {
+                const names = conflicted.map(c => c.player?.name || '?').join(', ');
+                showToast('⚠️ ' + t('defense.editConflicts')
+                    .replace('{names}', names)
+                    .replace('{id}', old.id), true);
+            }
+            closeDefenseEditModal();
         }
 
         async function deleteDefenseFormation(formationId) {
@@ -5968,6 +6205,7 @@
                             </div>
                             <div class="defense-formation-row-actions">
                                 <button class="btn btn-small btn-success" onclick="openDefenseAssignModal(${f.id})">🔗 ${t('defense.assignConfirm')}</button>
+                                <button class="btn btn-small btn-admin" onclick="openDefenseEditModal(${f.id})" title="${t('defense.editBtn')}">✏️</button>
                                 <button class="btn btn-small btn-danger" onclick="deleteDefenseFormation(${f.id})" title="${t('defense.deleteFormation')}">🗑️</button>
                             </div>
                         </div>
@@ -6632,16 +6870,24 @@
 			$('quick-select-modal').addEventListener('click', e => { if (e.target === $('quick-select-modal')) closeQuickSelect(); });
 			$('edit-modal')?.addEventListener('click', e => { if (e.target === $('edit-modal')) closeEditModal(); });
 			$('defense-assign-modal')?.addEventListener('click', e => { if (e.target === $('defense-assign-modal')) closeDefenseAssignModal(); });
+			$('defense-edit-modal')?.addEventListener('click', e => { if (e.target === $('defense-edit-modal')) closeDefenseEditModal(); });
 			document.addEventListener('keydown', e => {
 				if (e.key === 'Escape') {
 					if (!$('quick-select-modal').classList.contains('hidden')) closeQuickSelect();
 					if (!$('edit-modal').classList.contains('hidden')) closeEditModal();
 					if (!$('defense-assign-modal').classList.contains('hidden')) closeDefenseAssignModal();
+					if (!$('defense-edit-modal').classList.contains('hidden')) closeDefenseEditModal();
 				}
 			});
 
 			// Defense: Enter w polu nazwy gracza = dodaj
 			$('defense-new-player-name')?.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addDefensePlayer(); } });
+
+			// Defense edit modal: live impact preview na zmianę któregokolwiek pola
+			['defense-edit-name', 'defense-edit-comment', 'defense-edit-myPet',
+				'defense-edit-my1','defense-edit-my2','defense-edit-my3','defense-edit-my4',
+				'defense-edit-my5','defense-edit-my6','defense-edit-my7','defense-edit-my8'
+			].forEach(id => $(id)?.addEventListener('input', updateDefenseEditImpact));
             
 			// Inicjalizacja wykluczonych
 			renderExcludedHeroes();

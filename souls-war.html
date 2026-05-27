@@ -882,6 +882,53 @@
         </div>
     </div>
 
+    <!-- Modal: edycja składu obronnego -->
+    <div class="modal hidden" id="defense-edit-modal">
+        <div class="modal-content" style="max-width: 500px; max-height: 90vh; overflow-y: auto;">
+            <span class="close-btn" onclick="closeDefenseEditModal()">&times;</span>
+            <h2>✏️ <span data-i18n="defense.editTitle">Edytuj skład</span> #<span id="defense-edit-id">—</span></h2>
+            <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 15px;" data-i18n="defense.editHint">Zmiana slotów lub peta = nowy rekord, gracze zostaną automatycznie przepięci ze starego na nowy. Zmiana samej nazwy/komentarza = update w miejscu.</p>
+
+            <div class="autocomplete-wrapper" style="margin-bottom: 12px;">
+                <label data-i18n="defense.formationNameLabel">Nazwa składu (opcjonalnie)</label>
+                <input type="text" id="defense-edit-name">
+            </div>
+
+            <div class="add-form-section">
+                <h3>🛡️ <span data-i18n="defense.formationTeam">Skład obronny</span></h3>
+                <div class="form-row">
+                    <div class="autocomplete-wrapper"><label>Poz 1</label><input type="text" id="defense-edit-my1" data-type="hero" autocomplete="off"><div class="autocomplete-list" id="list-defense-edit-my1"></div></div>
+                    <div class="autocomplete-wrapper"><label>Poz 2</label><input type="text" id="defense-edit-my2" data-type="hero" autocomplete="off"><div class="autocomplete-list" id="list-defense-edit-my2"></div></div>
+                    <div class="autocomplete-wrapper"><label>Poz 3</label><input type="text" id="defense-edit-my3" data-type="hero" autocomplete="off"><div class="autocomplete-list" id="list-defense-edit-my3"></div></div>
+                </div>
+                <div class="form-row">
+                    <div class="autocomplete-wrapper"><label>Poz 4</label><input type="text" id="defense-edit-my4" data-type="hero" autocomplete="off"><div class="autocomplete-list" id="list-defense-edit-my4"></div></div>
+                    <div class="autocomplete-wrapper"><label>Poz 5</label><input type="text" id="defense-edit-my5" data-type="hero" autocomplete="off"><div class="autocomplete-list" id="list-defense-edit-my5"></div></div>
+                </div>
+                <div class="form-row">
+                    <div class="autocomplete-wrapper"><label>Poz 6</label><input type="text" id="defense-edit-my6" data-type="hero" autocomplete="off"><div class="autocomplete-list" id="list-defense-edit-my6"></div></div>
+                    <div class="autocomplete-wrapper"><label>Poz 7</label><input type="text" id="defense-edit-my7" data-type="hero" autocomplete="off"><div class="autocomplete-list" id="list-defense-edit-my7"></div></div>
+                    <div class="autocomplete-wrapper"><label>Poz 8</label><input type="text" id="defense-edit-my8" data-type="hero" autocomplete="off"><div class="autocomplete-list" id="list-defense-edit-my8"></div></div>
+                </div>
+                <div class="autocomplete-wrapper" style="max-width: 200px; margin: 10px auto 0;">
+                    <label>🐾 Pet</label>
+                    <input type="text" id="defense-edit-myPet" data-type="pet" autocomplete="off">
+                    <div class="autocomplete-list" id="list-defense-edit-myPet"></div>
+                </div>
+            </div>
+
+            <div class="autocomplete-wrapper" style="margin-top: 15px;">
+                <label>💬 <span data-i18n="defense.commentLabel">Komentarz (opcjonalnie)</span></label>
+                <input type="text" id="defense-edit-comment">
+            </div>
+
+            <div id="defense-edit-impact" style="margin-top: 12px; padding: 10px 12px; background: rgba(212, 175, 55, 0.08); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 6px; font-size: 0.8rem; color: var(--text-secondary, var(--text-light));"></div>
+
+            <button class="btn btn-success" onclick="saveDefenseEditModal()" style="margin-top: 12px;">💾 <span data-i18n="defense.editSaveBtn">ZAPISZ ZMIANY</span></button>
+            <button class="btn btn-secondary" onclick="closeDefenseEditModal()" style="margin-top: 8px;"><span data-i18n="common.cancel">Anuluj</span></button>
+        </div>
+    </div>
+
     <!-- Modal: przypisz skład do gracza -->
     <div class="modal hidden" id="defense-assign-modal">
         <div class="modal-content" style="max-width: 500px;">
