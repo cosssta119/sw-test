@@ -298,6 +298,8 @@
 				'defense.editImpactActionReuse': 'reużyjemy istniejący #{id}',
 				'defense.alsoUsedBy': 'Też używa',
 				'defense.uniqueToPlayer': 'Tylko ten gracz',
+				'defense.sameSetOtherArrangement': 'Ten sam set, inne ustawienie',
+				'defense.sameSetShort': 'inne ustaw.',
 				'defense.speedTitle': 'Speed',
 				'defense.speedEmpty': 'Speed nieustawiony',
 				'defense.speedAdd': '+ Dodaj',
@@ -528,6 +530,8 @@
 				'defense.editImpactActionReuse': 'reuse existing #{id}',
 				'defense.alsoUsedBy': 'Also used by',
 				'defense.uniqueToPlayer': 'Unique to this player',
+				'defense.sameSetOtherArrangement': 'Same set, different arrangement',
+				'defense.sameSetShort': 'diff. arr.',
 				'defense.speedTitle': 'Speed',
 				'defense.speedEmpty': 'Speed not set',
 				'defense.speedAdd': '+ Add',
@@ -5826,6 +5830,17 @@
             return slots.join('|') + '||' + normalize(pet || '');
         }
 
+        // Set fingerprint — ten sam zestaw bohaterów + ten sam pet, niezależnie od pozycji.
+        // Liczymy go w locie (a nie zapisujemy do bazy), bo set jest pochodną slotów — i tak musimy
+        // przepuścić każdą formację przez `defenseFingerprint` przy zapisie.
+        function defenseSetFingerprint(my, pet) {
+            const heroes = (my || [])
+                .map(h => normalize(h || ''))
+                .filter(Boolean)
+                .sort();
+            return heroes.join('|') + '||' + normalize(pet || '');
+        }
+
         function findDefenseFormationByFingerprint(fp) {
             return allDefenseFormations.find(f => f.fingerprint === fp) || null;
         }
@@ -5839,6 +5854,22 @@
         function getActiveAssignmentsForFormation(formationId) {
             const livePlayerIds = new Set(allDefensePlayers.filter(p => !p.deletedAt).map(p => p.id));
             return allDefenseAssignments.filter(a => a.formationId === formationId && !a.unassignedAt && livePlayerIds.has(a.playerId));
+        }
+
+        // Aktywne przypięcia *innych* składów o tym samym set fingerprincie (te same 5 hero + ten sam pet,
+        // ale inna kolejność slotów). Wyklucza sam `formationId` — chcemy "inne ustawienia", nie self.
+        function getActiveAssignmentsForSameSet(formationId) {
+            const self = getDefenseFormation(formationId);
+            if (!self) return [];
+            const setFp = defenseSetFingerprint(self.my, self.myPet);
+            const otherFormationIds = allDefenseFormations
+                .filter(f => f.id !== formationId && defenseSetFingerprint(f.my, f.myPet) === setFp)
+                .map(f => f.id);
+            if (otherFormationIds.length === 0) return [];
+            const livePlayerIds = new Set(allDefensePlayers.filter(p => !p.deletedAt).map(p => p.id));
+            const otherIdSet = new Set(otherFormationIds);
+            return allDefenseAssignments.filter(a =>
+                otherIdSet.has(a.formationId) && !a.unassignedAt && livePlayerIds.has(a.playerId));
         }
 
         function getDefensePlayer(playerId) {
@@ -6366,10 +6397,15 @@
             if (!list) return;
             const query = ($('defense-formation-search')?.value || '').toLowerCase().trim();
 
-            // Liczba aktywnych przypięć dla każdego składu (jednorazowo, żeby sortowanie po users było tanie)
+            // Liczba aktywnych przypięć dla każdego składu (jednorazowo, żeby sortowanie po users było tanie).
+            // Liczymy też "same-set other arrangement" — ile graczy używa innych składów o tym samym secie.
+            // Sortowanie users-*: najpierw po exact, potem same-set jako tiebreaker (np. exact 2 + same-set 2
+            // wyświetli się wyżej niż exact 1 + same-set 3 — dokładne ustawienie ma priorytet).
             const usersCount = new Map();
+            const sameSetCount = new Map();
             for (const f of allDefenseFormations) {
                 usersCount.set(f.id, getActiveAssignmentsForFormation(f.id).length);
+                sameSetCount.set(f.id, getActiveAssignmentsForSameSet(f.id).length);
             }
 
             const sorters = {
@@ -6377,8 +6413,14 @@
                 'id-asc':     (a, b) => a.id - b.id,
                 'date-desc':  (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
                 'date-asc':   (a, b) => new Date(a.createdAt) - new Date(b.createdAt),
-                'users-desc': (a, b) => usersCount.get(b.id) - usersCount.get(a.id) || b.id - a.id,
-                'users-asc':  (a, b) => usersCount.get(a.id) - usersCount.get(b.id) || a.id - b.id,
+                'users-desc': (a, b) =>
+                    usersCount.get(b.id) - usersCount.get(a.id) ||
+                    sameSetCount.get(b.id) - sameSetCount.get(a.id) ||
+                    b.id - a.id,
+                'users-asc':  (a, b) =>
+                    usersCount.get(a.id) - usersCount.get(b.id) ||
+                    sameSetCount.get(a.id) - sameSetCount.get(b.id) ||
+                    a.id - b.id,
             };
             let formations = [...allDefenseFormations].sort(sorters[currentDefenseSort] || sorters['id-desc']);
             if (query) {
@@ -6396,6 +6438,7 @@
 
             list.innerHTML = formations.map(f => {
                 const active = getActiveAssignmentsForFormation(f.id);
+                const sameSet = getActiveAssignmentsForSameSet(f.id);
                 const usersHtml = active.length === 0
                     ? `<span style="color: var(--text-muted); font-style: italic;">${t('defense.usersZero')}</span>`
                     : active.map(a => {
@@ -6403,6 +6446,18 @@
                         if (!p) return '';
                         return `<span class="defense-formation-row-user-chip" onclick="switchDefenseView('player', ${p.id})" title="${t('defense.assignedAt')}: ${formatDate(a.assignedAt)}">${escapeHtml(p.name)}</span>`;
                     }).join('');
+                // Chipy graczy używających tego samego setu w innym ustawieniu — z #id docelowego składu w tytule.
+                const sameSetHtml = sameSet.length === 0 ? '' : `
+                    <div class="defense-formation-row-users" style="margin-top: 4px;">
+                        <span style="font-size: 0.7rem; color: var(--text-muted); display: block; margin-bottom: 4px;">🔀 ${t('defense.sameSetOtherArrangement')} (${sameSet.length}):</span>
+                        ${sameSet.map(a => {
+                            const p = getDefensePlayer(a.playerId);
+                            if (!p) return '';
+                            return `<span class="defense-formation-row-user-chip" style="opacity: 0.75;" onclick="switchDefenseView('player', ${p.id})" title="${t('defense.sameSetOtherArrangement')} · #${a.formationId}">${escapeHtml(p.name)} <span style="color: var(--text-muted);">#${a.formationId}</span></span>`;
+                        }).join('')}
+                    </div>`;
+                const sameSetBadge = sameSet.length === 0 ? '' :
+                    ` <span style="color: var(--text-muted); font-weight: 400;">(+${sameSet.length} ${t('defense.sameSetShort')})</span>`;
                 return `
                     <div class="defense-formation-row">
                         <div class="defense-formation-row-header">
@@ -6410,7 +6465,7 @@
                                 <div class="defense-formation-row-name">${escapeHtml(f.name)} <span style="color: var(--text-muted); font-weight: 400;">#${f.id}</span></div>
                                 <div class="defense-formation-row-meta">
                                     <span>📅 ${t('defense.formationCreatedAt')}: ${formatDate(f.createdAt) || '—'}</span>
-                                    <span>👥 ${t('defense.usersCount')}: <strong>${active.length}</strong></span>
+                                    <span>👥 ${t('defense.usersCount')}: <strong>${active.length}</strong>${sameSetBadge}</span>
                                 </div>
                             </div>
                             <div class="defense-formation-row-actions">
@@ -6422,6 +6477,7 @@
                         ${renderDefenseMiniFormation(f.my, f.myPet)}
                         ${f.comment ? `<div class="defense-formation-row-meta" style="margin-bottom: 6px;">💬 ${escapeHtml(f.comment)}</div>` : ''}
                         <div class="defense-formation-row-users">${usersHtml}</div>
+                        ${sameSetHtml}
                     </div>`;
             }).join('');
         }
@@ -6469,9 +6525,14 @@
                         // Inni gracze używający tego samego składu (poza tym widokiem)
                         const otherUsers = getActiveAssignmentsForFormation(f.id)
                             .filter(o => o.playerId !== player.id);
-                        const othersHtml = otherUsers.length === 0
+                        // Inni gracze używający tego samego setu ale w innym ustawieniu — z #id docelowego składu w chipie.
+                        // Walidacja zapewnia, że self-gracz nie może być w tej grupie (powtórka hero/peta blokowana).
+                        const sameSetUsers = getActiveAssignmentsForSameSet(f.id);
+                        const noneHere = otherUsers.length === 0 && sameSetUsers.length === 0;
+                        const othersHtml = noneHere
                             ? `<div class="defense-player-slot-meta" style="font-style: italic;">👤 ${t('defense.uniqueToPlayer')}</div>`
                             : `<div class="defense-player-slot-others">
+                                ${otherUsers.length === 0 ? '' : `
                                 <span style="font-size: 0.7rem; color: var(--text-muted); display: block; margin-bottom: 4px;">👥 ${t('defense.alsoUsedBy')} (${otherUsers.length}):</span>
                                 <div style="display: flex; flex-wrap: wrap; gap: 4px;">
                                     ${otherUsers.map(o => {
@@ -6479,7 +6540,16 @@
                                         if (!p) return '';
                                         return `<span class="defense-formation-row-user-chip" onclick="switchDefenseView('player', ${p.id})" title="${t('defense.assignedAt')}: ${formatDate(o.assignedAt)}">${escapeHtml(p.name)}</span>`;
                                     }).join('')}
-                                </div>
+                                </div>`}
+                                ${sameSetUsers.length === 0 ? '' : `
+                                <span style="font-size: 0.7rem; color: var(--text-muted); display: block; margin: ${otherUsers.length === 0 ? '0' : '6px 0 4px 0'};">🔀 ${t('defense.sameSetOtherArrangement')} (${sameSetUsers.length}):</span>
+                                <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                                    ${sameSetUsers.map(o => {
+                                        const p = getDefensePlayer(o.playerId);
+                                        if (!p) return '';
+                                        return `<span class="defense-formation-row-user-chip" style="opacity: 0.75;" onclick="switchDefenseView('player', ${p.id})" title="${t('defense.sameSetOtherArrangement')} · #${o.formationId}">${escapeHtml(p.name)} <span style="color: var(--text-muted);">#${o.formationId}</span></span>`;
+                                    }).join('')}
+                                </div>`}
                             </div>`;
                         return `
                             <div class="defense-player-slot">
