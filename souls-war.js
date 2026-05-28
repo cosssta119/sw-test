@@ -297,7 +297,26 @@
 				'defense.editImpactActionNew': 'utworzymy nowy rekord',
 				'defense.editImpactActionReuse': 'reużyjemy istniejący #{id}',
 				'defense.alsoUsedBy': 'Też używa',
-				'defense.uniqueToPlayer': 'Tylko ten gracz'
+				'defense.uniqueToPlayer': 'Tylko ten gracz',
+				'defense.speedTitle': 'Speed',
+				'defense.speedEmpty': 'Speed nieustawiony',
+				'defense.speedAdd': '+ Dodaj',
+				'defense.speedEdit': 'Edytuj speed',
+				'defense.speedSave': 'Zapisz',
+				'defense.speedCancel': 'Anuluj',
+				'defense.speedSaved': 'Speed zapisany',
+				'defense.speedPartial': '{n}/{total} ustawionych',
+				'defense.speedInvalidNumber': 'Speed musi być liczbą dodatnią',
+				'database.filterPackages': 'Pakiety',
+				'packages.minSize': 'Min wielkość', 'packages.mode': 'Tryb',
+				'packages.modeExact': 'Dokładnie N', 'packages.modeAtLeast': 'Co najmniej N',
+				'packages.source': 'Źródło', 'packages.sourceEnemy': 'Wrogowie', 'packages.sourceMy': 'Kontry', 'packages.sourceBoth': 'Oba',
+				'packages.window': 'Okno', 'packages.windowAll': 'Cała baza',
+				'packages.minSupport': 'Min wystąpień',
+				'packages.empty': 'Brak pakietów spełniających kryteria. Zmniejsz min wystąpień albo min wielkość.',
+				'packages.stats': '{n} pakietów z {total} formacji',
+				'packages.occurrences': '×',
+				'packages.showFormations': 'Pokaż formacje'
             },
             en: {
                 'loading': 'Loading data...', 'common.loading': 'Loading...', 'common.cancel': 'Cancel', 'common.clear': 'Clear',
@@ -508,7 +527,26 @@
 				'defense.editImpactActionNew': 'create a new record',
 				'defense.editImpactActionReuse': 'reuse existing #{id}',
 				'defense.alsoUsedBy': 'Also used by',
-				'defense.uniqueToPlayer': 'Unique to this player'
+				'defense.uniqueToPlayer': 'Unique to this player',
+				'defense.speedTitle': 'Speed',
+				'defense.speedEmpty': 'Speed not set',
+				'defense.speedAdd': '+ Add',
+				'defense.speedEdit': 'Edit speed',
+				'defense.speedSave': 'Save',
+				'defense.speedCancel': 'Cancel',
+				'defense.speedSaved': 'Speed saved',
+				'defense.speedPartial': '{n}/{total} set',
+				'defense.speedInvalidNumber': 'Speed must be a positive number',
+				'database.filterPackages': 'Packages',
+				'packages.minSize': 'Min size', 'packages.mode': 'Mode',
+				'packages.modeExact': 'Exactly N', 'packages.modeAtLeast': 'At least N',
+				'packages.source': 'Source', 'packages.sourceEnemy': 'Enemies', 'packages.sourceMy': 'Counters', 'packages.sourceBoth': 'Both',
+				'packages.window': 'Window', 'packages.windowAll': 'All time',
+				'packages.minSupport': 'Min occurrences',
+				'packages.empty': 'No packages matching criteria. Lower min occurrences or min size.',
+				'packages.stats': '{n} packages from {total} formations',
+				'packages.occurrences': '×',
+				'packages.showFormations': 'Show formations'
             }
         };
         
@@ -2056,7 +2094,175 @@
         function setDbFilter(filter) {
             currentDbFilter = filter;
             document.querySelectorAll('.filter-btn[data-filter]').forEach(b => b.classList.toggle('active', b.dataset.filter === filter));
-            filterDatabase();
+            // Przełączenie między widokiem formacji a widokiem pakietów
+            const isPackages = filter === 'packages';
+            const sortBar = $('db-sort-bar');
+            const dbList = $('database-list');
+            const pkgBar = $('packages-config-bar');
+            const pkgList = $('packages-list');
+            if (sortBar) sortBar.style.display = isPackages ? 'none' : '';
+            if (dbList) dbList.style.display = isPackages ? 'none' : '';
+            if (pkgBar) pkgBar.style.display = isPackages ? 'flex' : 'none';
+            if (pkgList) pkgList.style.display = isPackages ? 'block' : 'none';
+            if (isPackages) renderPackagesView();
+            else filterDatabase();
+        }
+
+        // ─── Pakiety bohaterów (frequent itemsets) ──────────────
+
+        let packageOptions = { minSize: 3, mode: 'exact', source: 'enemy', window: 'all', minSupport: 5 };
+
+        function setPackageOption(key, value) {
+            packageOptions[key] = value;
+            // Update active state na wszystkich grupach przycisków pakietowych
+            document.querySelectorAll('.pkg-btn[data-pkg-size]').forEach(b => b.classList.toggle('active', String(b.dataset.pkgSize) === String(packageOptions.minSize)));
+            document.querySelectorAll('.pkg-btn[data-pkg-mode]').forEach(b => b.classList.toggle('active', b.dataset.pkgMode === packageOptions.mode));
+            document.querySelectorAll('.pkg-btn[data-pkg-source]').forEach(b => b.classList.toggle('active', b.dataset.pkgSource === packageOptions.source));
+            document.querySelectorAll('.pkg-btn[data-pkg-window]').forEach(b => b.classList.toggle('active', String(b.dataset.pkgWindow) === String(packageOptions.window)));
+            renderPackagesView();
+        }
+
+        // Enumeracja podzbiorów tablicy o danym rozmiarze (kombinacje, bez powtórzeń, bez kolejności)
+        function enumerateSubsets(arr, k, callback) {
+            const n = arr.length;
+            if (k > n || k < 1) return;
+            const idx = new Array(k);
+            (function recurse(start, depth) {
+                if (depth === k) {
+                    callback(idx.map(i => arr[i]));
+                    return;
+                }
+                for (let i = start; i < n; i++) {
+                    idx[depth] = i;
+                    recurse(i + 1, depth + 1);
+                }
+            })(0, 0);
+        }
+
+        // Główny algorytm: zbiera zbiory bohaterów spełniające kryteria.
+        // Zwraca [{ heroes: ['Death','Bahzam','Lilith'], count: 38, size: 3 }, ...] posortowane malejąco po count.
+        function findHeroPackages() {
+            const { minSize, mode, source, window, minSupport } = packageOptions;
+            // 1. Filtruj formacje po oknie czasowym
+            let formations = allFormations;
+            if (window !== 'all') {
+                const cutoff = Date.now() - Number(window) * 24 * 60 * 60 * 1000;
+                formations = formations.filter(f => f.dateAdded && new Date(f.dateAdded).getTime() >= cutoff);
+            }
+
+            // 2. Wyciągnij sety bohaterów per formacja (znormalizowane + posortowane dla determinizmu)
+            const heroSets = formations.map(f => {
+                const set = new Set();
+                if (source === 'enemy' || source === 'both') {
+                    (f.enemy || []).forEach(h => { if (h) set.add(h); });
+                }
+                if (source === 'my' || source === 'both') {
+                    (f.my || []).forEach(h => { if (h) set.add(h); });
+                }
+                return [...set].sort((a, b) => a.localeCompare(b));
+            }).filter(s => s.length >= minSize);
+
+            // 3. Licz wystąpienia podzbiorów
+            const counts = new Map(); // key = 'A|B|C', value = count
+            for (const hs of heroSets) {
+                if (mode === 'exact') {
+                    if (hs.length >= minSize) {
+                        enumerateSubsets(hs, minSize, subset => {
+                            const key = subset.join('|');
+                            counts.set(key, (counts.get(key) || 0) + 1);
+                        });
+                    }
+                } else {
+                    // at-least: enumerate all sizes from minSize to hs.length
+                    for (let k = minSize; k <= hs.length; k++) {
+                        enumerateSubsets(hs, k, subset => {
+                            const key = subset.join('|');
+                            counts.set(key, (counts.get(key) || 0) + 1);
+                        });
+                    }
+                }
+            }
+
+            // 4. Przefiltruj po minSupport
+            let packages = [];
+            for (const [key, count] of counts.entries()) {
+                if (count >= minSupport) {
+                    const heroes = key.split('|');
+                    packages.push({ heroes, count, size: heroes.length });
+                }
+            }
+
+            // 5. Dla "at-least" wytnij niemaksymalne (zbiory zdominowane przez większy z tym samym/lepszym count)
+            if (mode === 'atleast') {
+                // posortuj po size DESC, count DESC dla optymalizacji
+                packages.sort((a, b) => b.size - a.size || b.count - a.count);
+                const accepted = [];
+                for (const p of packages) {
+                    const heroSet = new Set(p.heroes);
+                    let dominated = false;
+                    for (const acc of accepted) {
+                        if (acc.size > p.size && acc.count >= p.count) {
+                            // czy acc zawiera wszystkie p.heroes?
+                            if (p.heroes.every(h => acc.heroes.includes(h))) { dominated = true; break; }
+                        }
+                    }
+                    if (!dominated) accepted.push(p);
+                }
+                packages = accepted;
+            }
+
+            // 6. Sort finalny: malejąco po count, potem malejąco po size, potem alfabetycznie
+            packages.sort((a, b) => b.count - a.count || b.size - a.size || a.heroes[0].localeCompare(b.heroes[0]));
+
+            return { packages, totalFormations: heroSets.length };
+        }
+
+        // Wyznacz emoji dominującej rasy w pakiecie. Parametr nazwany `names`, żeby nie zacieniał globalnej `heroes`.
+        function packageDominantEmoji(names) {
+            const counts = {};
+            names.forEach(name => {
+                const hero = heroes.find(x => x.name.toLowerCase() === name.toLowerCase());
+                if (hero?.race) counts[hero.race] = (counts[hero.race] || 0) + 1;
+            });
+            let topRace = null, topCount = 0;
+            Object.entries(counts).forEach(([race, c]) => { if (c > topCount) { topRace = race; topCount = c; } });
+            return topRace ? (RACE_EMOJI[topRace] || '🧩') : '🧩';
+        }
+
+        function renderPackagesView() {
+            const listEl = $('packages-list');
+            const statsEl = $('packages-stats');
+            if (!listEl) return;
+            const { packages, totalFormations } = findHeroPackages();
+
+            if (statsEl) statsEl.textContent = t('packages.stats').replace('{n}', packages.length).replace('{total}', totalFormations);
+
+            if (packages.length === 0) {
+                listEl.innerHTML = `<div class="empty-state"><p>${t('packages.empty')}</p></div>`;
+                return;
+            }
+
+            // Limit do 100 najczęstszych — przy większych ilościach scroll się nie skończy
+            const shown = packages.slice(0, 100);
+            const moreInfo = packages.length > 100 ? `<div style="text-align: center; color: var(--text-muted); font-size: 0.75rem; padding: 10px;">... (${packages.length - 100} kolejnych pakietów)</div>` : '';
+
+            listEl.innerHTML = shown.map(p => {
+                const emoji = packageDominantEmoji(p.heroes);
+                const tagsHtml = p.heroes.map(h => {
+                    const hero = heroes.find(x => x.name.toLowerCase() === h.toLowerCase());
+                    const rc = hero ? `tag-${hero.race.toLowerCase()}` : '';
+                    return `<span class="quick-tag ${rc}" style="cursor: default;">${escapeHtml(h)}</span>`;
+                }).join('');
+                return `
+                    <div class="package-card">
+                        <div class="package-card-header">
+                            <span class="package-card-emoji">${emoji}</span>
+                            <span class="package-card-size">${p.size}</span>
+                            <span class="package-card-count"><strong>${p.count}</strong>${t('packages.occurrences')}</span>
+                        </div>
+                        <div class="package-card-heroes">${tagsHtml}</div>
+                    </div>`;
+            }).join('') + moreInfo;
         }
 
 		function setDbSort(sort) {
@@ -6282,6 +6488,7 @@
                                 </div>
                                 <div style="font-weight: 600; color: var(--accent-gold); font-size: 0.85rem;">${escapeHtml(f.name)}</div>
                                 ${renderDefenseMiniFormation(f.my, f.myPet)}
+                                ${renderSpeedSection(a.id, f, a.speeds)}
                                 <div class="defense-player-slot-meta">
                                     📅 ${t('defense.assignedAt')}: ${formatDate(a.assignedAt) || '—'}<br>
                                     🛠️ ${t('defense.formationCreatedAt')}: ${formatDate(f.createdAt) || '—'}
@@ -6321,6 +6528,102 @@
 
             $('defense-player-content').innerHTML = slotsHtml + historyHtml;
         }
+
+        // ─── Speed per assignment ───────────────────────────────
+
+        // Zapisuje tablicę speeds (8 elementów lub null) na assignmencie.
+        // Pet pominięty — w grze nie ma speeda.
+        async function setAssignmentSpeeds(assignmentId, speeds) {
+            if (!isAdmin) return;
+            const a = allDefenseAssignments.find(x => x.id === assignmentId);
+            if (!a) return;
+            try {
+                await defenseAssignmentsRef.child(String(assignmentId)).update({ speeds });
+                showToast('⚡ ' + t('defense.speedSaved'));
+            } catch (e) {
+                showToast(t('common.error') + ': ' + e.message, true);
+            }
+        }
+
+        // Toggle edytor speeda w slocie. Edytor jest inline w samym kafelku slotu — nie modal.
+        function toggleSpeedEditor(assignmentId) {
+            const editor = $(`speed-editor-${assignmentId}`);
+            const display = $(`speed-display-${assignmentId}`);
+            if (!editor || !display) return;
+            const isOpen = editor.style.display !== 'none';
+            editor.style.display = isOpen ? 'none' : 'block';
+            display.style.display = isOpen ? 'block' : 'none';
+        }
+
+        async function saveSpeedEditor(assignmentId) {
+            const speeds = [];
+            for (let i = 0; i < 8; i++) {
+                const el = $(`speed-input-${assignmentId}-${i}`);
+                if (!el) { speeds.push(null); continue; }
+                const raw = el.value.trim();
+                if (!raw) { speeds.push(null); continue; }
+                const n = parseInt(raw, 10);
+                if (isNaN(n) || n <= 0) {
+                    showToast('❌ ' + t('defense.speedInvalidNumber') + ' (poz. ' + (i + 1) + ')', true);
+                    return;
+                }
+                speeds.push(n);
+            }
+            const allNull = speeds.every(s => s === null);
+            await setAssignmentSpeeds(assignmentId, allNull ? null : speeds);
+            // Listener z .on('value') pociągnie świeże dane i rerenderuje
+        }
+
+        // Renderuje pasek timeline + przycisk edycji + ukryty panel edycji (8 inputów obok nazw bohaterów).
+        function renderSpeedSection(assignmentId, formation, speeds) {
+            const filled = (speeds || []).map((s, i) => ({ slot: i, hero: formation.my[i], speed: s }))
+                .filter(x => x.speed != null && x.hero);
+            const total = formation.my.filter(h => h).length;
+            const filledCount = filled.length;
+
+            // Pasek timeline (jak są jakieś speedy) lub link "+ Dodaj"
+            const timelineHtml = filledCount === 0
+                ? `<span style="font-size: 0.7rem; color: var(--text-muted); font-style: italic;">⚡ ${t('defense.speedEmpty')}</span>
+                   <button class="btn btn-tiny btn-secondary" onclick="toggleSpeedEditor(${assignmentId})" style="margin-left: 6px;">${t('defense.speedAdd')}</button>`
+                : (() => {
+                    const sorted = [...filled].sort((a, b) => b.speed - a.speed);
+                    const chips = sorted.map(x => {
+                        const hero = heroes.find(h => h.name.toLowerCase() === x.hero.toLowerCase());
+                        const rc = hero ? `race-${hero.race.toLowerCase()}` : '';
+                        return `<span class="defense-speed-chip"><span class="${rc}">${escapeHtml(x.hero)}</span> <strong>${x.speed}</strong></span>`;
+                    }).join('<span class="defense-speed-arrow">→</span>');
+                    const partial = filledCount < total
+                        ? `<span style="font-size: 0.65rem; color: var(--text-muted); margin-left: 6px;">(${t('defense.speedPartial').replace('{n}', filledCount).replace('{total}', total)})</span>`
+                        : '';
+                    return `<div class="defense-speed-timeline">⚡ ${chips}${partial}
+                              <button class="btn btn-tiny btn-secondary" onclick="toggleSpeedEditor(${assignmentId})" title="${t('defense.speedEdit')}" style="margin-left: 6px;">✏️</button>
+                            </div>`;
+                })();
+
+            // Panel edycji — 8 inputów obok 8 nazw, pet pominięty
+            const editorRows = formation.my.map((h, i) => {
+                if (!h) return '';
+                const currentVal = (speeds && speeds[i] != null) ? speeds[i] : '';
+                const hero = heroes.find(x => x.name.toLowerCase() === h.toLowerCase());
+                const rc = hero ? `race-${hero.race.toLowerCase()}` : '';
+                return `<div class="defense-speed-row">
+                            <span class="${rc}" style="font-size: 0.75rem; flex: 1;">${escapeHtml(h)}</span>
+                            <input type="number" min="1" id="speed-input-${assignmentId}-${i}" value="${currentVal}" placeholder="—" class="defense-speed-input">
+                        </div>`;
+            }).join('');
+
+            return `
+                <div id="speed-display-${assignmentId}" class="defense-speed-display">${timelineHtml}</div>
+                <div id="speed-editor-${assignmentId}" class="defense-speed-editor" style="display: none;">
+                    <div style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 6px;">⚡ ${t('defense.speedTitle')} (pet pominięty)</div>
+                    ${editorRows}
+                    <div style="display: flex; gap: 4px; margin-top: 6px;">
+                        <button class="btn btn-tiny btn-success" onclick="saveSpeedEditor(${assignmentId})">💾 ${t('defense.speedSave')}</button>
+                        <button class="btn btn-tiny btn-secondary" onclick="toggleSpeedEditor(${assignmentId})">${t('defense.speedCancel')}</button>
+                    </div>
+                </div>`;
+        }
+
 
         // ─── Helpery ─────────────────────────────────────────────
 

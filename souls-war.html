@@ -207,10 +207,56 @@
 				<button class="filter-btn" data-filter="base" onclick="setDbFilter('base')" data-i18n="database.filterBase">Bazowe</button>
 				<button class="filter-btn" data-filter="user" onclick="setDbFilter('user')" data-i18n="database.filterUser">Dodane</button>
 				<button class="filter-btn" data-filter="favorites" onclick="setDbFilter('favorites')">⭐ <span data-i18n="database.filterFavorites">Ulubione</span></button>
+				<button class="filter-btn" data-filter="packages" onclick="setDbFilter('packages')">🧩 <span data-i18n="database.filterPackages">Pakiety</span></button>
 				<input type="text" class="search-input" id="db-search" data-i18n-placeholder="database.searchPlaceholder" placeholder="🔍 Szukaj..." oninput="filterDatabase()">
 			</div>
 
-			<div class="sort-bar">
+			<!-- Config bar dla widoku Pakiety (ukryty domyślnie, pokazuje się przy filter=packages) -->
+			<div class="packages-config-bar" id="packages-config-bar" style="display: none;">
+				<div class="packages-config-group">
+					<label data-i18n="packages.minSize">Min wielkość</label>
+					<div class="packages-config-buttons">
+						<button class="pkg-btn active" data-pkg-size="3" onclick="setPackageOption('minSize', 3)">3</button>
+						<button class="pkg-btn" data-pkg-size="4" onclick="setPackageOption('minSize', 4)">4</button>
+						<button class="pkg-btn" data-pkg-size="5" onclick="setPackageOption('minSize', 5)">5</button>
+						<button class="pkg-btn" data-pkg-size="6" onclick="setPackageOption('minSize', 6)">6</button>
+						<button class="pkg-btn" data-pkg-size="7" onclick="setPackageOption('minSize', 7)">7</button>
+						<button class="pkg-btn" data-pkg-size="8" onclick="setPackageOption('minSize', 8)">8</button>
+					</div>
+				</div>
+				<div class="packages-config-group">
+					<label data-i18n="packages.mode">Tryb</label>
+					<div class="packages-config-buttons">
+						<button class="pkg-btn active" data-pkg-mode="exact" onclick="setPackageOption('mode', 'exact')" data-i18n="packages.modeExact">Dokładnie N</button>
+						<button class="pkg-btn" data-pkg-mode="atleast" onclick="setPackageOption('mode', 'atleast')" data-i18n="packages.modeAtLeast">Co najmniej N</button>
+					</div>
+				</div>
+				<div class="packages-config-group">
+					<label data-i18n="packages.source">Źródło</label>
+					<div class="packages-config-buttons">
+						<button class="pkg-btn active" data-pkg-source="enemy" onclick="setPackageOption('source', 'enemy')" data-i18n="packages.sourceEnemy">Wrogowie</button>
+						<button class="pkg-btn" data-pkg-source="my" onclick="setPackageOption('source', 'my')" data-i18n="packages.sourceMy">Kontry</button>
+						<button class="pkg-btn" data-pkg-source="both" onclick="setPackageOption('source', 'both')" data-i18n="packages.sourceBoth">Oba</button>
+					</div>
+				</div>
+				<div class="packages-config-group">
+					<label data-i18n="packages.window">Okno</label>
+					<div class="packages-config-buttons">
+						<button class="pkg-btn active" data-pkg-window="all" onclick="setPackageOption('window', 'all')" data-i18n="packages.windowAll">Cała baza</button>
+						<button class="pkg-btn" data-pkg-window="30" onclick="setPackageOption('window', 30)">30 dni</button>
+						<button class="pkg-btn" data-pkg-window="90" onclick="setPackageOption('window', 90)">90 dni</button>
+					</div>
+				</div>
+				<div class="packages-config-group">
+					<label data-i18n="packages.minSupport">Min wystąpień</label>
+					<input type="number" id="packages-min-support" min="1" value="5" onchange="setPackageOption('minSupport', parseInt(this.value)||5)" style="width: 60px; padding: 4px 6px; background: var(--bg-input); color: var(--text-light); border: 1px solid var(--border); border-radius: 4px;">
+				</div>
+				<div style="margin-left: auto; font-size: 0.75rem; color: var(--text-muted); align-self: center;" id="packages-stats">—</div>
+			</div>
+
+			<div class="packages-list" id="packages-list" style="display: none;"></div>
+
+			<div class="sort-bar" id="db-sort-bar">
 				<span class="sort-label" data-i18n="database.sortLabel">Sortuj:</span>
 				<button class="sort-btn" data-sort="id-asc" onclick="setDbSort('id-asc')" title="ID rosnąco">ID ↑</button>
 				<button class="sort-btn active" data-sort="id-desc" onclick="setDbSort('id-desc')" title="ID malejąco">ID ↓</button>
