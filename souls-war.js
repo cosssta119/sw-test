@@ -42,6 +42,9 @@
         let currentLang = localStorage.getItem('souls_lang') || 'pl';
         let currentDbFilter = 'all';
 		let currentDbSort = 'id-desc';
+		let currentSearchSort = 'relevance'; // 'relevance' | 'newest' — sortowanie wyników wyszukiwania
+		let lastSearch = null; // { results, searchHeroes } — cache do przełącznika sortowania bez ponownego szukania
+		let searchMinMatch = storage.getJson('souls_search_min_match', 3); // min. liczba trafionych postaci w wynikach (1 = pokaż wszystkie)
         let quickSelectTarget = null, activeAddField = null, activeSearchField = null, editingFormationId = null;
 		let currentTheme = localStorage.getItem('souls_theme') || 'dark';
 		let isGuildAuthenticated = false;
@@ -99,7 +102,7 @@
                 'search.dataLoading': '⏳ Czekam na dane z bazy…',
                 'database.title': 'Pełna baza formacji', 'database.statsAll': 'Wszystkich', 'database.statsBase': 'Bazowych', 'database.statsUser': 'Dodanych',
                 'database.filterAll': 'Wszystkie', 'database.filterBase': 'Bazowe', 'database.filterUser': 'Dodane', 'database.filterFavorites': 'Ulubione',
-                'database.searchPlaceholder': '🔍 Szukaj...', 'database.noFormations': 'Brak formacji',
+                'database.searchPlaceholder': '🔍 Szukaj (nazwa, bohater, komentarz)...', 'database.noFormations': 'Brak formacji',
                 'preview.title': 'Podgląd formacji', 'preview.idPlaceholder': 'Wpisz ID (np. 12)', 'preview.showBtn': 'POKAŻ',
                 'preview.emptyState': 'Wpisz ID aby zobaczyć układ formacji', 'preview.notFound': 'Nie znaleziono formacji',
                 'preview.enemy': 'PRZECIWNIK', 'preview.yourTeam': 'TWÓJ SKŁAD', 'preview.noPet': 'Brak peta', 'preview.invalidId': 'Wpisz prawidłowy numer ID!',
@@ -239,7 +242,13 @@
 				'kreator.hide.hiddenFrom': '🚫 {name} ukryty w tagach',
 				'kreator.hide.empty': 'Brak ukrytych',
 				'common.remove': 'Usuń',
-                'badge.base': 'BAZA', 'badge.user': 'DODANA',
+                'badge.base': 'BAZA', 'badge.user': 'DODANA', 'badge.new': 'NOWE',
+                'sort.relevance': 'Trafność', 'sort.newest': 'Najnowsze',
+                'sort.relevanceHint': 'Sortuj wg dopasowania', 'sort.newestHint': 'Sortuj od najnowszych (ID)',
+                'search.toggleComment': 'Kliknij aby rozwinąć/zwinąć', 'search.repeatLast': 'Powtórz ostatnie',
+                'search.minMatch': 'Min. trafność', 'search.minMatchAll': 'Wszystkie',
+                'search.belowThresholdHint': 'Ukryte: trafność poniżej progu',
+                'search.allBelowThreshold': 'Wszystkie dopasowania mają trafność poniżej {n}. Zmniejsz próg.',
 				'nav.defense': 'Obrona',
 				'defense.title': 'Obrona gildii',
 				'defense.viewPlayers': 'Gracze', 'defense.viewFormations': 'Składy', 'defense.viewAdd': 'Dodaj skład',
@@ -331,7 +340,7 @@
                 'search.dataLoading': '⏳ Waiting for database…',
                 'database.title': 'Full formation database', 'database.statsAll': 'Total', 'database.statsBase': 'Base', 'database.statsUser': 'Added',
                 'database.filterAll': 'All', 'database.filterBase': 'Base', 'database.filterUser': 'Added', 'database.filterFavorites': 'Favorites',
-                'database.searchPlaceholder': '🔍 Search...', 'database.noFormations': 'No formations',
+                'database.searchPlaceholder': '🔍 Search (name, hero, comment)...', 'database.noFormations': 'No formations',
                 'preview.title': 'Formation preview', 'preview.idPlaceholder': 'Enter ID (e.g. 12)', 'preview.showBtn': 'SHOW',
                 'preview.emptyState': 'Enter ID to see formation layout', 'preview.notFound': 'Formation not found',
                 'preview.enemy': 'ENEMY', 'preview.yourTeam': 'YOUR TEAM', 'preview.noPet': 'No pet', 'preview.invalidId': 'Enter a valid ID number!',
@@ -471,7 +480,13 @@
 				'kreator.hide.hiddenFrom': '🚫 {name} hidden from tags',
 				'kreator.hide.empty': 'None hidden',
 				'common.remove': 'Remove',
-                'badge.base': 'BASE', 'badge.user': 'ADDED',
+                'badge.base': 'BASE', 'badge.user': 'ADDED', 'badge.new': 'NEW',
+                'sort.relevance': 'Relevance', 'sort.newest': 'Newest',
+                'sort.relevanceHint': 'Sort by match', 'sort.newestHint': 'Sort by newest (ID)',
+                'search.toggleComment': 'Click to expand/collapse', 'search.repeatLast': 'Repeat last',
+                'search.minMatch': 'Min. match', 'search.minMatchAll': 'All',
+                'search.belowThresholdHint': 'Hidden: match below threshold',
+                'search.allBelowThreshold': 'All matches are below {n}. Lower the threshold.',
 				'nav.defense': 'Defense',
 				'defense.title': 'Guild defense',
 				'defense.viewPlayers': 'Players', 'defense.viewFormations': 'Formations', 'defense.viewAdd': 'Add formation',
@@ -948,6 +963,14 @@
 			if (diff < 86400) return `${Math.floor(diff / 3600)} godz. temu`;
 			if (diff < 604800) return `${Math.floor(diff / 86400)} dni temu`;
 			return date.toLocaleDateString('pl-PL');
+		}
+
+		// Czy formacja jest "nowa" (dodana w ostatnich 14 dniach wg dateAdded; bazowe/bez daty → false)
+		const NEW_FORMATION_DAYS = 14;
+		function isNewFormation(f) {
+			if (!f) return false;
+			// Date.parse(undefined) → NaN, a porównanie z NaN daje false, więc bazowe/bez daty same wypadają
+			return (Date.now() - Date.parse(f.dateAdded)) < NEW_FORMATION_DAYS * 86400000;
 		}
 
 		// Aktualizuj kolor inputa na podstawie rasy bohatera
@@ -1710,36 +1733,92 @@
 				return r.score > 0
 					? { formation: f, matchedHeroes: r.matchedHeroes, petMatched: r.petMatched, score: r.score, maxScore: r.maxScore }
 					: null;
-			}).filter(Boolean).sort((a, b) => b.score - a.score);
-			
+			}).filter(Boolean);
+
 			displayResults(results, searchHeroes);
+		}
+
+		// Sortowanie wyników: 'relevance' (trafność, tie-break po id) lub 'newest' (najnowsze po id, tie-break po score)
+		function sortSearchResults(results) {
+			const sorted = [...results];
+			if (currentSearchSort === 'newest') {
+				sorted.sort((a, b) => (b.formation.id - a.formation.id) || (b.score - a.score));
+			} else {
+				sorted.sort((a, b) => (b.score - a.score) || (b.formation.id - a.formation.id));
+			}
+			return sorted;
+		}
+
+		function setSearchSort(mode) {
+			currentSearchSort = mode;
+			if (lastSearch) displayResults(lastSearch.results, lastSearch.searchHeroes);
+		}
+
+		function setSearchMinMatch(n) {
+			searchMinMatch = n;
+			storage.setJson('souls_search_min_match', n);
+			if (lastSearch) displayResults(lastSearch.results, lastSearch.searchHeroes);
 		}
 
 		function displayResults(results, searchHeroes) {
 			// Reset selekcji przy nowym wyszukiwaniu
 			selectedForCompare = [];
-			
+			// Zapamiętaj surowe wyniki, żeby przełącznik sortowania mógł je przerenderować bez ponownego szukania
+			lastSearch = { results, searchHeroes };
+
 			if (!results.length) {
 				$('results-section').innerHTML = `<div class="empty-state"><p>${t('search.noResults')}</p></div>`;
 				return;
 			}
-			
-			// Filtruj wyniki według wykluczonych
-			let displayedResults = results;
+
+			// Sortuj wg aktywnego trybu, potem filtruj wykluczonych
+			let displayedResults = sortSearchResults(results);
 			let hiddenCount = 0;
-			
+
 			if (hideExcludedResults && excludedHeroes.length > 0) {
-				displayedResults = results.filter(r => !isFormationExcluded(r.formation).excluded);
+				displayedResults = displayedResults.filter(r => !isFormationExcluded(r.formation).excluded);
 				hiddenCount = results.length - displayedResults.length;
 			}
-			
+
+			// Filtruj po min. trafności. Próg nie może przekroczyć liczby wpisanych postaci (maxScore),
+			// więc krótkie wyszukiwania nigdy nie zostają puste przez sam próg.
+			const maxTyped = results[0].maxScore;
+			const effectiveMin = Math.min(searchMinMatch, maxTyped);
+			let belowMin = 0;
+			if (effectiveMin > 1) {
+				const before = displayedResults.length;
+				displayedResults = displayedResults.filter(r => (r.matchedHeroes.length + (r.petMatched ? 1 : 0)) >= effectiveMin);
+				belowMin = before - displayedResults.length;
+			}
+
+			// Przyciski progu (1 = wszystkie). Pokazujemy tylko gdy wpisano >1 postać; cap na 5 (reguła gry).
+			let minMatchBtns = '';
+			if (maxTyped > 1) {
+				for (let n = 1; n <= Math.min(maxTyped, 5); n++) {
+					const label = n === 1 ? t('search.minMatchAll') : `${n}+`;
+					minMatchBtns += `<button class="sort-btn ${effectiveMin === n ? 'active' : ''}" onclick="setSearchMinMatch(${n})">${label}</button>`;
+				}
+			}
+
 			let html = `<div class="results-header">
-				<h3>${t('search.results')}</h3>
-				<span class="results-count">${t('search.found')}: ${displayedResults.length}${hiddenCount > 0 ? ` <span style="color:#f44336;">(+${hiddenCount} 🚫)</span>` : ''}</span>
+				<div class="results-header-top">
+					<h3>${t('search.results')}</h3>
+					<div class="results-sort">
+						<button class="sort-btn ${currentSearchSort === 'relevance' ? 'active' : ''}" onclick="setSearchSort('relevance')" title="${t('sort.relevanceHint')}">🎯 ${t('sort.relevance')}</button>
+						<button class="sort-btn ${currentSearchSort === 'newest' ? 'active' : ''}" onclick="setSearchSort('newest')" title="${t('sort.newestHint')}">🕐 ${t('sort.newest')}</button>
+					</div>
+				</div>
+				<div class="results-meta">
+					<span class="results-count">${t('search.found')}: ${displayedResults.length}${hiddenCount > 0 ? ` <span style="color:#f44336;">(+${hiddenCount} 🚫)</span>` : ''}${belowMin > 0 ? ` <span style="color:var(--text-muted);" title="${t('search.belowThresholdHint')}">(+${belowMin} 🔽)</span>` : ''}</span>
+					${minMatchBtns ? `<div class="results-filter"><span class="results-filter-label">${t('search.minMatch')}:</span>${minMatchBtns}</div>` : ''}
+				</div>
 			</div>`;
-			
+
 			if (!displayedResults.length) {
-				html += `<div class="empty-state"><p>${t('search.noResults')}</p><p style="font-size:0.8rem;color:var(--text-muted);margin-top:10px;">${t('excluded.hiddenInResults', {n: hiddenCount})}</p></div>`;
+				const reason = belowMin > 0
+					? `<p style="font-size:0.8rem;color:var(--text-muted);margin-top:10px;">${t('search.allBelowThreshold', {n: effectiveMin})}</p>`
+					: (hiddenCount > 0 ? `<p style="font-size:0.8rem;color:var(--text-muted);margin-top:10px;">${t('excluded.hiddenInResults', {n: hiddenCount})}</p>` : '');
+				html += `<div class="empty-state"><p>${t('search.noResults')}</p>${reason}</div>`;
 				$('results-section').innerHTML = html;
 				updateCompareButton();
 				return;
@@ -1767,13 +1846,14 @@
 						</div>
 						<div class="result-card-content" onclick="showFormation(${f.id})">
 							<div class="result-card-header">
-								<span class="result-id">ID: ${f.id}${f.isBase ? '' : ` <span class="badge user-badge">${t('badge.user')}</span>`}</span>
+								<span class="result-id">ID: ${f.id}${f.isBase ? '' : ` <span class="badge user-badge">${t('badge.user')}</span>`}${isNewFormation(f) ? ` <span class="badge new-badge">${t('badge.new')}</span>` : ''}</span>
 								<span class="match-score match-${Math.min(Math.floor(r.score), 6)}">${r.score % 1 === 0 ? r.score : '💬'}/${r.maxScore}</span>
 							</div>
 							<div class="result-name">${f.name}</div>
 							<div class="result-heroes">${t('search.enemy')}: ${enemyDisplay} + ${petDisplay}</div>
 							<div class="result-heroes result-my-heroes">⚔️ Kontra: ${f.my.filter(h => h).map(h => `<span class="my-hero">${h}</span>`).join(', ') || '—'}${f.myPet ? ` + <span class="my-pet">${f.myPet}</span>` : ''}</div>
 							${missingHeroes.length ? `<div class="result-missing">❌ ${t('search.missing')}: ${missingHeroes.join(', ')}</div>` : ''}
+							${f.comment ? `<div class="result-comment clamped" onclick="event.stopPropagation(); this.classList.toggle('clamped')" title="${t('search.toggleComment')}"><span class="comment-icon">💬</span>${escapeHtml(f.comment)}</div>` : ''}
 							${commentMatchInfo}
 							${hasExcluded ? `<div class="result-excluded-heroes">🚫 ${t('exclude.has')}: ${exclusionCheck.heroes.join(', ')}</div>` : ''}
 						</div>
@@ -1787,9 +1867,22 @@
         function clearSearch() {
             for (let i = 1; i <= 8; i++) $(`search-pos${i}`).value = '';
             $('search-pet').value = '';
-            $('results-section').innerHTML = `<div class="empty-state"><p>${t('search.emptyState')}</p></div>`;
+            lastSearch = null;
+            renderSearchEmptyState();
             document.querySelectorAll('.quick-tag.selected').forEach(t => t.classList.remove('selected'));
             $('search-counter')?.remove();
+        }
+
+        // Stan pustego ekranu wyszukiwarki — z opcją powtórzenia ostatniego wyszukiwania
+        function renderSearchEmptyState() {
+            const section = $('results-section');
+            if (!section) return;
+            const last = searchHistory[0];
+            const lastFilled = (last?.heroes || []).filter(v => v);
+            const lastBtn = (last && (lastFilled.length || last.pet))
+                ? `<button class="btn btn-secondary repeat-search-btn" onclick="loadSearchFromHistory(0)">🔁 ${t('search.repeatLast')}: ${lastFilled.slice(0, 3).join(', ')}${last.pet ? ` 🐾${last.pet}` : ''}</button>`
+                : '';
+            section.innerHTML = `<div class="empty-state"><p>${t('search.emptyState')}</p>${lastBtn}</div>`;
         }
 
 		// =====================================================
@@ -2318,8 +2411,14 @@
 			else if (currentDbFilter === 'user') formations = formations.filter(f => !f.isBase);
 			else if (currentDbFilter === 'favorites') formations = formations.filter(f => favorites.includes(f.id));
 			
-			if (searchTerm) formations = formations.filter(f => normalize(f.name).includes(searchTerm));
-			
+			// Szukaj po nazwie, bohaterach (my+enemy+pety) i komentarzu
+			if (searchTerm) formations = formations.filter(f => {
+				if (normalize(f.name).includes(searchTerm)) return true;
+				if (f.comment && normalize(f.comment).includes(searchTerm)) return true;
+				return [...(f.my || []), ...(f.enemy || []), f.myPet, f.enemyPet]
+					.some(h => h && normalize(h).includes(searchTerm));
+			});
+
 			// Filtruj według wykluczonych bohaterów
 			let hiddenCount = 0;
 			if (hideExcludedResults && excludedHeroes.length > 0) {
@@ -2344,7 +2443,7 @@
 				return `
 				<div class="db-item ${hasExcluded ? 'has-excluded' : ''}" onclick="showFormation(${f.id})">
 					<div class="db-item-info">
-						<div class="db-item-header"><span class="db-item-id">#${f.id}</span><span class="badge ${f.isBase ? 'base-badge' : 'user-badge'}">${t(f.isBase ? 'badge.base' : 'badge.user')}</span></div>
+						<div class="db-item-header"><span class="db-item-id">#${f.id}</span><span class="badge ${f.isBase ? 'base-badge' : 'user-badge'}">${t(f.isBase ? 'badge.base' : 'badge.user')}</span>${isNewFormation(f) ? `<span class="badge new-badge">${t('badge.new')}</span>` : ''}</div>
 						<div class="db-item-name">${f.name}</div>
 						<div class="db-item-details"><div>⚔️ ${f.my.filter(h => h).join(', ') || '—'} + ${f.myPet || '—'}</div><div>👹 ${f.enemy.filter(h => h).join(', ') || '—'} + ${f.enemyPet || '—'}</div></div>
 						${hasExcluded ? `<div style="font-size:0.65rem;color:#f44336;margin-top:3px;">🚫 ${exclusionCheck.heroes.join(', ')}</div>` : ''}
@@ -2803,11 +2902,11 @@
             return allFormations.filter(f => {
                 // Nie pokazuj tej samej formacji
                 if (f.id === formation.id) return false;
-                
+
                 // Sprawdź czy przeciwnik jest identyczny
                 const otherEnemyKey = getEnemyKey(f);
                 return enemyKey === otherEnemyKey;
-            });
+            }).sort((a, b) => b.id - a.id); // najnowsze (najwyższe ID) na górze
         }
 
         function getEnemyKey(formation) {
@@ -7306,7 +7405,10 @@
 			
 			// Inicjalizacja ostatnio przeglądanych
 			renderRecentlyViewed();
-			
+
+			// Startowy pusty ekran wyszukiwarki (z opcją powtórzenia ostatniego)
+			renderSearchEmptyState();
+
 			// Zamykanie modali kliknięciem poza content
 			$('duplicates-modal')?.addEventListener('click', e => {
 				if (e.target === $('duplicates-modal')) closeDuplicatesModal();

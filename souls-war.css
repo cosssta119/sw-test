@@ -556,9 +556,15 @@
 		.search-counter strong { color: var(--accent-gold); font-size: 0.9rem; }
 		
 		/* ===== WYNIKI ===== */
-		.results-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+		.results-header { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+		.results-header-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
 		.results-header h3 { font-size: 0.9rem; }
 		.results-count { font-size: 0.8rem; color: var(--text-muted); }
+		.results-sort { display: flex; gap: 4px; }
+		.results-meta { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+		.results-filter { display: flex; align-items: center; gap: 4px; }
+		.results-filter-label { font-size: 0.7rem; color: var(--text-muted); }
+		.repeat-search-btn { margin-top: 14px; max-width: 360px; }
 		
 		.result-card {
 			background: var(--bg-card);
@@ -626,17 +632,40 @@
 			font-weight: 500;
 		}
 		
-		.result-missing { 
-			font-size: 0.7rem; 
-			color: #ef5350; 
+		.result-missing {
+			font-size: 0.7rem;
+			color: #ef5350;
 			margin-top: 5px;
 			padding-top: 5px;
 			border-top: 1px dashed var(--border);
 		}
+
+		.result-comment {
+			margin-top: 6px;
+			padding: 7px 10px;
+			background: linear-gradient(135deg, rgba(212, 175, 55, 0.08), rgba(212, 175, 55, 0.02));
+			border-radius: 8px;
+			border-left: 3px solid var(--accent-gold);
+			font-size: 0.72rem;
+			color: var(--text-light);
+			line-height: 1.4;
+			white-space: pre-wrap;
+			word-break: break-word;
+			cursor: pointer;
+		}
+		.result-comment.clamped {
+			display: -webkit-box;
+			-webkit-line-clamp: 2;
+			-webkit-box-orient: vertical;
+			overflow: hidden;
+			white-space: normal;
+		}
+		.result-comment .comment-icon { color: var(--accent-gold); margin-right: 6px; }
 		
 		.badge { font-size: 0.6rem; padding: 2px 6px; border-radius: 3px; margin-left: 5px; }
 		.user-badge { background: var(--accent-purple); color: white; }
 		.base-badge { background: var(--accent-blue); color: white; }
+		.new-badge { background: #2e7d32; color: white; }
 
 		.compare-count-badge {
 			background: rgba(255, 255, 255, 0.25);
