@@ -23,6 +23,7 @@
                 const raw = localStorage.getItem(key);
                 return raw === null ? fallback : raw === 'true';
             },
+            setBool: (key, val) => localStorage.setItem(key, val),
         };
 
         // Migracja: 4 klucze preferencji UI bez prefiksu → souls_* (jednorazowo przy starcie)
@@ -42,9 +43,23 @@
         let currentLang = localStorage.getItem('souls_lang') || 'pl';
         let currentDbFilter = 'all';
 		let currentDbSort = 'id-desc';
-		let currentSearchSort = 'relevance'; // 'relevance' | 'newest' — sortowanie wyników wyszukiwania
+		// Globalna konfiguracja gildii (Firebase /config/settings) — wspólna dla wszystkich graczy.
+		// DEFAULT_CONFIG = bezpieczny backup, gdy node nie istnieje lub ma złe wartości.
+		const DEFAULT_CONFIG = {
+			newFormationDays: 7,        // próg badge „NOWE"
+			defaultMinMatch: 3,         // domyślny próg trafności wyszukiwania
+			defaultSearchSort: 'relevance', // domyślne sortowanie wyników
+			defaultDbFilter: 'all',     // domyślny filtr bazy na starcie
+			defaultPackageMinSupport: 5,// domyślne „min. wystąpień" w pakietach
+			defaultPackageWindow: 'all',// domyślne okno czasowe pakietów
+		};
+		let appConfig = { ...DEFAULT_CONFIG };
+		let configRef = null;
+		let configInitApplied = false; // domyślne „widoku" (filtr/pakiety) stosujemy tylko raz, przy pierwszym załadowaniu
+		let currentSearchSort = DEFAULT_CONFIG.defaultSearchSort; // 'relevance' | 'newest'
+		let userTouchedSort = false; // user ręcznie zmienił sortowanie w tej sesji → nie nadpisujemy globalnym domyślnym
 		let lastSearch = null; // { results, searchHeroes } — cache do przełącznika sortowania bez ponownego szukania
-		let searchMinMatch = storage.getJson('souls_search_min_match', 3); // min. liczba trafionych postaci w wynikach (1 = pokaż wszystkie)
+		let searchMinMatch = storage.getJson('souls_search_min_match', DEFAULT_CONFIG.defaultMinMatch); // per-user override (1 = wszystkie)
         let quickSelectTarget = null, activeAddField = null, activeSearchField = null, editingFormationId = null;
 		let currentTheme = localStorage.getItem('souls_theme') || 'dark';
 		let isGuildAuthenticated = false;
@@ -92,8 +107,8 @@
         
         const translations = {
             pl: {
-                'loading': 'Ładowanie danych...', 'common.loading': 'Ładowanie...', 'common.cancel': 'Anuluj', 'common.clear': 'Wyczyść',
-                'header.subtitle': 'Wyszukiwarka kontr-formacji', 'status.connecting': 'Łączenie...', 'status.online': 'Online', 'status.offline': 'Offline', 'status.formations': 'formacji',
+                'loading': 'Ładowanie danych...', 'common.loading': 'Ładowanie...', 'common.cancel': 'Anuluj', 'common.clear': 'Wyczyść', 'common.save': 'Zapisz',
+                'header.subtitle': 'Wyszukiwarka kontr-formacji', 'status.online': 'Online', 'status.offline': 'Offline', 'status.formations': 'formacji',
                 'nav.search': 'Szukaj', 'nav.database': 'Baza', 'nav.preview': 'Podgląd', 'nav.add': 'Dodaj', 'nav.import': 'Import',
                 'search.title': 'Szukaj kontr-formacji', 'search.subtitle': 'Wpisz skład przeciwnika (lub wybierz tagami)', 'search.btn': 'SZUKAJ', 'search.clear': 'Wyczyść',
                 'search.emptyState': 'Wpisz postacie przeciwnika i kliknij "Szukaj"', 'search.results': 'Wyniki', 'search.found': 'Znaleziono', 'search.noResults': 'Nie znaleziono pasujących formacji',
@@ -103,15 +118,13 @@
                 'database.title': 'Pełna baza formacji', 'database.statsAll': 'Wszystkich', 'database.statsBase': 'Bazowych', 'database.statsUser': 'Dodanych',
                 'database.filterAll': 'Wszystkie', 'database.filterBase': 'Bazowe', 'database.filterUser': 'Dodane', 'database.filterFavorites': 'Ulubione',
                 'database.searchPlaceholder': '🔍 Szukaj (nazwa, bohater, komentarz)...', 'database.noFormations': 'Brak formacji',
-                'preview.title': 'Podgląd formacji', 'preview.idPlaceholder': 'Wpisz ID (np. 12)', 'preview.showBtn': 'POKAŻ',
+                'preview.title': 'Podgląd formacji',
                 'preview.emptyState': 'Wpisz ID aby zobaczyć układ formacji', 'preview.notFound': 'Nie znaleziono formacji',
                 'preview.enemy': 'PRZECIWNIK', 'preview.yourTeam': 'TWÓJ SKŁAD', 'preview.noPet': 'Brak peta', 'preview.invalidId': 'Wpisz prawidłowy numer ID!',
-                'preview.recentlyViewed': 'Ostatnio przeglądane', 'preview.noRecent': 'Brak historii',
-                'search.searchInComments': 'Szukaj też w komentarzach',
-                'add.title': 'Dodaj nową formację', 'add.nameLabel': 'Nazwa formacji', 'add.namePlaceholder': 'np. Nick 01-01-2026 W1 / Kontra Dark-Undead v1',
+                'preview.recentlyViewed': 'Ostatnio przeglądane', 'preview.noRecent': 'Brak historii',                'add.title': 'Dodaj nową formację', 'add.nameLabel': 'Nazwa formacji', 'add.namePlaceholder': 'np. Nick 01-01-2026 W1 / Kontra Dark-Undead v1',
                 'add.yourTeam': 'Twój skład', 'add.enemyTeam': 'Skład przeciwnika', 'add.swapSections': 'Zamień kolejność','add.commentLabel': 'Komentarz (opcjonalnie)',
                 'add.commentPlaceholder': 'np. Unikać Death, Silbren u przeciwnika, kolejność speed: xxx > yyy > zzz, Pao runa PR, itp.', 'add.saveBtn': 'ZAPISZ FORMACJĘ',
-                'add.enterName': 'Podaj nazwę formacji!', 'add.addAtLeastOne': 'Dodaj przynajmniej jedną postać!',
+                'add.addAtLeastOne': 'Dodaj przynajmniej jedną postać!',
                 'add.unknownHeroes': 'Nieznani bohaterowie', 'add.unknownPets': 'Nieznane pety', 'add.saved': 'Zapisano formację',
                 'settings.title': 'Import / Eksport', 'settings.status': 'Status', 'settings.checking': 'Sprawdzanie połączenia...',
                 'settings.online': 'Połączono z bazą danych.', 'settings.offline': 'Brak połączenia z bazą.',
@@ -121,18 +134,24 @@
                 'admin.title': 'Panel Administratora', 'admin.enterPassword': 'Wpisz hasło administratora', 'admin.passwordPlaceholder': 'Hasło...', 'admin.login': 'ZALOGUJ',
                 'admin.panelTitle': 'Panel Administratora', 'admin.modeActive': 'Tryb Admin aktywny', 'admin.modeDesc': 'Możesz zarządzać bohaterami, petami i usuwać dowolne formacje.',
                 'admin.heroes': 'Bohaterowie', 'admin.pets': 'Pety', 'admin.heroNamePlaceholder': 'Nazwa bohatera', 'admin.petNamePlaceholder': 'Nazwa peta',
-                'admin.manageFormations': 'Zarządzanie formacjami', 'admin.deleteAllUser': 'Usuń wszystkie formacje użytkowników',
                 'admin.session': 'Sesja', 'admin.logout': 'Wyloguj z trybu Admin', 'admin.loggedIn': 'Zalogowano jako Administrator!', 'admin.loggedOut': 'Wylogowano z trybu Admin',
                 'admin.wrongPassword': 'Nieprawidłowe hasło!', 'admin.alreadyLogged': 'Już jesteś zalogowany jako Admin',
                 'admin.heroAdded': 'Dodano bohatera', 'admin.heroDeleted': 'Usunięto', 'admin.heroExists': 'Bohater już istnieje!',
+                'admin.editHero': 'Edytuj bohatera', 'admin.heroSaved': 'Zapisano bohatera',
+                'admin.renameConfirm': 'Zmiana nazwy zaktualizuje też wszystkie formacje i składy obrony używające tego bohatera. Kontynuować?',
+                'admin.editPet': 'Edytuj peta', 'admin.petSaved': 'Zapisano peta',
+                'admin.renamePetConfirm': 'Zmiana nazwy zaktualizuje też wszystkie formacje i składy obrony używające tego peta. Kontynuować?',
+                'admin.config': 'Konfiguracja (globalna)', 'admin.configNewDays': 'Próg „NOWE" (dni)',
+                'admin.configMinMatch': 'Domyślny próg trafności', 'admin.configSort': 'Domyślne sortowanie wyników',
+                'admin.configDbFilter': 'Domyślny filtr bazy', 'admin.configPkgSupport': 'Pakiety: domyślne min. wystąpień', 'admin.configPkgWindow': 'Pakiety: domyślne okno',
+                'admin.configHint': 'Zmiana działa dla wszystkich graczy gildii.', 'admin.configSaved': 'Zapisano konfigurację',
+                'admin.configInvalidDays': 'Podaj liczbę dni większą od 0!', 'admin.configInvalidMin': 'Podaj próg trafności większy od 0!',
                 'admin.petAdded': 'Dodano peta', 'admin.petExists': 'Pet już istnieje!', 'admin.enterHeroName': 'Podaj nazwę bohatera!', 'admin.enterPetName': 'Podaj nazwę peta!',
-                'admin.confirmDeleteHero': 'Usunąć bohatera', 'admin.confirmDeletePet': 'Usunąć peta', 'admin.confirmDeleteAllUser': 'Na pewno usunąć WSZYSTKIE formacje dodane przez użytkowników?',
-                'admin.deletedUserFormations': 'Usunięto formacji użytkowników',
-                'admin.loadingBase': 'Ładowanie bazy... To może chwilę potrwać.', 'admin.loadedBase': 'Załadowano formacji!',
+                'admin.confirmDeleteHero': 'Usunąć bohatera', 'admin.confirmDeletePet': 'Usunąć peta',
                 'quickSelect.title': 'Szybki wybór', 'quickSelect.selectFor': 'Wybierz dla',
                 'quickTags.expandAll': 'Rozwiń wszystkie tagi', 'quickTags.collapseAll': 'Zwiń wszystkie tagi', 'quickTags.pets': 'Pety',
                 'common.error': 'Błąd', 'common.noConnection': 'Brak połączenia z bazą!', 'common.formationDeleted': 'Formacja usunięta!',
-                'common.cannotDeleteBase': 'Nie możesz usunąć formacji bazowej!', 'common.confirmDelete': 'Usunąć formację',
+                'common.confirmDelete': 'Usunąć formację',
                 'common.addedToFavorites': 'Dodano do ulubionych ⭐', 'common.removedFromFavorites': 'Usunięto z ulubionych',
 				'common.adminRequired': 'Tylko admin może usuwać formacje!', 'database.sortLabel': 'Sortuj:',
 				'edit.title': 'Edytuj formację', 'edit.saveBtn': 'ZAPISZ ZMIANY', 'add.markAsBase': 'Oznacz jako formację BAZOWĄ',
@@ -144,10 +163,7 @@
 				'duplicates.allUnique': 'Wszystkie formacje są unikalne.', 'duplicates.found': 'Znaleziono',
 				'duplicates.groups': 'grup', 'duplicates.identical': 'Identyczne', 'duplicates.almostIdentical': 'Prawie identyczne',
 				'duplicates.enemy': 'Przeciwnik', 'duplicates.counter': 'Kontra',
-				'duplicates.confirmDelete': 'Czy na pewno usunąć formację', 'admin.deleteAllConfirm1': 'Czy na pewno chcesz usunąć',
-				'admin.deleteAllConfirm2': 'Wpisz liczbę formacji do usunięcia aby potwierdzić', 'admin.formations': 'formacji',
-				'admin.deleteAllCancelled': 'Anulowano usuwanie', 'admin.deletedAll': 'Usunięto',
-				'admin.noUserFormations': 'Brak formacji użytkowników do usunięcia!', 'duplicates.preview': 'Podgląd',
+				'duplicates.confirmDelete': 'Czy na pewno usunąć formację', 'duplicates.preview': 'Podgląd',
 				'duplicates.warningTitle': 'Znaleziono identyczną formację!', 'duplicates.warningText': 'Ta kombinacja przeciwnika i kontry już istnieje w bazie:',
 				'duplicates.cancel': 'Anuluj', 'duplicates.saveAnyway': 'Zapisz mimo to',
 				'common.close': 'Zamknij', 'common.delete': 'Usuń', 'database.deleted': 'Usunięto',
@@ -189,7 +205,6 @@
 				'war.legendExtra': 'Dodatkowe w bazie',
 				'war.legendConflict': 'Konflikt (użyty wielokrotnie)',
 				'war.selectCombo': 'Wybierz kombinację z planera wojny',
-				'war.history': 'Historia planera',
 				'common.historyCleared': 'Historia wyczyszczona',
 				'excluded.alreadyExcluded': 'Bohater już wykluczony!',
 				'excluded.added': 'Wykluczono',
@@ -197,9 +212,7 @@
 				'excluded.confirmClear': 'Wyczyścić wszystkich wykluczonych?',
 				'excluded.cleared': '🗑️ Wyczyszczono wykluczonych',
 				'excluded.hiddenInResults': '{n} ukrytych z powodu wykluczonych bohaterów',
-				'excluded.hiddenCountLabel': 'ukrytych (wykluczone)',
-				'search.foundInComment': 'Znaleziono w komentarzu',
-				'search.historyConfirmClear': 'Wyczyścić całą historię wyszukiwań?',
+				'excluded.hiddenCountLabel': 'ukrytych (wykluczone)',				'search.historyConfirmClear': 'Wyczyścić całą historię wyszukiwań?',
 				'search.loadedFromHistory': 'Wczytano z historii',
 				'search.clickFieldFirst': 'Najpierw kliknij w pole!',
 				'search.fieldIsPet': 'To pole jest na Peta!',
@@ -257,7 +270,7 @@
 				'defense.noPlayers': 'Brak graczy. Dodaj pierwszego powyżej.',
 				'defense.noFormations': 'Brak składów. Dodaj pierwszy w zakładce "Dodaj skład".',
 				'defense.searchPlaceholder': '🔍 Szukaj po nazwie/bohaterze...',
-				'defense.formationNameLabel': 'Nazwa składu (opcjonalnie)', 'defense.formationNamePlaceholder': 'np. Anti-Fire v2',
+				'defense.formationNameLabel': 'Nazwa składu (opcjonalnie)', 'defense.formationNamePlaceholder': 'np. Anti-Horde v2',
 				'defense.formationTeam': 'Skład obronny',
 				'defense.assignToPlayerLabel': 'Przypisz od razu do gracza (opcjonalnie)', 'defense.noAssign': '— Nie przypisuj —',
 				'defense.commentLabel': 'Komentarz (opcjonalnie)', 'defense.commentPlaceholder': 'np. używany od marca 2026',
@@ -287,9 +300,7 @@
 				'defense.usersCount': 'Używa', 'defense.usersZero': 'Nikt nie używa',
 				'defense.historyTitle': 'Historia przypięć gracza',
 				'defense.historyEmpty': 'Brak historii przypięć',
-				'defense.historyActive': 'AKTYWNE', 'defense.historyUnpinned': 'odpięte',
-				'defense.viewInDb': 'Otwórz w bazie składów',
-				'defense.deleteFormation': 'Usuń skład',
+				'defense.historyActive': 'AKTYWNE', 'defense.historyUnpinned': 'odpięte',				'defense.deleteFormation': 'Usuń skład',
 				'defense.confirmDeleteFormation': 'Usunąć skład #{id}? Tej operacji nie da się cofnąć. Wszystkie przypięcia (aktywne i historyczne) zostaną też usunięte.',
 				'defense.formationDeleted': 'Skład usunięty',
 				'defense.cannotDeleteFormationInUse': 'Nie można usunąć — skład jest aktywnie przypięty do {n} graczy. Najpierw odepnij.',
@@ -326,12 +337,11 @@
 				'packages.minSupport': 'Min wystąpień',
 				'packages.empty': 'Brak pakietów spełniających kryteria. Zmniejsz min wystąpień albo min wielkość.',
 				'packages.stats': '{n} pakietów z {total} formacji',
-				'packages.occurrences': '×',
-				'packages.showFormations': 'Pokaż formacje'
+				'packages.occurrences': '×'
             },
             en: {
-                'loading': 'Loading data...', 'common.loading': 'Loading...', 'common.cancel': 'Cancel', 'common.clear': 'Clear',
-                'header.subtitle': 'Counter-formation finder', 'status.connecting': 'Connecting...', 'status.online': 'Online', 'status.offline': 'Offline', 'status.formations': 'formations',
+                'loading': 'Loading data...', 'common.loading': 'Loading...', 'common.cancel': 'Cancel', 'common.clear': 'Clear', 'common.save': 'Save',
+                'header.subtitle': 'Counter-formation finder', 'status.online': 'Online', 'status.offline': 'Offline', 'status.formations': 'formations',
                 'nav.search': 'Search', 'nav.database': 'Database', 'nav.preview': 'Preview', 'nav.add': 'Add', 'nav.import': 'Import',
                 'search.title': 'Search counter-formations', 'search.subtitle': 'Enter enemy composition (or use tags)', 'search.btn': 'SEARCH', 'search.clear': 'Clear',
                 'search.emptyState': 'Enter enemy heroes and click "Search"', 'search.results': 'Results', 'search.found': 'Found', 'search.noResults': 'No matching formations found',
@@ -341,15 +351,14 @@
                 'database.title': 'Full formation database', 'database.statsAll': 'Total', 'database.statsBase': 'Base', 'database.statsUser': 'Added',
                 'database.filterAll': 'All', 'database.filterBase': 'Base', 'database.filterUser': 'Added', 'database.filterFavorites': 'Favorites',
                 'database.searchPlaceholder': '🔍 Search (name, hero, comment)...', 'database.noFormations': 'No formations',
-                'preview.title': 'Formation preview', 'preview.idPlaceholder': 'Enter ID (e.g. 12)', 'preview.showBtn': 'SHOW',
+                'preview.title': 'Formation preview',
                 'preview.emptyState': 'Enter ID to see formation layout', 'preview.notFound': 'Formation not found',
                 'preview.enemy': 'ENEMY', 'preview.yourTeam': 'YOUR TEAM', 'preview.noPet': 'No pet', 'preview.invalidId': 'Enter a valid ID number!',
                 'preview.recentlyViewed': 'Recently viewed', 'preview.noRecent': 'No history',
-                'search.searchInComments': 'Also search in comments',
                 'add.title': 'Add new formation', 'add.nameLabel': 'Formation name', 'add.namePlaceholder': 'e.g. Nick 01-01-2026 W1 / Counter Dark-Undead v1',
                 'add.yourTeam': 'Your team', 'add.enemyTeam': 'Enemy team', 'add.swapSections': 'Swap order', 'add.commentLabel': 'Comment (optional)',
                 'add.commentPlaceholder': 'e.g. Avoid Death, Silbren on enemy, speed order: xxx > yyy > zzz, Pao rune PR, etc.', 'add.saveBtn': 'SAVE FORMATION',
-                'add.enterName': 'Enter formation name!', 'add.addAtLeastOne': 'Add at least one hero!',
+                'add.addAtLeastOne': 'Add at least one hero!',
                 'add.unknownHeroes': 'Unknown heroes', 'add.unknownPets': 'Unknown pets', 'add.saved': 'Formation saved',
                 'settings.title': 'Import / Export', 'settings.status': 'Status', 'settings.checking': 'Checking connection...',
                 'settings.online': 'Connected to database.', 'settings.offline': 'No database connection.',
@@ -359,18 +368,24 @@
                 'admin.title': 'Administrator Panel', 'admin.enterPassword': 'Enter administrator password', 'admin.passwordPlaceholder': 'Password...', 'admin.login': 'LOGIN',
                 'admin.panelTitle': 'Administrator Panel', 'admin.modeActive': 'Admin mode active', 'admin.modeDesc': 'You can manage heroes, pets and delete any formations.',
                 'admin.heroes': 'Heroes', 'admin.pets': 'Pets', 'admin.heroNamePlaceholder': 'Hero name', 'admin.petNamePlaceholder': 'Pet name',
-                'admin.manageFormations': 'Manage formations', 'admin.deleteAllUser': 'Delete all user formations',
                 'admin.session': 'Session', 'admin.logout': 'Logout from Admin mode', 'admin.loggedIn': 'Logged in as Administrator!', 'admin.loggedOut': 'Logged out from Admin mode',
                 'admin.wrongPassword': 'Wrong password!', 'admin.alreadyLogged': 'Already logged in as Admin',
                 'admin.heroAdded': 'Hero added', 'admin.heroDeleted': 'Deleted', 'admin.heroExists': 'Hero already exists!',
+                'admin.editHero': 'Edit hero', 'admin.heroSaved': 'Hero saved',
+                'admin.renameConfirm': 'Renaming will also update all formations and defense setups using this hero. Continue?',
+                'admin.editPet': 'Edit pet', 'admin.petSaved': 'Pet saved',
+                'admin.renamePetConfirm': 'Renaming will also update all formations and defense setups using this pet. Continue?',
+                'admin.config': 'Configuration (global)', 'admin.configNewDays': '"NEW" threshold (days)',
+                'admin.configMinMatch': 'Default match threshold', 'admin.configSort': 'Default results sorting',
+                'admin.configDbFilter': 'Default database filter', 'admin.configPkgSupport': 'Packages: default min. occurrences', 'admin.configPkgWindow': 'Packages: default window',
+                'admin.configHint': 'Applies to all guild players.', 'admin.configSaved': 'Configuration saved',
+                'admin.configInvalidDays': 'Enter a number of days greater than 0!', 'admin.configInvalidMin': 'Enter a match threshold greater than 0!',
                 'admin.petAdded': 'Pet added', 'admin.petExists': 'Pet already exists!', 'admin.enterHeroName': 'Enter hero name!', 'admin.enterPetName': 'Enter pet name!',
-                'admin.confirmDeleteHero': 'Delete hero', 'admin.confirmDeletePet': 'Delete pet', 'admin.confirmDeleteAllUser': 'Are you sure you want to delete ALL user formations?',
-                'admin.deletedUserFormations': 'Deleted user formations',
-                'admin.loadingBase': 'Loading base... This may take a moment.', 'admin.loadedBase': 'Loaded formations!',
+                'admin.confirmDeleteHero': 'Delete hero', 'admin.confirmDeletePet': 'Delete pet',
                 'quickSelect.title': 'Quick select', 'quickSelect.selectFor': 'Select for',
                 'quickTags.expandAll': 'Expand all', 'quickTags.collapseAll': 'Collapse all', 'quickTags.pets': 'Pets',
                 'common.error': 'Error', 'common.noConnection': 'No database connection!', 'common.formationDeleted': 'Formation deleted!',
-                'common.cannotDeleteBase': 'Cannot delete base formation!', 'common.confirmDelete': 'Delete formation',
+                'common.confirmDelete': 'Delete formation',
                 'common.addedToFavorites': 'Added to favorites ⭐', 'common.removedFromFavorites': 'Removed from favorites',
 				'common.adminRequired': 'Only admin can delete formations!', 'database.sortLabel': 'Sort:',
 				'edit.title': 'Edit formation', 'edit.saveBtn': 'SAVE CHANGES', 'add.markAsBase': 'Mark as BASE formation',
@@ -382,14 +397,11 @@
 				'duplicates.allUnique': 'All formations are unique.', 'duplicates.found': 'Found',
 				'duplicates.groups': 'groups', 'duplicates.identical': 'Identical', 'duplicates.almostIdentical': 'Almost identical',
 				'duplicates.enemy': 'Enemy', 'duplicates.counter': 'Counter',
-				'duplicates.confirmDelete': 'Are you sure you want to delete formation', 'admin.deleteAllConfirm1': 'Are you sure you want to delete',
-				'admin.deleteAllConfirm2': 'Type the number of formations to confirm', 'admin.formations': 'formations',
-				'admin.deleteAllCancelled': 'Deletion cancelled', 'admin.deletedAll': 'Deleted',
-				'admin.noUserFormations': 'No user formations to delete!', 'duplicates.preview': 'Preview',
+				'duplicates.confirmDelete': 'Are you sure you want to delete formation', 'duplicates.preview': 'Preview',
 				'duplicates.warningTitle': 'Identical formation found!', 'duplicates.warningText': 'This enemy and counter combination already exists:',
 				'duplicates.cancel': 'Cancel', 'duplicates.saveAnyway': 'Save anyway',
 				'common.close': 'Close', 'common.delete': 'Delete', 'database.deleted': 'Deleted',
-				'search.history': 'Ostatnie wyszukiwania','search.historyEmpty': 'Brak historii', 'war.history': 'Planner history',
+				'search.history': 'Recent searches', 'search.historyEmpty': 'No history', 'war.history': 'Planner history',
 				'compare.title': 'Compare formations',
 				'compare.btn': 'Compare',
 				'compare.select': 'Select to compare',
@@ -427,7 +439,6 @@
 				'war.legendExtra': 'Extra in database',
 				'war.legendConflict': 'Conflict (used multiple times)',
 				'war.selectCombo': 'Select a combination from war planner',
-				'war.history': 'Planner history',
 				'common.historyCleared': 'History cleared',
 				'excluded.alreadyExcluded': 'Hero already excluded!',
 				'excluded.added': 'Excluded',
@@ -436,7 +447,6 @@
 				'excluded.cleared': '🗑️ Cleared excluded',
 				'excluded.hiddenInResults': '{n} hidden due to excluded heroes',
 				'excluded.hiddenCountLabel': 'hidden (excluded)',
-				'search.foundInComment': 'Found in comment',
 				'search.historyConfirmClear': 'Clear all search history?',
 				'search.loadedFromHistory': 'Loaded from history',
 				'search.clickFieldFirst': 'Click a field first!',
@@ -495,7 +505,7 @@
 				'defense.noPlayers': 'No players. Add the first one above.',
 				'defense.noFormations': 'No formations. Add one in the "Add formation" tab.',
 				'defense.searchPlaceholder': '🔍 Search by name/hero...',
-				'defense.formationNameLabel': 'Formation name (optional)', 'defense.formationNamePlaceholder': 'e.g. Anti-Fire v2',
+				'defense.formationNameLabel': 'Formation name (optional)', 'defense.formationNamePlaceholder': 'e.g. Anti-Horde v2',
 				'defense.formationTeam': 'Defense formation',
 				'defense.assignToPlayerLabel': 'Assign to player right away (optional)', 'defense.noAssign': '— Do not assign —',
 				'defense.commentLabel': 'Comment (optional)', 'defense.commentPlaceholder': 'e.g. used since March 2026',
@@ -526,7 +536,6 @@
 				'defense.historyTitle': 'Player pin history',
 				'defense.historyEmpty': 'No pin history',
 				'defense.historyActive': 'ACTIVE', 'defense.historyUnpinned': 'unpinned',
-				'defense.viewInDb': 'Open in formations list',
 				'defense.deleteFormation': 'Delete formation',
 				'defense.confirmDeleteFormation': 'Delete formation #{id}? This cannot be undone. All pins (active and historical) will also be removed.',
 				'defense.formationDeleted': 'Formation deleted',
@@ -564,8 +573,7 @@
 				'packages.minSupport': 'Min occurrences',
 				'packages.empty': 'No packages matching criteria. Lower min occurrences or min size.',
 				'packages.stats': '{n} packages from {total} formations',
-				'packages.occurrences': '×',
-				'packages.showFormations': 'Show formations'
+				'packages.occurrences': '×'
             }
         };
         
@@ -581,6 +589,10 @@
         
         const $ = id => document.getElementById(id);
         const normalize = str => (str || '').trim().toLowerCase();
+        // Wyszukanie bohatera po nazwie (case-insensitive, BEZ trim — zgodnie z dotychczasowym dopasowaniem)
+        const findHero = name => heroes.find(h => h.name.toLowerCase() === name.toLowerCase());
+        // Escape stringa do wstawienia w atrybut onclick="fn('...')"
+        const jsStr = s => String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
         const getPetName = p => typeof p === 'string' ? p : p.name;
 
         // Helpery menedżerów wykluczeń (search / war / kreator)
@@ -704,6 +716,8 @@
 			if (baseOption) baseOption.style.display = 'block';
 			renderHeroesList();
 			renderPetsList();
+			renderConfigForm();
+			styleRaceSelect($('new-hero-race'));
 			filterDatabase();
 		}
 
@@ -965,12 +979,12 @@
 			return date.toLocaleDateString('pl-PL');
 		}
 
-		// Czy formacja jest "nowa" (dodana w ostatnich 14 dniach wg dateAdded; bazowe/bez daty → false)
-		const NEW_FORMATION_DAYS = 14;
+		// Czy formacja jest "nowa" (dodana w ostatnich N dniach wg dateAdded; N = globalny appConfig.newFormationDays).
+		// Bazowe/bez daty → false (Date.parse(undefined) → NaN, porównanie z NaN daje false).
+		const MS_PER_DAY = 86400000;
 		function isNewFormation(f) {
 			if (!f) return false;
-			// Date.parse(undefined) → NaN, a porównanie z NaN daje false, więc bazowe/bez daty same wypadają
-			return (Date.now() - Date.parse(f.dateAdded)) < NEW_FORMATION_DAYS * 86400000;
+			return (Date.now() - Date.parse(f.dateAdded)) < appConfig.newFormationDays * MS_PER_DAY;
 		}
 
 		// Aktualizuj kolor inputa na podstawie rasy bohatera
@@ -1002,7 +1016,6 @@
 				const type = input.dataset.type;
 
 				const isWarField = input.id.startsWith('war-');
-				const isEditField = input.id.startsWith('edit-') && !['edit-name', 'edit-comment', 'edit-id'].includes(input.id);
 				let dynamicList = null;
 				
 				if (isWarField && !list) {
@@ -1607,7 +1620,7 @@
 			btn?.classList.toggle('active');
 			
 			const isReversed = container.classList.contains('reversed');
-			localStorage.setItem('souls_searchRowsReversed', isReversed);
+			storage.setBool('souls_searchRowsReversed', isReversed);
 			
 			const msg = isReversed 
 				? t('layout.top678')
@@ -1751,6 +1764,7 @@
 
 		function setSearchSort(mode) {
 			currentSearchSort = mode;
+			userTouchedSort = true;
 			if (lastSearch) displayResults(lastSearch.results, lastSearch.searchHeroes);
 		}
 
@@ -1833,12 +1847,7 @@
 				// Sprawdź wykluczone (dla trybu "pokaż wszystkie")
 				const exclusionCheck = isFormationExcluded(f);
 				const hasExcluded = !hideExcludedResults && exclusionCheck.excluded;
-				
-				// Info o dopasowaniu w komentarzu
-				const commentMatchInfo = r.commentMatched && r.matchedHeroes.length === 0 && !r.petMatched 
-					? `<div style="font-size:0.7rem;color:var(--accent-gold);margin-top:3px;">💬 ${t('search.foundInComment')}</div>`
-					: '';
-				
+
 				return `
 					<div class="result-card ${hasExcluded ? 'has-excluded' : ''}" id="result-card-${f.id}">
 						<div class="result-card-checkbox">
@@ -1847,14 +1856,13 @@
 						<div class="result-card-content" onclick="showFormation(${f.id})">
 							<div class="result-card-header">
 								<span class="result-id">ID: ${f.id}${f.isBase ? '' : ` <span class="badge user-badge">${t('badge.user')}</span>`}${isNewFormation(f) ? ` <span class="badge new-badge">${t('badge.new')}</span>` : ''}</span>
-								<span class="match-score match-${Math.min(Math.floor(r.score), 6)}">${r.score % 1 === 0 ? r.score : '💬'}/${r.maxScore}</span>
+								<span class="match-score match-${Math.min(Math.floor(r.score), 6)}">${r.score}/${r.maxScore}</span>
 							</div>
 							<div class="result-name">${f.name}</div>
 							<div class="result-heroes">${t('search.enemy')}: ${enemyDisplay} + ${petDisplay}</div>
 							<div class="result-heroes result-my-heroes">⚔️ Kontra: ${f.my.filter(h => h).map(h => `<span class="my-hero">${h}</span>`).join(', ') || '—'}${f.myPet ? ` + <span class="my-pet">${f.myPet}</span>` : ''}</div>
 							${missingHeroes.length ? `<div class="result-missing">❌ ${t('search.missing')}: ${missingHeroes.join(', ')}</div>` : ''}
 							${f.comment ? `<div class="result-comment clamped" onclick="event.stopPropagation(); this.classList.toggle('clamped')" title="${t('search.toggleComment')}"><span class="comment-icon">💬</span>${escapeHtml(f.comment)}</div>` : ''}
-							${commentMatchInfo}
 							${hasExcluded ? `<div class="result-excluded-heroes">🚫 ${t('exclude.has')}: ${exclusionCheck.heroes.join(', ')}</div>` : ''}
 						</div>
 					</div>`;
@@ -1898,8 +1906,7 @@
 		function renderExcludedHeroes() {
 			const container = $('excluded-chips');
 			const countEl = $('excluded-count');
-			const emptyEl = $('excluded-empty');
-			
+
 			countEl.textContent = `(${excludedHeroes.length})`;
 			
 			if (excludedHeroes.length === 0) {
@@ -1964,7 +1971,7 @@
 
 		function onExcludeSettingChange() {
 			hideExcludedResults = $('exclude-hide-results').checked;
-			localStorage.setItem('souls_hide_excluded', hideExcludedResults);
+			storage.setBool('souls_hide_excluded', hideExcludedResults);
 			
 			// Odśwież aktywną zakładkę
 			filterDatabase();
@@ -2243,7 +2250,7 @@
             // 1. Filtruj formacje po oknie czasowym
             let formations = allFormations;
             if (window !== 'all') {
-                const cutoff = Date.now() - Number(window) * 24 * 60 * 60 * 1000;
+                const cutoff = Date.now() - Number(window) * MS_PER_DAY;
                 formations = formations.filter(f => f.dateAdded && new Date(f.dateAdded).getTime() >= cutoff);
             }
 
@@ -2604,7 +2611,7 @@
 				const normalizedName = normalize(name);
 				const diffClass = getHeroDiffClass(normalizedName, pos, type, formationIdx, allData);
 				
-				const hero = heroes.find(h => h.name.toLowerCase() === name.toLowerCase());
+				const hero = findHero(name);
 				const rc = hero ? `race-${hero.race.toLowerCase()}` : '';
 				
 				return `<div class="battle-slot filled ${rc} ${diffClass}"><span class="hero-name">${name}</span></div>`;
@@ -2862,7 +2869,7 @@
 			icon.classList.toggle('expanded');
 			
 			// Zapisz stan
-			localStorage.setItem('souls_rv_expanded', list.classList.contains('show'));
+			storage.setBool('souls_rv_expanded', list.classList.contains('show'));
 		}
 
         // PODOBNE FORMACJE
@@ -2916,31 +2923,6 @@
             return enemyHeroes.join('|') + '||' + enemyPet;
         }
 
-		function buildFormationNav(currentId) {
-			const idx = navFormationIds.indexOf(currentId);
-			const total = navFormationIds.length;
-			
-			const hasPrev = idx > 0;
-			const hasNext = idx < total - 1;
-			const prevLabel = t('preview.prev');
-			const nextLabel = t('preview.next');
-			const showLabel = t('preview.show');
-			
-			return `
-				<div class="formation-nav">
-					<button class="formation-nav-btn" onclick="navigateFormation(-1)" ${!hasPrev ? 'disabled' : ''} title="${prevLabel}">◀</button>
-					<div class="formation-nav-center">
-						<div class="id-lookup">
-							<input type="number" id="lookup-id" value="${currentId}" placeholder="ID">
-							<button class="btn" onclick="lookupById()">${showLabel}</button>
-						</div>
-						${total > 1 ? `<div class="formation-nav-counter"><strong>${idx + 1}</strong> / ${total}</div>` : ''}
-					</div>
-					<button class="formation-nav-btn" onclick="navigateFormation(1)" ${!hasNext ? 'disabled' : ''} title="${nextLabel}">▶</button>
-				</div>
-			`;
-		}
-
 		function updateFormationNav(currentId) {
 			const total = navFormationIds.length;
 			const idx = navFormationIds.indexOf(currentId);
@@ -2974,11 +2956,6 @@
             showFormation(newId);
         }
 
-        function setNavContext(formationIds) {
-            navFormationIds = formationIds || [];
-            navCurrentIndex = -1;
-        }
-
         // Przechowuj aktualne wyniki wojny
         let currentWarResults = null;
 
@@ -2986,7 +2963,7 @@
             const slot = i => {
                 const name = arr[i] || '';
                 if (!name) return `<div class="battle-slot empty"></div>`;
-                const hero = heroes.find(h => h.name.toLowerCase() === name.toLowerCase());
+                const hero = findHero(name);
                 const rc = hero ? `race-${hero.race.toLowerCase()}` : '';
                 return `<div class="battle-slot filled ${rc}"><span class="hero-name">${name}</span></div>`;
             };
@@ -3180,7 +3157,7 @@
             
             // Zapisz preferencję
             const isReversed = container.classList.contains('reversed');
-            localStorage.setItem('souls_addFormSectionsReversed', isReversed);
+            storage.setBool('souls_addFormSectionsReversed', isReversed);
             
             // Pokaż informację
             const msg = isReversed 
@@ -3212,7 +3189,7 @@
 			btn?.classList.toggle('active');
 			
 			const isReversed = container.classList.contains('reversed');
-			localStorage.setItem('souls_enemyRowsReversed', isReversed);
+			storage.setBool('souls_enemyRowsReversed', isReversed);
 			
 			const msg = isReversed 
 				? t('layout.top678')
@@ -3267,7 +3244,7 @@
 			btn?.classList.toggle('active');
 			
 			const isStacked = container.classList.contains('stacked');
-			localStorage.setItem('souls_addFormStacked', isStacked);
+			storage.setBool('souls_addFormStacked', isStacked);
 			
 			if (text) {
 				text.textContent = isStacked 
@@ -3747,7 +3724,6 @@
 
 		function renderWarExcludedChips() {
 			const container = $('war-excluded-chips');
-			const emptyMsg = $('war-excluded-empty');
 			if (!container) return;
 			
 			if (!warExcludedHeroes.length) {
@@ -3770,7 +3746,7 @@
 
 		function onWarExcludeSettingChange() {
 			warHideExcluded = $('war-hide-excluded')?.checked ?? true;
-			localStorage.setItem('souls_war_hide_excluded', warHideExcluded);
+			storage.setBool('souls_war_hide_excluded', warHideExcluded);
 		}
 
 		function isWarFormationExcluded(formation) {
@@ -5098,51 +5074,6 @@
 			$('war-preview-content').innerHTML = html;
 		}
 
-		function renderCompactGridFromArray(heroesArr, matchedHeroes, showConflicts, conflictSet, isEnemy = false) {
-			const slot = (name) => {
-				if (!name) return `<div class="compact-slot empty">—</div>`;
-				const hero = heroes.find(h => h.name.toLowerCase() === name.toLowerCase());
-				const race = hero?.race?.toLowerCase() || '';
-				const normName = normalize(name);
-				
-				// Sprawdź czy to trafiony bohater (zielone tło)
-				const isMatched = matchedHeroes.some(mh => mh === normName || mh.startsWith(normName) || normName.startsWith(mh));
-				
-				// Sprawdź czy to konflikt (pomarańczowe obramowanie)
-				const isConflict = showConflicts && conflictSet && conflictSet.has(normName);
-				
-				let classes = 'compact-slot filled';
-				if (race) classes += ` race-${race}`;
-				if (isMatched) classes += ' matched';
-				if (isConflict) classes += ' conflict';
-				
-				let style = race ? `border-color:var(--race-${race});color:var(--race-${race})` : '';
-				
-				return `<div class="${classes}" style="${style}">${name}</div>`;
-			};
-			
-			// Użyj tablicy z zachowaniem pozycji (8 slotów)
-			const h = [];
-			for (let i = 0; i < 8; i++) {
-				h.push(heroesArr[i] || '');
-			}
-			
-			// Układ 3-2-3 - odwrócony dla wroga
-			if (isEnemy) {
-				return `
-					<div class="compact-row">${slot(h[5])}${slot(h[6])}${slot(h[7])}</div>
-					<div class="compact-row">${slot(h[3])}${slot(h[4])}</div>
-					<div class="compact-row">${slot(h[0])}${slot(h[1])}${slot(h[2])}</div>
-				`;
-			} else {
-				return `
-					<div class="compact-row">${slot(h[0])}${slot(h[1])}${slot(h[2])}</div>
-					<div class="compact-row">${slot(h[3])}${slot(h[4])}</div>
-					<div class="compact-row">${slot(h[5])}${slot(h[6])}${slot(h[7])}</div>
-				`;
-			}
-		}
-
 		// Analiza dopasowania między szukanym a bazą
 		function analyzeWarMatch(searched, formation) {
 			const searchedHeroes = searched.heroesRaw.filter(h => h); // Oryginalne nazwy
@@ -5203,7 +5134,7 @@
 				const isMatched = analysis.matched.some(m => normalize(m) === normalize(name));
 				const isMissing = analysis.missing.some(m => normalize(m) === normalize(name));
 				
-				const hero = heroes.find(h => h.name.toLowerCase() === name.toLowerCase());
+				const hero = findHero(name);
 				const race = hero?.race?.toLowerCase() || '';
 				
 				let classes = 'compact-slot filled';
@@ -5234,7 +5165,7 @@
 				const isMatched = analysis.searchedHeroesNorm.some(sh => normName === sh || normName.startsWith(sh) || sh.startsWith(normName));
 				const isExtra = analysis.extra.some(e => normalize(e) === normName);
 				
-				const hero = heroes.find(h => h.name.toLowerCase() === name.toLowerCase());
+				const hero = findHero(name);
 				const race = hero?.race?.toLowerCase() || '';
 				
 				let classes = 'compact-slot filled';
@@ -5261,7 +5192,7 @@
 				const normName = normalize(name);
 				const isConflict = conflictSet.has(normName);
 				
-				const hero = heroes.find(h => h.name.toLowerCase() === name.toLowerCase());
+				const hero = findHero(name);
 				const race = hero?.race?.toLowerCase() || '';
 				
 				let classes = 'war-your-team-slot filled';
@@ -5406,35 +5337,6 @@
             
             return text;
         }
-
-        function collectWarPlanData() {
-            // Zbierz dane o wrogach z inputów
-            const battles = [];
-            
-            for (let i = 1; i <= 3; i++) {
-                const enemyHeroes = [];
-                for (let j = 1; j <= 5; j++) {
-                    const val = $(`war-e${i}-h${j}`)?.value.trim();
-                    if (val) enemyHeroes.push(val);
-                }
-                const enemyPet = $(`war-e${i}-pet`)?.value.trim();
-                
-                // Szukaj kontry w wynikach (jeśli jest)
-                const counterData = currentWarResults?.[i-1];
-                
-                battles.push({
-                    enemy: { heroes: enemyHeroes, pet: enemyPet },
-                    counter: counterData ? {
-                        heroes: counterData.formation.my.filter(h => h),
-                        pet: counterData.formation.myPet,
-                        comment: counterData.formation.comment
-                    } : { heroes: [], pet: '', comment: '' }
-                });
-            }
-            
-            return battles;
-        }
-
 
         // ═══════════════════════════════════════════════════════════
         // TAB: KREATOR — ręczny builder 3 składów, zapisane
@@ -6757,7 +6659,7 @@
                 : (() => {
                     const sorted = [...filled].sort((a, b) => b.speed - a.speed);
                     const chips = sorted.map(x => {
-                        const hero = heroes.find(h => h.name.toLowerCase() === x.hero.toLowerCase());
+                        const hero = findHero(x.hero);
                         const rc = hero ? `race-${hero.race.toLowerCase()}` : '';
                         return `<span class="defense-speed-chip"><span class="${rc}">${escapeHtml(x.hero)}</span> <strong>${x.speed}</strong></span>`;
                     }).join('<span class="defense-speed-arrow">→</span>');
@@ -6805,7 +6707,7 @@
             const slot = i => {
                 const name = my[i] || '';
                 if (!name) return `<div class="defense-mini-slot empty"></div>`;
-                const hero = heroes.find(h => h.name.toLowerCase() === name.toLowerCase());
+                const hero = findHero(name);
                 const rc = hero ? `race-${hero.race.toLowerCase()}` : '';
                 return `<div class="defense-mini-slot"><span class="${rc}">${escapeHtml(name)}</span></div>`;
             };
@@ -6967,21 +6869,249 @@
 			event.target.value = '';
 		}
 
+        // Zwijanie/rozwijanie sekcji panelu admina (Bohaterowie / Pety) — domyślnie rozwinięte
+        function toggleAdminSection(key) {
+            const body = $(key + '-body'), icon = $(key + '-toggle');
+            if (!body) return;
+            const willShow = body.style.display === 'none';
+            body.style.display = willShow ? '' : 'none';
+            if (icon) icon.textContent = willShow ? '▼' : '▶';
+        }
+
+        // Koloruje zamknięty <select> rasy kolorem aktualnie wybranej opcji
+        function styleRaceSelect(sel) { if (sel) sel.style.color = sel.options[sel.selectedIndex]?.style.color || ''; }
+
+        // Stała kolejność ras w panelu admina (życzenie: Dark, Light, Human, Horde, Elf, Undead)
+        const ADMIN_RACE_ORDER = ['Dark', 'Light', 'Human', 'Fire', 'Elf', 'Undead'];
+        let editingHeroName = null; // bohater aktualnie w trybie inline-edycji (po nazwie)
+
         function renderHeroesList() {
             $('heroes-count').textContent = heroes.length;
+            // Jednolita szerokość kafelka = najdłuższa nazwa (+ miejsce na ✏️🗑️ i padding)
+            const maxLen = heroes.reduce((m, h) => Math.max(m, h.name.length), 4);
+            $('heroes-list').style.setProperty('--tile-w', (maxLen + 9) + 'ch');
             const byRace = {};
             heroes.forEach(h => { (byRace[h.race] = byRace[h.race] || []).push(h); });
-            
-            $('heroes-list').innerHTML = Object.keys(byRace).sort().map(r =>
-                `<div style="font-size:0.7rem;color:var(--accent-gold);margin:10px 0 5px;border-bottom:1px solid var(--border);padding-bottom:3px;">${raceLabel(r)} (${byRace[r].length})</div>` +
-                byRace[r].map(h => `<div class="entity-item"><span class="entity-name">${h.name}</span><button class="btn btn-danger btn-small" onclick="deleteHero('${h.name}')">🗑️</button></div>`).join('')
-            ).join('') || `<p style="color:var(--text-muted);text-align:center;">${t('database.noFormations')}</p>`;
+
+            // Rasy w ustalonej kolejności + ewentualne nieznane na końcu
+            const races = [...ADMIN_RACE_ORDER.filter(r => byRace[r]),
+                           ...Object.keys(byRace).filter(r => !ADMIN_RACE_ORDER.includes(r))];
+
+            $('heroes-list').innerHTML = races.map(r => {
+                const rc = r.toLowerCase();
+                const list = byRace[r].slice().sort((a, b) => a.name.localeCompare(b.name, 'pl'));
+                const tiles = list.map(h => h.name === editingHeroName
+                    ? renderHeroEditRow(h, rc)
+                    : `<div class="admin-tile" style="background:color-mix(in srgb, var(--race-${rc}) 13%, var(--bg-card)); border-color:var(--race-${rc})">
+                            <span class="admin-tile-name">${escapeHtml(h.name)}</span>
+                            <div class="admin-tile-actions">
+                                <button class="btn-icon" onclick="startHeroEdit('${jsStr(h.name)}')" title="${t('admin.editHero')}">✏️</button>
+                                <button class="btn-icon btn-icon-danger" onclick="deleteHero('${jsStr(h.name)}')" title="${t('admin.confirmDeleteHero')}">🗑️</button>
+                            </div>
+                        </div>`
+                ).join('');
+                return `<div class="admin-race-group">
+                    <div class="admin-race-header" style="color:var(--race-${rc})">${RACE_EMOJI[r] || ''} ${raceLabel(r)} (${list.length})</div>
+                    <div class="admin-tile-grid">${tiles}</div>
+                </div>`;
+            }).join('') || `<p style="color:var(--text-muted);text-align:center;">${t('database.noFormations')}</p>`;
         }
+
+        function renderHeroEditRow(h, rc) {
+            const opts = ADMIN_RACE_ORDER.map(opt =>
+                `<option value="${opt}" style="color:var(--race-${opt.toLowerCase()})"${opt === h.race ? ' selected' : ''}>${raceLabel(opt)}</option>`).join('');
+            return `<div class="admin-tile editing" style="border-color:var(--race-${rc})">
+                <input id="edit-hero-name" class="admin-hero-edit-name" value="${escapeHtml(h.name)}" autocomplete="off">
+                <select id="edit-hero-race" class="admin-hero-edit-race" onchange="styleRaceSelect(this)">${opts}</select>
+                <div class="admin-tile-actions">
+                    <button class="btn-icon btn-icon-save" onclick="saveHeroEdit('${jsStr(h.name)}')" title="${t('common.save')}">✔️</button>
+                    <button class="btn-icon" onclick="cancelHeroEdit()" title="${t('common.cancel')}">✖️</button>
+                </div>
+            </div>`;
+        }
+
+        function startHeroEdit(name) { editingHeroName = name; renderHeroesList(); styleRaceSelect($('edit-hero-race')); $('edit-hero-name')?.focus(); }
+        function cancelHeroEdit() { editingHeroName = null; renderHeroesList(); }
+
+        // Rename bohatera propagujemy do /formations (my+enemy) i /defenseFormations (my + nowy fingerprint),
+        // żeby nie zostały sieroty referencji. Zwraca liczbę zmienionych rekordów.
+        // Fingerprint obrony aktualizujemy in-place bezpiecznie: rename to bijekcja nazw (oldName→newName
+        // jednolicie), a blokada heroExists gwarantuje że newName nie koliduje z innym bohaterem — więc
+        // dwa różne składy nie mogą skleić się w ten sam fingerprint.
+        async function propagateHeroRename(oldName, newName) {
+            const lo = oldName.toLowerCase();
+            let count = 0;
+            const fUpdates = {};
+            allFormations.forEach(f => {
+                let changed = false;
+                const my = (f.my || []).map(x => (x && x.toLowerCase() === lo) ? (changed = true, newName) : x);
+                const enemy = (f.enemy || []).map(x => (x && x.toLowerCase() === lo) ? (changed = true, newName) : x);
+                if (changed) { fUpdates[`${f.id}/my`] = my; fUpdates[`${f.id}/enemy`] = enemy; count++; }
+            });
+            if (Object.keys(fUpdates).length) await formationsRef.update(fUpdates);
+
+            if (defenseFormationsRef) {
+                const dUpdates = {};
+                allDefenseFormations.forEach(df => {
+                    let changed = false;
+                    const my = (df.my || []).map(x => (x && x.toLowerCase() === lo) ? (changed = true, newName) : x);
+                    if (changed) {
+                        dUpdates[`${df.id}/my`] = my;
+                        dUpdates[`${df.id}/fingerprint`] = defenseFingerprint(my, df.myPet);
+                        count++;
+                    }
+                });
+                if (Object.keys(dUpdates).length) await defenseFormationsRef.update(dUpdates);
+            }
+            return count;
+        }
+
+        async function saveHeroEdit(oldName) {
+            if (!isOnline) { showToast(t('common.noConnection'), true); return; }
+            const old = heroes.find(h => h.name === oldName);
+            if (!old) { cancelHeroEdit(); return; }
+
+            const newName = $('edit-hero-name').value.trim();
+            const newRace = $('edit-hero-race').value;
+            if (!newName) { showToast(t('admin.enterHeroName'), true); return; }
+
+            const nameChanged = newName !== oldName;
+            if (nameChanged && heroes.some(h => h.name !== oldName && h.name.toLowerCase() === newName.toLowerCase())) {
+                showToast(t('admin.heroExists'), true); return;
+            }
+            if (!nameChanged && newRace === old.race) { cancelHeroEdit(); return; }
+
+            try {
+                if (!nameChanged) {
+                    // tylko zmiana rasy — bezpieczne, nie dotyka formacji
+                    await heroesRef.child(oldName).update({ race: newRace });
+                    showToast(`✅ ${t('admin.heroSaved')}`);
+                } else {
+                    if (!confirm(t('admin.renameConfirm'))) return;
+                    const affected = await propagateHeroRename(oldName, newName);
+                    await heroesRef.child(newName).set({ name: newName, race: newRace });
+                    await heroesRef.child(oldName).remove();
+                    showToast(`✅ ${t('admin.heroSaved')} (${affected} ${t('status.formations')})`);
+                }
+                editingHeroName = null;
+            } catch (e) { showToast(`${t('common.error')}: ${e.message}`, true); }
+        }
+
+        let editingPetName = null; // pet aktualnie w trybie inline-edycji
 
         function renderPetsList() {
             $('pets-count').textContent = pets.length;
-            $('pets-list').innerHTML = pets.map(p => `<div class="entity-item"><span class="entity-name">🐾 ${p}</span><button class="btn btn-danger btn-small" onclick="deletePet('${p}')">🗑️</button></div>`).join('') ||
-                `<p style="color:var(--text-muted);text-align:center;">${t('database.noFormations')}</p>`;
+            // Jednolita szerokość kafelka = najdłuższa nazwa (+ ikona 🐾, ✏️🗑️ i padding)
+            const maxLen = pets.reduce((m, p) => Math.max(m, p.length), 4);
+            $('pets-list').style.setProperty('--tile-w', (maxLen + 11) + 'ch');
+            const sorted = pets.slice().sort((a, b) => a.localeCompare(b, 'pl'));
+            const petTiles = sorted.map(p => p === editingPetName
+                ? `<div class="admin-tile editing" style="border-color:var(--accent-gold)">
+                        <span class="admin-pet-icon">🐾</span>
+                        <input id="edit-pet-name" class="admin-hero-edit-name" value="${escapeHtml(p)}" autocomplete="off">
+                        <div class="admin-tile-actions">
+                            <button class="btn-icon btn-icon-save" onclick="savePetEdit('${jsStr(p)}')" title="${t('common.save')}">✔️</button>
+                            <button class="btn-icon" onclick="cancelPetEdit()" title="${t('common.cancel')}">✖️</button>
+                        </div>
+                    </div>`
+                : `<div class="admin-tile" style="background:color-mix(in srgb, var(--accent-gold) 12%, var(--bg-card)); border-color:var(--accent-gold)">
+                        <span class="admin-tile-name">🐾 ${escapeHtml(p)}</span>
+                        <div class="admin-tile-actions">
+                            <button class="btn-icon" onclick="startPetEdit('${jsStr(p)}')" title="${t('admin.editPet')}">✏️</button>
+                            <button class="btn-icon btn-icon-danger" onclick="deletePet('${jsStr(p)}')" title="${t('admin.confirmDeletePet')}">🗑️</button>
+                        </div>
+                    </div>`
+            ).join('');
+            $('pets-list').innerHTML = petTiles
+                ? `<div class="admin-tile-grid">${petTiles}</div>`
+                : `<p style="color:var(--text-muted);text-align:center;">${t('database.noFormations')}</p>`;
+        }
+
+        function startPetEdit(name) { editingPetName = name; renderPetsList(); $('edit-pet-name')?.focus(); }
+        function cancelPetEdit() { editingPetName = null; renderPetsList(); }
+
+        // Rename peta propagujemy do /formations (myPet/enemyPet) i /defenseFormations (myPet + nowy fingerprint).
+        async function propagatePetRename(oldName, newName) {
+            const lo = oldName.toLowerCase();
+            let count = 0;
+            const fUpdates = {};
+            allFormations.forEach(f => {
+                let changed = false;
+                let myPet = f.myPet, enemyPet = f.enemyPet;
+                if (myPet && myPet.toLowerCase() === lo) { myPet = newName; changed = true; }
+                if (enemyPet && enemyPet.toLowerCase() === lo) { enemyPet = newName; changed = true; }
+                if (changed) { fUpdates[`${f.id}/myPet`] = myPet; fUpdates[`${f.id}/enemyPet`] = enemyPet; count++; }
+            });
+            if (Object.keys(fUpdates).length) await formationsRef.update(fUpdates);
+
+            if (defenseFormationsRef) {
+                const dUpdates = {};
+                allDefenseFormations.forEach(df => {
+                    if (df.myPet && df.myPet.toLowerCase() === lo) {
+                        dUpdates[`${df.id}/myPet`] = newName;
+                        dUpdates[`${df.id}/fingerprint`] = defenseFingerprint(df.my, newName);
+                        count++;
+                    }
+                });
+                if (Object.keys(dUpdates).length) await defenseFormationsRef.update(dUpdates);
+            }
+            return count;
+        }
+
+        async function savePetEdit(oldName) {
+            if (!isOnline) { showToast(t('common.noConnection'), true); return; }
+            if (!pets.includes(oldName)) { cancelPetEdit(); return; }
+
+            const newName = $('edit-pet-name').value.trim();
+            if (!newName) { showToast(t('admin.enterPetName'), true); return; }
+            if (newName === oldName) { cancelPetEdit(); return; }
+            if (pets.some(p => p.toLowerCase() === newName.toLowerCase())) {
+                showToast(t('admin.petExists'), true); return;
+            }
+
+            try {
+                if (!confirm(t('admin.renamePetConfirm'))) return;
+                const affected = await propagatePetRename(oldName, newName);
+                await petsRef.child(newName).set({ name: newName });
+                await petsRef.child(oldName).remove();
+                showToast(`✅ ${t('admin.petSaved')} (${affected} ${t('status.formations')})`);
+                editingPetName = null;
+            } catch (e) { showToast(`${t('common.error')}: ${e.message}`, true); }
+        }
+
+        // Wstaw aktualne wartości globalnej konfiguracji do pól w panelu admina
+        function renderConfigForm() {
+            if ($('config-new-days')) $('config-new-days').value = appConfig.newFormationDays;
+            if ($('config-min-match')) $('config-min-match').value = appConfig.defaultMinMatch;
+            if ($('config-default-sort')) $('config-default-sort').value = appConfig.defaultSearchSort;
+            if ($('config-db-filter')) $('config-db-filter').value = appConfig.defaultDbFilter;
+            if ($('config-pkg-support')) $('config-pkg-support').value = appConfig.defaultPackageMinSupport;
+            if ($('config-pkg-window')) $('config-pkg-window').value = appConfig.defaultPackageWindow;
+        }
+
+        // Zapis globalnej konfiguracji do Firebase /config/settings (działa dla wszystkich graczy)
+        async function saveConfig() {
+            if (!isOnline) { showToast(t('common.noConnection'), true); return; }
+            const days = parseInt($('config-new-days')?.value, 10);
+            const minMatch = parseInt($('config-min-match')?.value, 10);
+            const sort = $('config-default-sort')?.value;
+            const dbFilter = $('config-db-filter')?.value;
+            const pkgSup = parseInt($('config-pkg-support')?.value, 10);
+            const pkgWindow = $('config-pkg-window')?.value;
+            if (!(days > 0)) { showToast(t('admin.configInvalidDays'), true); return; }
+            if (!(minMatch > 0)) { showToast(t('admin.configInvalidMin'), true); return; }
+            if (!(pkgSup > 0)) { showToast(t('admin.configInvalidMin'), true); return; }
+            try {
+                await configRef.update({
+                    newFormationDays: days,
+                    defaultMinMatch: minMatch,
+                    defaultSearchSort: (sort === 'newest' ? 'newest' : 'relevance'),
+                    defaultDbFilter: ['all', 'base', 'user', 'favorites'].includes(dbFilter) ? dbFilter : 'all',
+                    defaultPackageMinSupport: pkgSup,
+                    defaultPackageWindow: ['all', '30', '90'].includes(pkgWindow) ? pkgWindow : 'all'
+                });
+                showToast(`✅ ${t('admin.configSaved')}`);
+            } catch (e) { showToast(`${t('common.error')}: ${e.message}`, true); }
         }
 
         async function addHero() {
@@ -7222,42 +7352,6 @@
 			}
 		}
 
-		function confirmDeleteAllUserFormations() {
-			const userFormations = allFormations.filter(f => !f.isBase);
-			
-			if (userFormations.length === 0) {
-				showToast(t('admin.noUserFormations') || 'Brak formacji użytkowników do usunięcia!');
-				return;
-			}
-			
-			// Pierwsze potwierdzenie
-			if (!confirm(`⚠️ ${t('admin.deleteAllConfirm1')} ${userFormations.length} ${t('admin.formations')}?`)) return;
-			
-			// Drugie potwierdzenie - wpisanie liczby
-			const confirmNumber = prompt(`${t('admin.deleteAllConfirm2')} ${userFormations.length}:`);
-			
-			if (confirmNumber !== String(userFormations.length)) {
-				showToast('❌ ' + t('admin.deleteAllCancelled'), true);
-				return;
-			}
-			
-			// Wykonaj usunięcie
-			deleteAllUserFormationsConfirmed(userFormations);
-		}
-
-		async function deleteAllUserFormationsConfirmed(userFormations) {
-			if (!isOnline) { showToast(t('common.noConnection'), true); return; }
-			
-			try {
-				for (const f of userFormations) {
-					await formationsRef.child(String(f.id)).remove();
-				}
-				showToast(`✅ ${t('admin.deletedAll')} ${userFormations.length} ${t('admin.formations')}!`);
-			} catch (e) {
-				showToast(`${t('common.error')}: ${e.message}`, true);
-			}
-		}
-
 
         // ═══════════════════════════════════════════════════════════
         // FIREBASE INIT — realtime listenery formacji/heroes/pets
@@ -7316,6 +7410,45 @@
             defenseAssignmentsRef.on('value', snap => {
                 allDefenseAssignments = snap.val() ? Object.values(snap.val()).sort((a, b) => a.id - b.id) : [];
                 if (isAdmin) rerenderDefenseCurrent();
+            });
+
+            // ─── Globalna konfiguracja gildii ───
+            // Pod-węzeł 'config/settings' (a nie całe /config), bo reguły Firebase trzymają
+            // /config zamknięte, a /config/adminPassword osobno — settings ma własną regułę read/write.
+            configRef = db.ref('config/settings');
+            configRef.on('value', snap => {
+                const c = snap.val() || {};
+                const days = Number(c.newFormationDays);
+                const minMatch = Number(c.defaultMinMatch);
+                const pkgSup = Number(c.defaultPackageMinSupport);
+                appConfig.newFormationDays = days > 0 ? days : DEFAULT_CONFIG.newFormationDays;
+                appConfig.defaultMinMatch = minMatch > 0 ? minMatch : DEFAULT_CONFIG.defaultMinMatch;
+                appConfig.defaultSearchSort = (c.defaultSearchSort === 'newest' || c.defaultSearchSort === 'relevance')
+                    ? c.defaultSearchSort : DEFAULT_CONFIG.defaultSearchSort;
+                appConfig.defaultDbFilter = ['all', 'base', 'user', 'favorites'].includes(c.defaultDbFilter)
+                    ? c.defaultDbFilter : DEFAULT_CONFIG.defaultDbFilter;
+                appConfig.defaultPackageMinSupport = pkgSup > 0 ? pkgSup : DEFAULT_CONFIG.defaultPackageMinSupport;
+                appConfig.defaultPackageWindow = ['all', '30', '90'].includes(String(c.defaultPackageWindow))
+                    ? String(c.defaultPackageWindow) : DEFAULT_CONFIG.defaultPackageWindow;
+
+                // Live: globalne domyślne tam, gdzie użytkownik nie ma własnego wyboru
+                if (storage.getJson('souls_search_min_match', null) === null) searchMinMatch = appConfig.defaultMinMatch;
+                if (!userTouchedSort) currentSearchSort = appConfig.defaultSearchSort;
+
+                // Domyślne „widoku" (filtr bazy + pakiety) stosujemy tylko raz, przy pierwszym załadowaniu
+                if (!configInitApplied) {
+                    configInitApplied = true;
+                    packageOptions.minSupport = appConfig.defaultPackageMinSupport;
+                    packageOptions.window = appConfig.defaultPackageWindow;
+                    if ($('packages-min-support')) $('packages-min-support').value = packageOptions.minSupport;
+                    document.querySelectorAll('.pkg-btn[data-pkg-window]').forEach(b =>
+                        b.classList.toggle('active', String(b.dataset.pkgWindow) === String(packageOptions.window)));
+                    setDbFilter(appConfig.defaultDbFilter);
+                }
+
+                renderConfigForm();
+                if (allFormations.length) filterDatabase();              // odśwież badge NOWE w bazie
+                if (lastSearch) displayResults(lastSearch.results, lastSearch.searchHeroes); // odśwież aktywne wyniki
             });
 
             db.ref('.info/connected').on('value', snap => setOnlineStatus(snap.val() === true));
