@@ -1505,12 +1505,14 @@
 		}
 		.admin-card-title.clickable { cursor: pointer; user-select: none; }
 		.admin-card .entity-list { background: transparent; padding: 0; margin-bottom: 10px; }
-		.admin-tile.editing { grid-column: 1 / -1; background: var(--bg-input); }
+		.admin-tile.editing { grid-column: 1 / -1; background: var(--bg-input); flex-wrap: wrap; }
 		.admin-hero-edit-name {
-			flex: 1;
-			min-width: 0;
+			flex: 1 1 140px;
+			min-width: 140px;
+			width: auto;
 			padding: 5px 8px !important;
 			font-size: 0.8rem !important;
+			background: var(--bg-card);
 		}
 		.admin-hero-edit-race {
 			padding: 5px 6px;

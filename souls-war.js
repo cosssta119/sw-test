@@ -6921,7 +6921,7 @@
             const opts = ADMIN_RACE_ORDER.map(opt =>
                 `<option value="${opt}" style="color:var(--race-${opt.toLowerCase()})"${opt === h.race ? ' selected' : ''}>${raceLabel(opt)}</option>`).join('');
             return `<div class="admin-tile editing" style="border-color:var(--race-${rc})">
-                <input id="edit-hero-name" class="admin-hero-edit-name" value="${escapeHtml(h.name)}" autocomplete="off">
+                <input type="text" id="edit-hero-name" class="admin-hero-edit-name" value="${escapeHtml(h.name)}" autocomplete="off">
                 <select id="edit-hero-race" class="admin-hero-edit-race" onchange="styleRaceSelect(this)">${opts}</select>
                 <div class="admin-tile-actions">
                     <button class="btn-icon btn-icon-save" onclick="saveHeroEdit('${jsStr(h.name)}')" title="${t('common.save')}">✔️</button>
@@ -7008,7 +7008,7 @@
             const petTiles = sorted.map(p => p === editingPetName
                 ? `<div class="admin-tile editing" style="border-color:var(--accent-gold)">
                         <span class="admin-pet-icon">🐾</span>
-                        <input id="edit-pet-name" class="admin-hero-edit-name" value="${escapeHtml(p)}" autocomplete="off">
+                        <input type="text" id="edit-pet-name" class="admin-hero-edit-name" value="${escapeHtml(p)}" autocomplete="off">
                         <div class="admin-tile-actions">
                             <button class="btn-icon btn-icon-save" onclick="savePetEdit('${jsStr(p)}')" title="${t('common.save')}">✔️</button>
                             <button class="btn-icon" onclick="cancelPetEdit()" title="${t('common.cancel')}">✖️</button>
