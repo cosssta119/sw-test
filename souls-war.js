@@ -4083,7 +4083,7 @@
             const WAR_POOL_SIZE = 50;          // ile kontr/wroga wchodzi do iloczynu (ranking i tak utnie do WAR_RESULT_LIMIT)
             const WAR_RESULT_LIMIT = 20;       // ile kombinacji ostatecznie pokazujemy
             const CONFLICT_PENALTY_MULT = 8;   // mnożnik kary za konflikty bohaterów
-            const CONFLICT_PENALTY_EXP = 1.5;  // wykładnik kary (superlinearny)
+            const CONFLICT_PENALTY_EXP = 1.7;  // wykładnik kary (superlinearny) — 1 konflikt = MULT, 2+ rosną szybciej
             const WAR_TIE_EPSILON = 0.1;       // próg „remisu" score przy sortowaniu
             // Znajdź pasujące formacje dla każdego wroga
             const matches1 = findMatchingFormations(enemy1, 1).slice(0, WAR_POOL_SIZE);
