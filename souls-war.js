@@ -133,6 +133,7 @@
                 'add.yourTeam': 'Twój skład', 'add.enemyTeam': 'Skład przeciwnika', 'add.swapSections': 'Zamień kolejność','add.commentLabel': 'Komentarz (opcjonalnie)',
                 'add.commentPlaceholder': 'np. Unikać Death, Silbren u przeciwnika, kolejność speed: xxx > yyy > zzz, Pao runa PR, itp.', 'add.saveBtn': 'ZAPISZ FORMACJĘ',
                 'add.addAtLeastOne': 'Dodaj przynajmniej jedną postać!', 'add.tooManyHeroes': 'Maks. 5 bohaterów w składzie (pet liczony osobno)!',
+                'kreator.petSlotsFull': 'Wszystkie pola Pet są zajęte!', 'kreator.formation': 'Skład', 'kreator.copied': '📋 Składy skopiowane do schowka!', 'kreator.savePrompt': 'Nazwa dla tego zestawu:', 'kreator.saved': '💾 Skład zapisany!', 'kreator.loaded': 'Załadowano', 'kreator.confirmDelete': 'Usunąć ten zapis?', 'kreator.deleted': 'Usunięto', 'kreator.confirmDeleteAll': 'Usunąć WSZYSTKIE zapisane składy?', 'kreator.allDeleted': 'Wszystkie zapisy usunięte', 'kreator.cleared': 'Wyczyszczono',
                 'add.unknownHeroes': 'Nieznani bohaterowie', 'add.unknownPets': 'Nieznane pety', 'add.saved': 'Zapisano formację',
                 'settings.title': 'Import / Eksport', 'settings.status': 'Status', 'settings.checking': 'Sprawdzanie połączenia...',
                 'settings.online': 'Połączono z bazą danych.', 'settings.offline': 'Brak połączenia z bazą.',
@@ -371,6 +372,7 @@
                 'add.yourTeam': 'Your team', 'add.enemyTeam': 'Enemy team', 'add.swapSections': 'Swap order', 'add.commentLabel': 'Comment (optional)',
                 'add.commentPlaceholder': 'e.g. Avoid Death, Silbren on enemy, speed order: xxx > yyy > zzz, Pao rune PR, etc.', 'add.saveBtn': 'SAVE FORMATION',
                 'add.addAtLeastOne': 'Add at least one hero!', 'add.tooManyHeroes': 'Max 5 heroes per formation (pet counted separately)!',
+                'kreator.petSlotsFull': 'All pet slots are full!', 'kreator.formation': 'Formation', 'kreator.copied': '📋 Formations copied to clipboard!', 'kreator.savePrompt': 'Name for this set:', 'kreator.saved': '💾 Formation saved!', 'kreator.loaded': 'Loaded', 'kreator.confirmDelete': 'Delete this save?', 'kreator.deleted': 'Deleted', 'kreator.confirmDeleteAll': 'Delete ALL saved formations?', 'kreator.allDeleted': 'All saves deleted', 'kreator.cleared': 'Cleared',
                 'add.unknownHeroes': 'Unknown heroes', 'add.unknownPets': 'Unknown pets', 'add.saved': 'Formation saved',
                 'settings.title': 'Import / Export', 'settings.status': 'Status', 'settings.checking': 'Checking connection...',
                 'settings.online': 'Connected to database.', 'settings.offline': 'No database connection.',
@@ -957,7 +959,7 @@
             $('db-stat-total').textContent = allFormations.length;
             $('db-stat-base').textContent = allFormations.filter(f => f.isBase).length;
             $('db-stat-user').textContent = allFormations.filter(f => !f.isBase).length;
-            filterDatabase();
+            if (currentDbFilter === 'packages') renderPackagesView(); else filterDatabase();
             generateQuickTags();
             generateAddFormTags();
             generateWarTags();
@@ -4015,7 +4017,7 @@
                     return;
                 }
             }
-            showToast('Wszystkie pola Pet są zajęte!', true);
+            showToast(t('kreator.petSlotsFull'), true);
         }
 
         function getNextEmptyWarField(currentFieldId) {
@@ -5671,7 +5673,7 @@
                     return;
                 }
             }
-            showToast('Wszystkie pola Pet są zajęte!', true);
+            showToast(t('kreator.petSlotsFull'), true);
         }
 
         function getNextEmptyKreatorField(currentFieldId) {
@@ -5762,7 +5764,7 @@
 				if (filledHeroes.length > 0 || formation.pet) {
 					hasContent = true;
 					if (kreatorCount > 1) {
-						text += `Skład ${i}\n`;
+						text += `${t('kreator.formation')} ${i}\n`;
 					}
 					text += formatFormationAsText(formation.heroes, formation.pet);
 					text += '\n';
@@ -5770,12 +5772,12 @@
 			}
 			
 			if (!hasContent) {
-				showToast('Wpisz przynajmniej jednego bohatera!', true);
+				showToast(t('add.addAtLeastOne'), true);
 				return;
 			}
 			
 			navigator.clipboard.writeText(text.trim()).then(() => {
-				showToast('📋 Składy skopiowane do schowka!');
+				showToast(t('kreator.copied'));
 			}).catch(() => {
 				const textarea = document.createElement('textarea');
 				textarea.value = text.trim();
@@ -5783,7 +5785,7 @@
 				textarea.select();
 				document.execCommand('copy');
 				document.body.removeChild(textarea);
-				showToast('📋 Składy skopiowane do schowka!');
+				showToast(t('kreator.copied'));
 			});
 		}
 
@@ -5800,13 +5802,13 @@
 			}
 			
 			if (!hasContent) {
-				showToast('Wpisz przynajmniej jednego bohatera!', true);
+				showToast(t('add.addAtLeastOne'), true);
 				return;
 			}
 			
 			if (formations.some(f => f.heroes.filter(h => h).length > 5)) { showToast(t('add.tooManyHeroes'), true); return; }
-			const defaultName = `Skład ${kreatorSaved.length + 1}`;
-			const name = prompt('Nazwa dla tego zestawu:', defaultName);
+			const defaultName = `${t('kreator.formation')} ${kreatorSaved.length + 1}`;
+			const name = prompt(t('kreator.savePrompt'), defaultName);
 			if (name === null) return;
 			
 			const saved = {
@@ -5822,7 +5824,7 @@
 			
 			storage.setJson('souls_kreator_saved', kreatorSaved);
 			renderKreatorSaved();
-			showToast('💾 Skład zapisany!');
+			showToast(t('kreator.saved'));
 		}
 
 		function loadKreatorSaved(id) {
@@ -5850,27 +5852,27 @@
 			});
 			
 			updateKreatorTagsSelection();
-			showToast(`Załadowano: ${saved.name}`);
+			showToast(`${t('kreator.loaded')}: ${saved.name}`);
 		}
 
 		function deleteKreatorSaved(id, event) {
 			event.stopPropagation();
-			if (!confirm('Usunąć ten zapis?')) return;
+			if (!confirm(t('kreator.confirmDelete'))) return;
 			
 			kreatorSaved = kreatorSaved.filter(s => s.id !== id);
 			storage.setJson('souls_kreator_saved', kreatorSaved);
 			renderKreatorSaved();
-			showToast('Usunięto');
+			showToast(t('kreator.deleted'));
 		}
 
 		function clearAllKreatorSaved() {
 			if (!kreatorSaved.length) return;
-			if (!confirm('Usunąć WSZYSTKIE zapisane składy?')) return;
+			if (!confirm(t('kreator.confirmDeleteAll'))) return;
 			
 			kreatorSaved = [];
 			storage.setJson('souls_kreator_saved', kreatorSaved);
 			renderKreatorSaved();
-			showToast('Wszystkie zapisy usunięte');
+			showToast(t('kreator.allDeleted'));
 		}
 
 		function clearKreator() {
@@ -5890,7 +5892,7 @@
 				}
 			}
 			updateKreatorTagsSelection();
-			showToast('Wyczyszczono');
+			showToast(t('kreator.cleared'));
 		}
 
 		function renderKreatorSaved() {
@@ -5908,7 +5910,7 @@
 					.map((f, idx) => {
 						const heroes = f.heroes.filter(h => h);
 						if (!heroes.length && !f.pet) return '';
-						return `<div style="margin-top:4px;"><strong>Skład ${idx + 1}:</strong> ${heroes.join(', ') || '-'}${f.pet ? ` + ${f.pet}` : ''}</div>`;
+						return `<div style="margin-top:4px;"><strong>${t('kreator.formation')} ${idx + 1}:</strong> ${escapeHtml(heroes.join(', ')) || '-'}${f.pet ? ` + ${escapeHtml(f.pet)}` : ''}</div>`;
 					})
 					.filter(p => p)
 					.join('');
