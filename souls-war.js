@@ -205,6 +205,8 @@
 				'war.searchedEnemy': 'Szukany wróg',
 				'war.databaseEnemy': 'Wróg z bazy',
 				'war.yourTeam': 'TWÓJ SKŁAD',
+				'war.enemyZone': 'Wróg',
+				'war.counterLabel': 'kontra',
 				'war.comment': 'Komentarz',
 				'war.noComment': 'Brak komentarza',
 				'war.fullPreview': 'Pełny podgląd',
@@ -444,6 +446,8 @@
 				'war.searchedEnemy': 'Searched enemy',
 				'war.databaseEnemy': 'Database enemy',
 				'war.yourTeam': 'YOUR TEAM',
+				'war.enemyZone': 'Enemy',
+				'war.counterLabel': 'counter',
 				'war.comment': 'Comment',
 				'war.noComment': 'No comment',
 				'war.fullPreview': 'Full preview',
@@ -5070,25 +5074,6 @@
 					</div>
 				</div>
 				
-				<!-- Legenda kolorów -->
-				<div class="war-preview-legend">
-					<div class="war-legend-item">
-						<span class="war-legend-dot matched"></span>
-						<span>${t('war.legendMatched')}</span>
-					</div>
-					<div class="war-legend-item">
-						<span class="war-legend-dot missing"></span>
-						<span>${t('war.legendMissing')}</span>
-					</div>
-					<div class="war-legend-item">
-						<span class="war-legend-dot extra"></span>
-						<span>${t('war.legendExtra')}</span>
-					</div>
-					<div class="war-legend-item">
-						<span class="war-legend-dot conflict"></span>
-						<span>${t('war.legendConflict')}</span>
-					</div>
-				</div>
 			`;
 			
 			// Karty porównania dla każdej walki
@@ -5115,8 +5100,10 @@
 						</div>
 						
 						<div class="war-compare-body">
-							<!-- Porównanie: Szukany vs Baza -->
-							<div class="war-compare-grid">
+							<!-- STREFA: Wróg (szukany vs baza) -->
+							<div class="war-enemy-zone">
+									<div class="war-zone-label enemy">🎯 ${t('war.enemyZone')}</div>
+									<div class="war-compare-grid">
 								<div class="war-compare-side">
 									<div class="war-compare-side-title searched">🔍 ${t('war.searchedEnemy')}</div>
 									<div style="text-align:center">
@@ -5141,8 +5128,9 @@
 							</div>
 							
 							<!-- Separator - Twój skład -->
-							<div class="war-your-team-separator">
-								<span class="war-your-team-badge">⚔️ ${t('war.yourTeam')}</span>
+							</div><!-- /strefa: Wróg -->
+								<div class="war-your-team-separator">
+								<span class="war-your-team-badge">⚔️ ${t('war.yourTeam')} — ${t('war.counterLabel')}</span>
 							</div>
 
 							<!-- Twój skład z konfliktami - ładniejszy -->
@@ -5153,20 +5141,11 @@
 								</div>
 							</div>
 							
-							<!-- Podsumowanie dopasowania -->
-							<div class="war-match-summary">
-								<div class="war-match-item matched">
-									<span class="war-match-item-icon">✅</span>
-									<span class="war-match-item-list">${analysis.matched.length ? analysis.matched.join(', ') : '—'}</span>
-								</div>
-								<div class="war-match-item missing">
-									<span class="war-match-item-icon">❌</span>
-									<span class="war-match-item-list">${analysis.missing.length ? analysis.missing.join(', ') : '—'}</span>
-								</div>
-								<div class="war-match-item extra">
-									<span class="war-match-item-icon">➕</span>
-									<span class="war-match-item-list">${analysis.extra.length ? analysis.extra.join(', ') : '—'}</span>
-								</div>
+							<!-- Mini legenda kolorów -->
+							<div class="war-mini-legend">
+								<span><i class="m"></i>${t('war.legendMatched')}</span>
+								<span><i class="x"></i>${t('war.legendMissing')}</span>
+								<span><i class="c"></i>${t('war.legendConflict')}</span>
 							</div>
 							
 							<!-- Komentarz -->

@@ -1081,8 +1081,8 @@
 		}
 
 		.battle-slot { width: 75px; height: 42px; border-radius: 8px; font-size: 0.7rem; padding: 4px; }
-		.compact-slot { width: 50px; height: 24px; border-radius: 4px; font-size: 0.55rem; padding: 2px; }
-		.war-your-team-slot { width: 90px; height: 38px; border-radius: 8px; font-size: 0.8rem; font-weight: 600; border: 2px solid var(--border); background: var(--bg-input); }
+		.compact-slot { width: 72px; min-height: 32px; border-radius: 6px; font-size: 0.7rem; padding: 3px 4px; line-height: 1.1; white-space: normal; word-break: break-word; }
+		.war-your-team-slot { width: 100px; min-height: 42px; border-radius: 9px; font-size: 0.82rem; font-weight: 700; padding: 4px 6px; line-height: 1.15; border: 2px solid var(--border); background: var(--bg-input); white-space: normal; word-break: break-word; }
 
 		/* Empty slots */
 		.battle-slot.empty, .compact-slot.empty, .war-your-team-slot.empty {
@@ -1103,7 +1103,13 @@
 		}
 		
 		.battle-slot.filled:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4); }
-		.compact-slot.filled { background: var(--bg-input); border: 1px solid; font-weight: 600; }
+		.compact-slot.filled { background: var(--bg-input); border: 2px solid var(--border); font-weight: 600; }
+		.compact-slot.race-dark { border-color: var(--race-dark); color: var(--race-dark); }
+		.compact-slot.race-light { border-color: var(--race-light); color: var(--race-light); }
+		.compact-slot.race-human { border-color: var(--race-human); color: var(--race-human); }
+		.compact-slot.race-fire { border-color: var(--race-fire); color: var(--race-fire); }
+		.compact-slot.race-elf { border-color: var(--race-elf); color: var(--race-elf); }
+		.compact-slot.race-undead { border-color: var(--race-undead); color: var(--race-undead); }
 		.war-your-team-slot.filled { background: linear-gradient(135deg, rgba(0,0,0,0.3), rgba(0,0,0,0.1)); }
 
 		/* Race colors dla slotów */
@@ -1958,17 +1964,17 @@
 			justify-content: space-between;
 			align-items: center;
 			padding: 12px 15px;
-			background: var(--bg-input);
-			border-bottom: 1px solid var(--border);
+			background: rgba(212, 175, 55, 0.16);
+			border-bottom: 2px solid var(--border);
 		}
 
-		.war-compare-title { font-family: 'Cinzel', serif; color: var(--accent-gold); font-size: 1rem; }
+		.war-compare-title { font-family: 'Cinzel', serif; color: var(--accent-gold); font-size: 1.15rem; }
 		.war-compare-id { font-size: 0.75rem; color: var(--text-muted); }
-		
-		.war-compare-score { padding: 4px 12px; border-radius: 12px; font-size: 0.8rem; font-weight: 600; }
-		.war-compare-score.high { background: rgba(76, 175, 80, 0.2); color: #4caf50; }
-		.war-compare-score.medium { background: rgba(255, 193, 7, 0.2); color: #ffc107; }
-		.war-compare-score.low { background: rgba(244, 67, 54, 0.2); color: #f44336; }
+
+		.war-compare-score { padding: 5px 13px; border-radius: 12px; font-size: 0.8rem; font-weight: 700; }
+		.war-compare-score.high { background: #2e7d32; color: #fff; }
+		.war-compare-score.medium { background: #e08600; color: #000; }
+		.war-compare-score.low { background: #c62828; color: #fff; }
 
 		.war-compare-body { padding: 15px; }
 		.war-compare-grid { display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: start; }
@@ -1988,14 +1994,25 @@
 		.war-compare-side-title.searched { color: #42a5f5; }
 		.war-compare-side-title.database { color: var(--accent-gold); }
 
-		.war-compare-vs { display: flex; align-items: center; justify-content: center; font-size: 1.2rem; color: var(--text-muted); padding: 20px 5px; }
+		.war-compare-vs { display: flex; align-items: center; justify-content: center; font-size: 1.3rem; color: var(--accent-gold); padding: 30px 5px; }
+
+		/* Opcja 1: strefy (góra = Wróg, dół = Twoja kontra) + etykiety + mini-legenda */
+		.war-enemy-zone { background: rgba(244, 67, 54, 0.05); border: 2px solid rgba(244, 67, 54, 0.4); border-radius: 10px; padding: 12px; }
+		.war-zone-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+		.war-zone-label.enemy { color: #ef5350; }
+		.war-zone-label.team { color: #66bb6a; }
+		.war-mini-legend { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; font-size: 0.68rem; color: var(--text-muted); margin-top: 12px; }
+		.war-mini-legend i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 4px; vertical-align: middle; }
+		.war-mini-legend i.m { background: #2e7d32; }
+		.war-mini-legend i.x { background: #f44336; opacity: 0.6; }
+		.war-mini-legend i.c { background: #ff5722; }
 
 		.compact-grid { display: flex; flex-direction: column; align-items: center; gap: 3px; }
 		.compact-row { display: flex; gap: 4px; justify-content: center; }
 
 		/* War slot states */
-		.compact-slot.war-matched { border-color: #4caf50 !important; box-shadow: 0 0 8px rgba(76, 175, 80, 0.4), inset 0 0 10px rgba(76, 175, 80, 0.15) !important; color: #4caf50 !important; }
-		.compact-slot.war-missing { border-color: #f44336 !important; border-style: dashed !important; background: rgba(244, 67, 54, 0.1) !important; color: #f44336 !important; opacity: 0.7; }
+		.compact-slot.war-matched { border-color: #2e7d32 !important; background: #2e7d32 !important; color: #fff !important; box-shadow: none !important; }
+		.compact-slot.war-missing { border-color: #f44336 !important; border-style: dashed !important; background: transparent !important; color: #ef5350 !important; opacity: 0.75; text-decoration: line-through; }
 		.compact-slot.war-extra { border-color: #ff9800 !important; box-shadow: 0 0 8px rgba(255, 152, 0, 0.4) !important; color: #ff9800 !important; }
 
 		.compact-pet.war-matched { border-color: #4caf50 !important; background: rgba(76, 175, 80, 0.15) !important; color: #4caf50 !important; }
