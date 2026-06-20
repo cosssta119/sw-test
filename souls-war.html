@@ -762,6 +762,15 @@
             <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 10px;" data-i18n="settings.importDesc">Wczytaj formacje z pliku CSV (ten sam format co eksport)</p>
             <button class="btn btn-success" onclick="document.getElementById('csv-input').click()">📥 <span data-i18n="settings.importBtn">Importuj CSV</span></button>
             <input type="file" id="csv-input" accept=".csv" style="display:none" onchange="importFromCSV(event)">
+
+            <h3 style="font-size: 0.85rem; color: var(--text-muted); margin: 25px 0 10px;">💾 <span data-i18n="settings.backupTitle">Kopia zapasowa (JSON)</span></h3>
+            <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 10px;" data-i18n="settings.backupDesc">Pobierz pełną kopię: formacje, bohaterowie, pety, dane Obrony</p>
+            <button class="btn" onclick="exportBackupJSON()">💾 <span data-i18n="settings.backupBtn">Pobierz kopię JSON</span></button>
+
+            <h3 style="font-size: 0.85rem; color: var(--text-muted); margin: 25px 0 10px;">♻️ <span data-i18n="settings.restoreTitle">Przywróć z kopii (JSON)</span></h3>
+            <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 10px;" data-i18n="settings.restoreDesc">Wczytaj kopię JSON — dodaje tylko nowe rekordy, istniejące pomija, nic nie kasuje</p>
+            <button class="btn btn-success" onclick="document.getElementById('json-input').click()">♻️ <span data-i18n="settings.restoreBtn">Wczytaj kopię JSON</span></button>
+            <input type="file" id="json-input" accept=".json,application/json" style="display:none" onchange="restoreBackupJSON(event)">
             
         </div>
     </div>

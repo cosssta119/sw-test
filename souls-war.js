@@ -138,7 +138,7 @@
                 'settings.online': 'Połączono z bazą danych.', 'settings.offline': 'Brak połączenia z bazą.',
                 'settings.exportTitle': 'Eksport do CSV', 'settings.exportDesc': 'Pobierz wszystkie formacje jako plik CSV', 'settings.exportBtn': 'Eksportuj CSV',
                 'settings.importTitle': 'Import z CSV', 'settings.importDesc': 'Wczytaj formacje z pliku CSV (ten sam format co eksport)', 'settings.importBtn': 'Importuj CSV',
-                'settings.exported': 'Wyeksportowano', 'settings.imported': 'Zaimportowano',
+                'settings.exported': 'Wyeksportowano', 'settings.imported': 'Zaimportowano', 'settings.importEmpty': 'Plik jest pusty lub ma tylko nagłówki', 'settings.importConfirm': 'Dodać nowe formacje do bazy (dotyczy wszystkich graczy)? Liczba:', 'settings.importNothing': 'Brak nowych formacji do dodania', 'settings.importDupes': 'duplikatów pominięto', 'settings.importSkipped': 'błędnych wierszy', 'settings.backupTitle': 'Kopia zapasowa (JSON)', 'settings.backupDesc': 'Pobierz pełną kopię: formacje, bohaterowie, pety, dane Obrony', 'settings.backupBtn': 'Pobierz kopię JSON', 'settings.backupDone': 'Pobrano kopię zapasową', 'settings.restoreTitle': 'Przywróć z kopii (JSON)', 'settings.restoreDesc': 'Wczytaj kopię JSON — dodaje tylko nowe rekordy, istniejące pomija, nic nie kasuje', 'settings.restoreBtn': 'Wczytaj kopię JSON', 'settings.restoreConfirm': 'Przywrócić z kopii? Dodane zostaną tylko nowe rekordy (nic nie jest kasowane). Nowych rekordów:', 'settings.restoreBad': 'Nieprawidłowy plik kopii', 'settings.restoreNothing': 'Kopia nie zawiera nowych rekordów', 'settings.restoreDone': 'Przywrócono z kopii',
                 'admin.title': 'Panel Administratora', 'admin.enterPassword': 'Wpisz hasło administratora', 'admin.passwordPlaceholder': 'Hasło...', 'admin.login': 'ZALOGUJ',
                 'admin.panelTitle': 'Panel Administratora', 'admin.modeActive': 'Tryb Admin aktywny', 'admin.modeDesc': 'Możesz zarządzać bohaterami, petami i usuwać dowolne formacje.',
                 'admin.heroes': 'Bohaterowie', 'admin.pets': 'Pety', 'admin.heroNamePlaceholder': 'Nazwa bohatera', 'admin.petNamePlaceholder': 'Nazwa peta',
@@ -376,7 +376,7 @@
                 'settings.online': 'Connected to database.', 'settings.offline': 'No database connection.',
                 'settings.exportTitle': 'Export to CSV', 'settings.exportDesc': 'Download all formations as CSV file', 'settings.exportBtn': 'Export CSV',
                 'settings.importTitle': 'Import from CSV', 'settings.importDesc': 'Load formations from CSV file (same format as export)', 'settings.importBtn': 'Import CSV',
-                'settings.exported': 'Exported', 'settings.imported': 'Imported',
+                'settings.exported': 'Exported', 'settings.imported': 'Imported', 'settings.importEmpty': 'File is empty or has headers only', 'settings.importConfirm': 'Add new formations to the database (affects all players)? Count:', 'settings.importNothing': 'No new formations to add', 'settings.importDupes': 'duplicates skipped', 'settings.importSkipped': 'invalid rows', 'settings.backupTitle': 'Backup (JSON)', 'settings.backupDesc': 'Download a full backup: formations, heroes, pets, defense data', 'settings.backupBtn': 'Download JSON backup', 'settings.backupDone': 'Backup downloaded', 'settings.restoreTitle': 'Restore from backup (JSON)', 'settings.restoreDesc': 'Load a JSON backup — adds only new records, skips existing, deletes nothing', 'settings.restoreBtn': 'Load JSON backup', 'settings.restoreConfirm': 'Restore from backup? Only new records will be added (nothing is deleted). New records:', 'settings.restoreBad': 'Invalid backup file', 'settings.restoreNothing': 'Backup contains no new records', 'settings.restoreDone': 'Restored from backup',
                 'admin.title': 'Administrator Panel', 'admin.enterPassword': 'Enter administrator password', 'admin.passwordPlaceholder': 'Password...', 'admin.login': 'LOGIN',
                 'admin.panelTitle': 'Administrator Panel', 'admin.modeActive': 'Admin mode active', 'admin.modeDesc': 'You can manage heroes, pets and delete any formations.',
                 'admin.heroes': 'Heroes', 'admin.pets': 'Pets', 'admin.heroNamePlaceholder': 'Hero name', 'admin.petNamePlaceholder': 'Pet name',
@@ -6907,8 +6907,8 @@
 			
 			const rows = allFormations.map(f => {
 				// Upewnij się że my i enemy mają 8 elementów
-				const myArr = f.my || [];
-				const enemyArr = f.enemy || [];
+				const myArr = [...(f.my || [])];
+				const enemyArr = [...(f.enemy || [])];
 				while (myArr.length < 8) myArr.push('');
 				while (enemyArr.length < 8) enemyArr.push('');
 				
@@ -6932,6 +6932,79 @@
 			showToast(`${t('settings.exported')} ${allFormations.length} ${t('status.formations')}`);
 		}
 
+        // Fingerprint formacji do dedupu (zgodny z checkForExactDuplicate): posortowane nazwy + pety, case-insensitive.
+        function formationFingerprint(my, myPet, enemy, enemyPet) {
+            const norm = arr => (arr || []).filter(h => h).map(h => String(h).toLowerCase().trim()).sort().join('|');
+            return norm(my) + '#' + String(myPet || '').toLowerCase().trim() + '##' + norm(enemy) + '#' + String(enemyPet || '').toLowerCase().trim();
+        }
+
+        // Pełna kopia zapasowa do JSON: formacje + bohaterowie + pety + cała Obrona. Read-only (bezpieczne).
+        function exportBackupJSON() {
+            const backup = {
+                _meta: { app: 'souls-war', version: 1, exportedAt: new Date().toISOString() },
+                formations: allFormations,
+                heroes: heroes,
+                pets: pets,
+                defenseFormations: allDefenseFormations,
+                defensePlayers: allDefensePlayers,
+                defenseAssignments: allDefenseAssignments
+            };
+            const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json;charset=utf-8;' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `souls-war-backup_${new Date().toISOString().slice(0,10)}.json`;
+            a.click();
+            showToast(`💾 ${t('settings.backupDone')} (${allFormations.length} + ${allDefenseFormations.length})`);
+        }
+
+        // Przywracanie z kopii JSON — DODAJE tylko nowe rekordy (pomija istniejące po ID/fingerprincie/nazwie),
+        // zachowuje oryginalne ID (więc referencje Obrony zostają spójne), NIGDY nic nie kasuje/nadpisuje.
+        async function restoreBackupJSON(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            if (!isOnline) { showToast(t('common.noConnection'), true); return; }
+            const reader = new FileReader();
+            reader.onload = async e => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    if (!data || typeof data !== 'object') { showToast(t('settings.restoreBad'), true); return; }
+                    const arr = x => Array.isArray(x) ? x : [];
+                    const F = arr(data.formations), H = arr(data.heroes), P = arr(data.pets),
+                          DF = arr(data.defenseFormations), DP = arr(data.defensePlayers), DA = arr(data.defenseAssignments);
+                    const fIds = new Set(allFormations.map(f => f.id));
+                    const fFps = new Set(allFormations.map(f => formationFingerprint(f.my, f.myPet, f.enemy, f.enemyPet)));
+                    const hNames = new Set(heroes.map(h => String(h.name || '').toLowerCase()));
+                    const pNames = new Set(pets.map(p => String(typeof p === 'string' ? p : (p && p.name) || '').toLowerCase()));
+                    const dfIds = new Set(allDefenseFormations.map(x => x.id));
+                    const dpIds = new Set(allDefensePlayers.map(x => x.id));
+                    const daIds = new Set(allDefenseAssignments.map(x => x.id));
+                    const newF = F.filter(f => f && f.id != null && !fIds.has(f.id) && !fFps.has(formationFingerprint(f.my, f.myPet, f.enemy, f.enemyPet)));
+                    const newH = H.filter(h => h && h.name && !hNames.has(String(h.name).toLowerCase()));
+                    const newP = P.filter(p => { const n = typeof p === 'string' ? p : (p && p.name); return n && !pNames.has(String(n).toLowerCase()); });
+                    const newDF = DF.filter(x => x && x.id != null && !dfIds.has(x.id));
+                    const newDP = DP.filter(x => x && x.id != null && !dpIds.has(x.id));
+                    const newDA = DA.filter(x => x && x.id != null && !daIds.has(x.id));
+                    const total = newF.length + newH.length + newP.length + newDF.length + newDP.length + newDA.length;
+                    if (!total) { showToast(t('settings.restoreNothing')); return; }
+                    if (!confirm(`${t('settings.restoreConfirm')} +${total}\n${t('status.formations')} +${newF.length} · ${t('nav.defense')} +${newDF.length}/${newDP.length}/${newDA.length}`)) return;
+                    const writes = [];
+                    newF.forEach(f => writes.push(formationsRef.child(String(f.id)).set(f)));
+                    newH.forEach(h => writes.push(heroesRef.child(h.name).set({ name: h.name, race: h.race || 'Human' })));
+                    newP.forEach(p => { const n = typeof p === 'string' ? p : p.name; writes.push(petsRef.child(n).set({ name: n })); });
+                    newDF.forEach(x => writes.push(defenseFormationsRef.child(String(x.id)).set(x)));
+                    newDP.forEach(x => writes.push(defensePlayersRef.child(String(x.id)).set(x)));
+                    newDA.forEach(x => writes.push(defenseAssignmentsRef.child(String(x.id)).set(x)));
+                    await Promise.all(writes);
+                    showToast(`♻️ ${t('settings.restoreDone')} (+${total})`);
+                } catch (err) {
+                    console.error('Restore error:', err);
+                    showToast(`${t('common.error')}: ${err.message}`, true);
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        }
+
         function parseCSVLine(line, sep = ';') {
             const result = [];
             let current = '', inQuotes = false;
@@ -6953,7 +7026,7 @@
 			reader.onload = async e => {
 				try {
 					const lines = e.target.result.split('\n').filter(l => l.trim());
-					if (lines.length < 2) { showToast('Plik jest pusty lub ma tylko nagłówki', true); return; }
+					if (lines.length < 2) { showToast(t('settings.importEmpty'), true); return; }
 					
 					const sep = lines[0].includes(';') ? ';' : ',';
 					const headers = parseCSVLine(lines[0], sep).map(h => h.toLowerCase().trim());
@@ -6961,7 +7034,9 @@
 					// Sprawdź czy mamy nowy format (z komentarzem) czy stary
 					const hasComment = headers.includes('komentarz') || headers.length >= 22;
 					
-					let imported = 0, skipped = 0;
+					let imported = 0, skipped = 0, dupes = 0;
+						const seen = new Set(allFormations.map(f => formationFingerprint(f.my, f.myPet, f.enemy, f.enemyPet)));
+						const toAdd = [];
 					let maxId = allFormations.length ? Math.max(...allFormations.map(f => f.id)) : 0;
 					const existingIds = allFormations.map(f => f.id);
 					
@@ -6981,6 +7056,9 @@
 						const myPet = cleanVal(vals[startIdx + 9]);
 						const enemyHeroes = vals.slice(startIdx + 10, startIdx + 18).map(cleanVal);
 						const enemyPet = cleanVal(vals[startIdx + 18]);
+						const __fp = formationFingerprint(myHeroes, myPet, enemyHeroes, enemyPet);
+						if (seen.has(__fp)) { dupes++; continue; }
+						seen.add(__fp);
 						
 						// Komentarz i isBase (jeśli dostępne)
 						let comment = '';
@@ -6991,7 +7069,7 @@
 							isBase = cleanVal(vals[startIdx + 20]) === '1';
 						}
 						
-						await formationsRef.child(String(maxId)).set({
+						toAdd.push({
 							id: maxId,
 							name: cleanVal(vals[startIdx]) || `Import #${maxId}`,
 							my: myHeroes,
@@ -7005,8 +7083,12 @@
 						imported++;
 					}
 					
-					let msg = `${t('settings.imported')} ${imported} ${t('status.formations')}!`;
-					if (skipped > 0) msg += ` (${skipped} pominięto)`;
+					if (!toAdd.length) { showToast(`${t('settings.importNothing')} (${dupes} ${t('settings.importDupes')}, ${skipped} ${t('settings.importSkipped')})`, true); return; }
+						if (!confirm(`${t('settings.importConfirm')} ${toAdd.length}\n${dupes} ${t('settings.importDupes')}, ${skipped} ${t('settings.importSkipped')}`)) return;
+						await Promise.all(toAdd.map(f => formationsRef.child(String(f.id)).set(f)));
+						let msg = `${t('settings.imported')} ${toAdd.length} ${t('status.formations')}!`;
+					if (dupes > 0) msg += ` (${dupes} ${t('settings.importDupes')})`;
+						if (skipped > 0) msg += ` (${skipped} ${t('settings.importSkipped')})`;
 					showToast(msg);
 					
 				} catch (e) { 
