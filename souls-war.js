@@ -52,6 +52,12 @@
 			defaultDbFilter: 'all',     // domyślny filtr bazy na starcie
 			defaultPackageMinSupport: 5,// domyślne „min. wystąpień" w pakietach
 			defaultPackageWindow: 'all',// domyślne okno czasowe pakietów
+			// Widoczność zakładek: 'all' = wszyscy (też admin), 'admin' = tylko admin. Domyślne = obecny stan apki.
+			// Zakładka 'admin' jest zawsze admin-only (poza tą mapą, niekonfigurowalna).
+			tabVisibility: { search: 'all', database: 'all', view: 'all', add: 'all', settings: 'admin', war: 'all', kreator: 'all', defense: 'admin' },
+			// Umiejscowienie: 'bar' = w pasku, 'more' = w menu „⋯ Więcej", 'hidden' = ukryta. Domyślnie wszystko w pasku.
+			// Przycisk „Więcej" pojawia się dopiero gdy ≥2 widoczne zakładki są w „Więcej".
+			tabPlacement: { search: 'bar', database: 'bar', view: 'bar', add: 'bar', settings: 'bar', war: 'bar', kreator: 'bar', defense: 'bar', admin: 'bar' },
 		};
 		let appConfig = { ...DEFAULT_CONFIG };
 		let configRef = null;
@@ -109,7 +115,7 @@
             pl: {
                 'loading': 'Ładowanie danych...', 'common.loading': 'Ładowanie...', 'common.cancel': 'Anuluj', 'common.clear': 'Wyczyść', 'common.save': 'Zapisz',
                 'header.subtitle': 'Wyszukiwarka kontr-formacji', 'status.online': 'Online', 'status.offline': 'Offline', 'status.formations': 'formacji',
-                'nav.search': 'Szukaj', 'nav.database': 'Baza', 'nav.preview': 'Podgląd', 'nav.add': 'Dodaj', 'nav.import': 'Import',
+                'nav.search': 'Szukaj', 'nav.database': 'Baza', 'nav.preview': 'Podgląd', 'nav.add': 'Dodaj', 'nav.import': 'Import', 'nav.more': 'Więcej',
                 'search.title': 'Szukaj kontr-formacji', 'search.subtitle': 'Wpisz skład przeciwnika (lub wybierz tagami)', 'search.btn': 'SZUKAJ', 'search.clear': 'Wyczyść',
                 'search.emptyState': 'Wpisz postacie przeciwnika i kliknij "Szukaj"', 'search.results': 'Wyniki', 'search.found': 'Znaleziono', 'search.noResults': 'Nie znaleziono pasujących formacji',
                 'search.enemy': 'Przeciwnik', 'search.missing': 'Brak', 'search.allSlotsFull': 'Wszystkie pola zajęte!', 'search.petSlotFull': 'Pole Pet już zajęte!',
@@ -144,6 +150,9 @@
                 'admin.config': 'Konfiguracja (globalna)', 'admin.configNewDays': 'Próg „NOWE" (dni)',
                 'admin.configMinMatch': 'Domyślny próg trafności', 'admin.configSort': 'Domyślne sortowanie wyników',
                 'admin.configDbFilter': 'Domyślny filtr bazy', 'admin.configPkgSupport': 'Pakiety: domyślne min. wystąpień', 'admin.configPkgWindow': 'Pakiety: domyślne okno',
+                'admin.tabVisibility': 'Widoczność zakładek', 'admin.visAll': 'Wszyscy', 'admin.visAdmin': 'Tylko admin',
+                'admin.placeBar': 'W pasku', 'admin.placeMore': 'W „Więcej"', 'admin.placeHidden': 'Ukryj',
+                'admin.tabLocked': 'Zawsze dostępna (tylko admin)', 'admin.tabLockedHint': 'Tej zakładki nie można ukryć ani przenieść — to wejście do panelu admina.',
                 'admin.configHint': 'Zmiana działa dla wszystkich graczy gildii.', 'admin.configSaved': 'Zapisano konfigurację',
                 'admin.configInvalidDays': 'Podaj liczbę dni większą od 0!', 'admin.configInvalidMin': 'Podaj próg trafności większy od 0!',
                 'admin.petAdded': 'Dodano peta', 'admin.petExists': 'Pet już istnieje!', 'admin.enterHeroName': 'Podaj nazwę bohatera!', 'admin.enterPetName': 'Podaj nazwę peta!',
@@ -342,7 +351,7 @@
             en: {
                 'loading': 'Loading data...', 'common.loading': 'Loading...', 'common.cancel': 'Cancel', 'common.clear': 'Clear', 'common.save': 'Save',
                 'header.subtitle': 'Counter-formation finder', 'status.online': 'Online', 'status.offline': 'Offline', 'status.formations': 'formations',
-                'nav.search': 'Search', 'nav.database': 'Database', 'nav.preview': 'Preview', 'nav.add': 'Add', 'nav.import': 'Import',
+                'nav.search': 'Search', 'nav.database': 'Database', 'nav.preview': 'Preview', 'nav.add': 'Add', 'nav.import': 'Import', 'nav.more': 'More',
                 'search.title': 'Search counter-formations', 'search.subtitle': 'Enter enemy composition (or use tags)', 'search.btn': 'SEARCH', 'search.clear': 'Clear',
                 'search.emptyState': 'Enter enemy heroes and click "Search"', 'search.results': 'Results', 'search.found': 'Found', 'search.noResults': 'No matching formations found',
                 'search.enemy': 'Enemy', 'search.missing': 'Missing', 'search.allSlotsFull': 'All slots are full!', 'search.petSlotFull': 'Pet slot is full!',
@@ -378,6 +387,9 @@
                 'admin.config': 'Configuration (global)', 'admin.configNewDays': '"NEW" threshold (days)',
                 'admin.configMinMatch': 'Default match threshold', 'admin.configSort': 'Default results sorting',
                 'admin.configDbFilter': 'Default database filter', 'admin.configPkgSupport': 'Packages: default min. occurrences', 'admin.configPkgWindow': 'Packages: default window',
+                'admin.tabVisibility': 'Tab visibility', 'admin.visAll': 'Everyone', 'admin.visAdmin': 'Admin only',
+                'admin.placeBar': 'In bar', 'admin.placeMore': 'In „More"', 'admin.placeHidden': 'Hidden',
+                'admin.tabLocked': 'Always available (admin only)', 'admin.tabLockedHint': 'This tab cannot be hidden or moved — it is the entry to the admin panel.',
                 'admin.configHint': 'Applies to all guild players.', 'admin.configSaved': 'Configuration saved',
                 'admin.configInvalidDays': 'Enter a number of days greater than 0!', 'admin.configInvalidMin': 'Enter a match threshold greater than 0!',
                 'admin.petAdded': 'Pet added', 'admin.petExists': 'Pet already exists!', 'admin.enterHeroName': 'Enter hero name!', 'admin.enterPetName': 'Enter pet name!',
@@ -704,13 +716,71 @@
             $('admin-password').value = '';
         }
 
+		// Konfigurowalne zakładki (kolejność = w panelu). 'admin' zawsze admin-only (locked).
+		const NAV_TABS = ['search', 'database', 'view', 'add', 'settings', 'war', 'kreator', 'defense', 'admin'];
+		const TAB_LABELS = { search: '🔍 Szukaj', database: '📚 Baza', view: '👁️ Podgląd', add: '➕ Dodaj', settings: '⚙️ Import', war: '⚔️ Wojna', kreator: '🎯 Kreator', defense: '🛡️ Obrona', admin: '👑 Admin' };
+
+		let moreTabsActive = []; // zakładki aktualnie pokazane w menu „⋯ Więcej"
+
+		// Stan zakładki: kto widzi (audience) + gdzie (placement) → czy w ogóle widoczna.
+		// 'hidden' chowa dla wszystkich (admin może odkryć przez panel — zakładka Admin jest zablokowana).
+		function tabState(tab) {
+			const vis = tab === 'admin' ? 'admin' : (appConfig.tabVisibility?.[tab] || 'all');
+			const placement = appConfig.tabPlacement?.[tab] || 'bar';
+			const audienceOK = vis === 'all' || isAdmin;
+			return { visible: audienceOK && placement !== 'hidden', placement };
+		}
+
+		// Pokazuje/ukrywa przyciski dolnego menu wg appConfig (widoczność + umiejscowienie) i stanu admina.
+		// Przycisk „Więcej" pojawia się tylko gdy ≥2 widoczne zakładki są w „Więcej" (przy 1 chowanie nie ma sensu).
+		function applyTabVisibility() {
+			const moreCandidates = NAV_TABS.filter(tab => { const s = tabState(tab); return s.visible && s.placement === 'more'; });
+			const useMore = moreCandidates.length >= 2;
+			moreTabsActive = useMore ? moreCandidates : [];
+
+			NAV_TABS.forEach(tab => {
+				const btn = $('nav-' + tab);
+				if (!btn) return;
+				const s = tabState(tab);
+				const inMore = useMore && s.placement === 'more';
+				btn.style.display = (s.visible && !inMore) ? 'flex' : 'none';
+			});
+
+			const moreBtn = $('nav-more');
+			if (moreBtn) moreBtn.style.display = useMore ? 'flex' : 'none';
+			renderMoreMenu();
+			if (!useMore) closeMoreMenu();
+		}
+
+		function renderMoreMenu() {
+			const menu = $('more-menu');
+			if (!menu) return;
+			menu.innerHTML = moreTabsActive.map(tab =>
+				`<button class="more-menu-item" onclick="switchTab('${tab}'); closeMoreMenu();">${TAB_LABELS[tab]}</button>`
+			).join('');
+		}
+
+		function toggleMoreMenu(e) {
+			if (e) e.stopPropagation();
+			const menu = $('more-menu');
+			if (!menu) return;
+			const willOpen = menu.classList.contains('hidden');
+			menu.classList.toggle('hidden', !willOpen);
+			if (willOpen) setTimeout(() => document.addEventListener('click', closeMoreMenuOutside), 10);
+			else document.removeEventListener('click', closeMoreMenuOutside);
+		}
+		function closeMoreMenu() {
+			$('more-menu')?.classList.add('hidden');
+			document.removeEventListener('click', closeMoreMenuOutside);
+		}
+		function closeMoreMenuOutside(e) {
+			if (!e.target.closest('#more-menu') && !e.target.closest('#nav-more')) closeMoreMenu();
+		}
+
 		function enableAdminMode() {
 			isAdmin = true;
 			$('admin-badge').style.display = 'inline';
-			$('nav-admin').classList.add('show');
-			$('nav-settings').classList.add('show');
-			$('nav-war').classList.add('show');
-			$('nav-defense')?.classList.add('show');
+			applyTabVisibility();
 			// Pokaż opcję "formacja bazowa" w formularzu dodawania
 			const baseOption = $('add-base-option');
 			if (baseOption) baseOption.style.display = 'block';
@@ -725,10 +795,7 @@
 			isAdmin = false;
 			localStorage.removeItem('souls_admin');
 			$('admin-badge').style.display = 'none';
-			$('nav-admin').classList.remove('show');
-			$('nav-settings').classList.remove('show');
-			$('nav-war').classList.remove('show');
-			$('nav-defense')?.classList.remove('show');
+			applyTabVisibility();
 			// Ukryj opcję "formacja bazowa" w formularzu dodawania
 			const baseOption = $('add-base-option');
 			if (baseOption) baseOption.style.display = 'none';
@@ -830,6 +897,9 @@
 			document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
 			document.querySelector(`.nav-btn[onclick="switchTab('${name}')"]`)?.classList.add('active');
 			$(`tab-${name}`)?.classList.add('active');
+			// Jeśli zakładka jest w menu „Więcej", podświetl przycisk Więcej
+			$('nav-more')?.classList.toggle('active', moreTabsActive.includes(name));
+			closeMoreMenu();
 
 			// Pokaż/ukryj sekcję wykluczonych na wybranych zakładkach
 			const excludedSection = $('excluded-section');
@@ -2453,6 +2523,7 @@
 						<div class="db-item-header"><span class="db-item-id">#${f.id}</span><span class="badge ${f.isBase ? 'base-badge' : 'user-badge'}">${t(f.isBase ? 'badge.base' : 'badge.user')}</span>${isNewFormation(f) ? `<span class="badge new-badge">${t('badge.new')}</span>` : ''}</div>
 						<div class="db-item-name">${f.name}</div>
 						<div class="db-item-details"><div>⚔️ ${f.my.filter(h => h).join(', ') || '—'} + ${f.myPet || '—'}</div><div>👹 ${f.enemy.filter(h => h).join(', ') || '—'} + ${f.enemyPet || '—'}</div></div>
+						${f.comment ? `<div class="result-comment clamped" onclick="event.stopPropagation(); this.classList.toggle('clamped')" title="${t('search.toggleComment')}"><span class="comment-icon">💬</span>${escapeHtml(f.comment)}</div>` : ''}
 						${hasExcluded ? `<div style="font-size:0.65rem;color:#f44336;margin-top:3px;">🚫 ${exclusionCheck.heroes.join(', ')}</div>` : ''}
 					</div>
 					<div class="db-item-date">${formatDate(f.dateAdded) ? `📅 ${formatDate(f.dateAdded)}` : ''}</div>
@@ -7087,13 +7158,41 @@
             if ($('config-db-filter')) $('config-db-filter').value = appConfig.defaultDbFilter;
             if ($('config-pkg-support')) $('config-pkg-support').value = appConfig.defaultPackageMinSupport;
             if ($('config-pkg-window')) $('config-pkg-window').value = appConfig.defaultPackageWindow;
+
+            // Widoczność zakładek — lista przełączników (zakładka 'admin' zablokowana na Admin)
+            const tvList = $('tabvis-list');
+            if (tvList) {
+                tvList.innerHTML = NAV_TABS.map(tab => {
+                    if (tab === 'admin') {
+                        // Zakładka Admin — zablokowana (zawsze admin, w pasku), żeby nie zablokować sobie dostępu
+                        return `<div class="admin-config-row">
+                            <label>${TAB_LABELS[tab]}</label>
+                            <span class="tabvis-locked" title="${t('admin.tabLockedHint')}">🔒 ${t('admin.tabLocked')}</span>
+                        </div>`;
+                    }
+                    const val = appConfig.tabVisibility?.[tab] || 'all';
+                    const place = appConfig.tabPlacement?.[tab] || 'bar';
+                    return `<div class="admin-config-row">
+                        <label>${TAB_LABELS[tab]}</label>
+                        <select class="admin-config-select" data-tabvis="${tab}">
+                            <option value="all"${val === 'all' ? ' selected' : ''}>${t('admin.visAll')}</option>
+                            <option value="admin"${val === 'admin' ? ' selected' : ''}>${t('admin.visAdmin')}</option>
+                        </select>
+                        <select class="admin-config-select" data-tabmore="${tab}">
+                            <option value="bar"${place === 'bar' ? ' selected' : ''}>${t('admin.placeBar')}</option>
+                            <option value="more"${place === 'more' ? ' selected' : ''}>${t('admin.placeMore')}</option>
+                            <option value="hidden"${place === 'hidden' ? ' selected' : ''}>${t('admin.placeHidden')}</option>
+                        </select>
+                    </div>`;
+                }).join('');
+            }
         }
 
         // Zapis globalnej konfiguracji do Firebase /config/settings (działa dla wszystkich graczy)
         async function saveConfig() {
             if (!isOnline) { showToast(t('common.noConnection'), true); return; }
             const days = parseInt($('config-new-days')?.value, 10);
-            const minMatch = parseInt($('config-min-match')?.value, 10);
+            let minMatch = parseInt($('config-min-match')?.value, 10);
             const sort = $('config-default-sort')?.value;
             const dbFilter = $('config-db-filter')?.value;
             const pkgSup = parseInt($('config-pkg-support')?.value, 10);
@@ -7101,14 +7200,28 @@
             if (!(days > 0)) { showToast(t('admin.configInvalidDays'), true); return; }
             if (!(minMatch > 0)) { showToast(t('admin.configInvalidMin'), true); return; }
             if (!(pkgSup > 0)) { showToast(t('admin.configInvalidMin'), true); return; }
+            minMatch = Math.min(5, minMatch); // próg trafności ≤ 5 (max bohaterów w grze)
             try {
+                const tabVisibility = {};
+                Object.keys(DEFAULT_CONFIG.tabVisibility).forEach(k => {
+                    const sel = document.querySelector(`[data-tabvis="${k}"]`);
+                    tabVisibility[k] = (sel && sel.value === 'admin') ? 'admin' : 'all';
+                });
+                const tabPlacement = {};
+                Object.keys(DEFAULT_CONFIG.tabPlacement).forEach(k => {
+                    const sel = document.querySelector(`[data-tabmore="${k}"]`);
+                    const v = sel ? sel.value : 'bar';
+                    tabPlacement[k] = ['bar', 'more', 'hidden'].includes(v) ? v : 'bar';
+                });
                 await configRef.update({
                     newFormationDays: days,
                     defaultMinMatch: minMatch,
                     defaultSearchSort: (sort === 'newest' ? 'newest' : 'relevance'),
                     defaultDbFilter: ['all', 'base', 'user', 'favorites'].includes(dbFilter) ? dbFilter : 'all',
                     defaultPackageMinSupport: pkgSup,
-                    defaultPackageWindow: ['all', '30', '90'].includes(pkgWindow) ? pkgWindow : 'all'
+                    defaultPackageWindow: ['all', '30', '90'].includes(pkgWindow) ? pkgWindow : 'all',
+                    tabVisibility,
+                    tabPlacement
                 });
                 showToast(`✅ ${t('admin.configSaved')}`);
             } catch (e) { showToast(`${t('common.error')}: ${e.message}`, true); }
@@ -7430,6 +7543,19 @@
                 appConfig.defaultPackageMinSupport = pkgSup > 0 ? pkgSup : DEFAULT_CONFIG.defaultPackageMinSupport;
                 appConfig.defaultPackageWindow = ['all', '30', '90'].includes(String(c.defaultPackageWindow))
                     ? String(c.defaultPackageWindow) : DEFAULT_CONFIG.defaultPackageWindow;
+                const tv = c.tabVisibility || {};
+                appConfig.tabVisibility = {};
+                Object.keys(DEFAULT_CONFIG.tabVisibility).forEach(k => {
+                    appConfig.tabVisibility[k] = (tv[k] === 'admin' || tv[k] === 'all') ? tv[k] : DEFAULT_CONFIG.tabVisibility[k];
+                });
+                const tp = c.tabPlacement || {};
+                appConfig.tabPlacement = {};
+                Object.keys(DEFAULT_CONFIG.tabPlacement).forEach(k => {
+                    const v = tp[k];
+                    // migracja starego boola (true = 'more') + walidacja stringa
+                    appConfig.tabPlacement[k] = (v === 'bar' || v === 'more' || v === 'hidden') ? v : (v === true ? 'more' : 'bar');
+                });
+                applyTabVisibility();
 
                 // Live: globalne domyślne tam, gdzie użytkownik nie ma własnego wyboru
                 if (storage.getJson('souls_search_min_match', null) === null) searchMinMatch = appConfig.defaultMinMatch;
@@ -7541,6 +7667,9 @@
 
 			// Startowy pusty ekran wyszukiwarki (z opcją powtórzenia ostatniego)
 			renderSearchEmptyState();
+
+			// Widoczność zakładek wg domyślnych (config dociągnie i ew. nadpisze)
+			applyTabVisibility();
 
 			// Zamykanie modali kliknięciem poza content
 			$('duplicates-modal')?.addEventListener('click', e => {
