@@ -524,6 +524,8 @@
 		.btn-success { background: linear-gradient(135deg, var(--accent-green), #1b5e20); color: white; }
 		.btn-danger { background: linear-gradient(135deg, #c62828, #8b0000); color: white; }
 		.btn-small { padding: 8px 15px; font-size: 0.8rem; width: auto; margin-top: 0; }
+		/* Przyciski nagłówka Podglądu Wojny: auto-szerokość, w jednym rzędzie (nie na całą szerokość) */
+		.war-preview-actions .btn { width: auto; margin-top: 0; padding: 8px 14px; font-size: 0.82rem; }
 		.btn-admin { background: linear-gradient(135deg, var(--accent-purple), #4a148c); color: white; }
 		.btn-favorite-active { background: linear-gradient(135deg, #ffd700, #ffb300) !important; color: #000 !important; }
 		.btn-compare { background: linear-gradient(135deg, #e65100, #bf360c) !important; color: white !important; }
