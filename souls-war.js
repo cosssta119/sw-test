@@ -5044,8 +5044,8 @@
 				? `✓ ${t('war.noConflicts')}` 
 				: `${totalConflicts} ${t('war.conflictsCount')}`;
 			
-			let html = `
-				<!-- Podsumowanie kombinacji -->
+			const summaryBox = `
+				<!-- Podsumowanie kombinacji (na dole, dyskretne) -->
 				<div class="war-preview-summary">
 					<div class="war-preview-summary-header">
 						<span class="war-preview-summary-title">📊 ${t('war.combinationSummary')}</span>
@@ -5078,6 +5078,8 @@
 				
 			`;
 			
+			let html = '';
+
 			// Karty porównania dla każdej walki
 			combo.formations.forEach((match, idx) => {
 				const f = match.formation;
@@ -5180,7 +5182,8 @@
 				`;
 			});
 			
-			// Podsumowanie konfliktów na dole
+			// Konflikty (renderowane na GÓRZE, nad walkami)
+			let conflictsBox = '';
 			const hasHeroConflicts = conflictHeroes.size > 0;
 			const hasPetConflicts = conflictPets.size > 0;
 			
@@ -5205,7 +5208,7 @@
 					}
 				});
 				
-				html += `
+				conflictsBox = `
 					<div class="war-conflicts-box has-conflicts">
 						<h3 class="war-conflicts-title bad">⚠️ ${t('war.conflictsTitle')}</h3>
 						<div>
@@ -5221,7 +5224,7 @@
 					</div>
 				`;
 			} else {
-				html += `
+				conflictsBox = `
 					<div class="war-conflicts-box no-conflicts">
 						<h3 class="war-conflicts-title good">✅ ${t('war.noConflictsTitle')}</h3>
 						<p style="font-size: 0.8rem; color: var(--text-muted);">
@@ -5231,7 +5234,8 @@
 				`;
 			}
 			
-			$('war-preview-content').innerHTML = html;
+			// Kolejność: konflikty (góra) → walki → podsumowanie (dół)
+			$('war-preview-content').innerHTML = conflictsBox + html + summaryBox;
 		}
 
 		// Analiza dopasowania między szukanym a bazą
