@@ -138,7 +138,7 @@
                 'settings.online': 'Połączono z bazą danych.', 'settings.offline': 'Brak połączenia z bazą.',
                 'settings.exportTitle': 'Eksport do CSV', 'settings.exportDesc': 'Pobierz wszystkie formacje jako plik CSV', 'settings.exportBtn': 'Eksportuj CSV',
                 'settings.importTitle': 'Import z CSV', 'settings.importDesc': 'Wczytaj formacje z pliku CSV (ten sam format co eksport)', 'settings.importBtn': 'Importuj CSV',
-                'settings.syncTitle': 'Synchronizacja', 'settings.refreshBtn': 'Odśwież dane', 'settings.exported': 'Wyeksportowano', 'settings.imported': 'Zaimportowano',
+                'settings.exported': 'Wyeksportowano', 'settings.imported': 'Zaimportowano',
                 'admin.title': 'Panel Administratora', 'admin.enterPassword': 'Wpisz hasło administratora', 'admin.passwordPlaceholder': 'Hasło...', 'admin.login': 'ZALOGUJ',
                 'admin.panelTitle': 'Panel Administratora', 'admin.modeActive': 'Tryb Admin aktywny', 'admin.modeDesc': 'Możesz zarządzać bohaterami, petami i usuwać dowolne formacje.',
                 'admin.heroes': 'Bohaterowie', 'admin.pets': 'Pety', 'admin.heroNamePlaceholder': 'Nazwa bohatera', 'admin.petNamePlaceholder': 'Nazwa peta',
@@ -376,7 +376,7 @@
                 'settings.online': 'Connected to database.', 'settings.offline': 'No database connection.',
                 'settings.exportTitle': 'Export to CSV', 'settings.exportDesc': 'Download all formations as CSV file', 'settings.exportBtn': 'Export CSV',
                 'settings.importTitle': 'Import from CSV', 'settings.importDesc': 'Load formations from CSV file (same format as export)', 'settings.importBtn': 'Import CSV',
-                'settings.syncTitle': 'Synchronization', 'settings.refreshBtn': 'Refresh data', 'settings.exported': 'Exported', 'settings.imported': 'Imported',
+                'settings.exported': 'Exported', 'settings.imported': 'Imported',
                 'admin.title': 'Administrator Panel', 'admin.enterPassword': 'Enter administrator password', 'admin.passwordPlaceholder': 'Password...', 'admin.login': 'LOGIN',
                 'admin.panelTitle': 'Administrator Panel', 'admin.modeActive': 'Admin mode active', 'admin.modeDesc': 'You can manage heroes, pets and delete any formations.',
                 'admin.heroes': 'Heroes', 'admin.pets': 'Pets', 'admin.heroNamePlaceholder': 'Hero name', 'admin.petNamePlaceholder': 'Pet name',
@@ -3684,7 +3684,6 @@
         // ═══════════════════════════════════════════════════════════
 
         const cleanVal = v => (v || '').replace(/"/g, '').trim();
-        const refreshData = () => location.reload();
 
         // =====================================================
         // PLANER WOJNY - 3 SKŁADY
