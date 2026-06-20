@@ -2005,6 +2005,7 @@
 		.war-mini-legend i { display: inline-block; width: 14px; height: 14px; border-radius: 3px; margin-right: 5px; vertical-align: middle; }
 		.war-mini-legend i.frame-miss { border: 2px dashed #f44336; background: rgba(244, 67, 54, 0.16); }
 		.war-mini-legend i.frame-extra { border: 2px dashed #ff9800; background: rgba(255, 152, 0, 0.16); }
+		.war-mini-legend i.moved { background: #29b6f6; }
 		.war-mini-legend i.c { background: #ff5722; }
 
 		.compact-grid { display: flex; flex-direction: column; align-items: center; gap: 3px; }
@@ -2016,10 +2017,13 @@
 		/* RÓŻNICA szukany ≠ baza — wyraźna ramka (kolor rasy zostaje na tekście) */
 		.compact-slot.war-missing { border: 2px dashed #f44336 !important; background: rgba(244, 67, 54, 0.16) !important; box-shadow: 0 0 6px rgba(244, 67, 54, 0.45) !important; }
 		.compact-slot.war-extra { border: 2px dashed #ff9800 !important; background: rgba(255, 152, 0, 0.16) !important; box-shadow: 0 0 6px rgba(255, 152, 0, 0.4) !important; }
+		/* dopasowany, ale na INNEJ pozycji — pasek + ikona, kolor rasy zostaje na obrysie */
+		.compact-slot.war-moved { box-shadow: inset 0 -5px 0 #29b6f6 !important; }
+		.compact-slot.war-moved::after { content: '⇄'; position: absolute; top: 0; right: 2px; font-size: 0.6rem; color: #29b6f6; }
 
 		.compact-pet.war-matched { border-color: #4caf50 !important; background: rgba(76, 175, 80, 0.15) !important; color: #4caf50 !important; }
-		.compact-pet.war-missing { border-color: #f44336 !important; border-style: dashed !important; background: rgba(244, 67, 54, 0.1) !important; color: #f44336 !important; }
-		.compact-pet.war-extra { border-color: #ff9800 !important; background: rgba(255, 152, 0, 0.15) !important; color: #ff9800 !important; }
+		.compact-pet.war-missing { border: 2px dashed #f44336 !important; background: rgba(244, 67, 54, 0.16) !important; box-shadow: 0 0 6px rgba(244, 67, 54, 0.45) !important; color: #ff7961 !important; }
+		.compact-pet.war-extra { border: 2px dashed #ff9800 !important; background: rgba(255, 152, 0, 0.16) !important; box-shadow: 0 0 6px rgba(255, 152, 0, 0.4) !important; color: #ffb74d !important; }
 
 		.war-your-team-separator { text-align: center; margin: 15px 0; position: relative; }
 		.war-your-team-separator::before { content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: linear-gradient(to right, transparent, var(--border), transparent); }

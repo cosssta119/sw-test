@@ -219,6 +219,7 @@
 				'war.legendMatched': 'Trafione',
 				'war.legendMissing': 'Brakuje',
 				'war.legendExtra': 'Dodatkowe w bazie',
+				'war.legendMoved': 'Inna pozycja',
 				'war.legendConflict': 'Konflikt (użyty wielokrotnie)',
 				'war.selectCombo': 'Wybierz kombinację z planera wojny',
 				'common.historyCleared': 'Historia wyczyszczona',
@@ -460,6 +461,7 @@
 				'war.legendMatched': 'Matched',
 				'war.legendMissing': 'Missing',
 				'war.legendExtra': 'Extra in database',
+				'war.legendMoved': 'Different position',
 				'war.legendConflict': 'Conflict (used multiple times)',
 				'war.selectCombo': 'Select a combination from war planner',
 				'common.historyCleared': 'History cleared',
@@ -5110,7 +5112,7 @@
 										${renderWarPetComparison(searchedEnemy.petRaw, f.enemyPet, 'searched')}
 									</div>
 									<div class="compact-grid">
-										${renderWarSearchedGrid(searchedEnemy.heroesRaw, analysis)}
+										${renderWarSearchedGrid(searchedEnemy.heroesRaw, analysis, f.enemy)}
 									</div>
 								</div>
 								
@@ -5122,7 +5124,7 @@
 										${renderWarPetComparison(f.enemyPet, searchedEnemy.pet, 'database')}
 									</div>
 									<div class="compact-grid">
-										${renderWarDatabaseGrid(f.enemy, analysis)}
+										${renderWarDatabaseGrid(f.enemy, analysis, searchedEnemy.heroesRaw)}
 									</div>
 								</div>
 							</div>
@@ -5145,6 +5147,7 @@
 							<div class="war-mini-legend">
 								<span><i class="frame-miss"></i>${t('war.legendMissing')}</span>
 								<span><i class="frame-extra"></i>${t('war.legendExtra')}</span>
+								<span><i class="moved"></i>${t('war.legendMoved')}</span>
 								<span><i class="c"></i>${t('war.legendConflict')}</span>
 							</div>
 							
@@ -5283,7 +5286,7 @@
 		}
 
 		// Renderuj siatkę szukanego wroga - z zachowaniem pozycji
-		function renderWarSearchedGrid(heroesRaw, analysis) {
+		function renderWarSearchedGrid(heroesRaw, analysis, otherArr) {
 			const slot = (idx) => {
 				const name = heroesRaw[idx] || '';
 				if (!name) return `<div class="compact-slot empty">—</div>`;
@@ -5296,7 +5299,11 @@
 				
 				let classes = 'compact-slot filled';
 				if (race) classes += ` race-${race}`;
+				const nm = normalize(name);
+				const otherNm = (otherArr && otherArr[idx]) ? normalize(otherArr[idx]) : '';
+				const samePos = otherNm && (otherNm === nm || otherNm.startsWith(nm) || nm.startsWith(otherNm));
 				if (isMatched) classes += ' war-matched';
+				if (isMatched && !samePos) classes += ' war-moved';
 				if (isMissing) classes += ' war-missing';
 				
 				// Kapitalizuj nazwę (pierwsza duża)
@@ -5313,7 +5320,7 @@
 		}
 
 		// Renderuj siatkę wroga z bazy
-		function renderWarDatabaseGrid(heroesArr, analysis) {
+		function renderWarDatabaseGrid(heroesArr, analysis, otherArr) {
 			const slot = (idx) => {
 				const name = heroesArr[idx] || '';
 				if (!name) return `<div class="compact-slot empty">—</div>`;
@@ -5327,7 +5334,10 @@
 				
 				let classes = 'compact-slot filled';
 				if (race) classes += ` race-${race}`;
+				const otherNm = (otherArr && otherArr[idx]) ? normalize(otherArr[idx]) : '';
+				const samePos = otherNm && (otherNm === normName || otherNm.startsWith(normName) || normName.startsWith(otherNm));
 				if (isMatched) classes += ' war-matched';
+				if (isMatched && !samePos) classes += ' war-moved';
 				if (isExtra) classes += ' war-extra';
 				
 				return `<div class="${classes}">${name}</div>`;
@@ -5392,18 +5402,13 @@
 			const displayName = petData || (petName.charAt(0).toUpperCase() + petName.slice(1).toLowerCase());
 			
 			let petClass = 'filled';
-			if (side === 'searched') {
-				if (normOther && (normPet === normOther || normPet.startsWith(normOther) || normOther.startsWith(normPet))) {
-					petClass += ' war-matched';
-				} else if (normPet && !normOther) {
-					petClass += ' war-missing';
-				}
+			const samePet = normOther && (normPet === normOther || normPet.startsWith(normOther) || normOther.startsWith(normPet));
+			if (samePet) {
+				petClass += ' war-matched';      // ten sam pet
+			} else if (side === 'searched') {
+				petClass += ' war-missing';       // pet u szukanego, inny/brak w bazie
 			} else {
-				if (normOther && (normPet === normOther || normPet.startsWith(normOther) || normOther.startsWith(normPet))) {
-					petClass += ' war-matched';
-				} else if (normPet && !normOther) {
-					petClass += ' war-extra';
-				}
+				petClass += ' war-extra';         // pet w bazie, inny/brak u szukanego
 			}
 			
 			return `<div class="compact-pet ${petClass}">🐾 ${displayName}</div>`;
