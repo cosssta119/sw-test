@@ -138,7 +138,7 @@
                 'settings.online': 'Połączono z bazą danych.', 'settings.offline': 'Brak połączenia z bazą.',
                 'settings.exportTitle': 'Eksport do CSV', 'settings.exportDesc': 'Pobierz wszystkie formacje jako plik CSV', 'settings.exportBtn': 'Eksportuj CSV',
                 'settings.importTitle': 'Import z CSV', 'settings.importDesc': 'Wczytaj formacje z pliku CSV (ten sam format co eksport)', 'settings.importBtn': 'Importuj CSV',
-                'settings.exported': 'Wyeksportowano', 'settings.imported': 'Zaimportowano', 'settings.importEmpty': 'Plik jest pusty lub ma tylko nagłówki', 'settings.importConfirm': 'Dodać nowe formacje do bazy (dotyczy wszystkich graczy)? Liczba:', 'settings.importNothing': 'Brak nowych formacji do dodania', 'settings.importDupes': 'duplikatów pominięto', 'settings.importSkipped': 'błędnych wierszy', 'settings.backupTitle': 'Kopia zapasowa (JSON)', 'settings.backupDesc': 'Pobierz pełną kopię: formacje, bohaterowie, pety, dane Obrony', 'settings.backupBtn': 'Pobierz kopię JSON', 'settings.backupDone': 'Pobrano kopię zapasową', 'settings.restoreTitle': 'Przywróć z kopii (JSON)', 'settings.restoreDesc': 'Wczytaj kopię JSON — dodaje tylko nowe rekordy, istniejące pomija, nic nie kasuje', 'settings.restoreBtn': 'Wczytaj kopię JSON', 'settings.restoreConfirm': 'Przywrócić z kopii? Dodane zostaną tylko nowe rekordy (nic nie jest kasowane). Nowych rekordów:', 'settings.restoreBad': 'Nieprawidłowy plik kopii', 'settings.restoreNothing': 'Kopia nie zawiera nowych rekordów', 'settings.restoreDone': 'Przywrócono z kopii',
+                'settings.exported': 'Wyeksportowano', 'settings.imported': 'Zaimportowano', 'settings.importEmpty': 'Plik jest pusty lub ma tylko nagłówki', 'settings.importConfirm': 'Dodać nowe formacje do bazy (dotyczy wszystkich graczy)? Liczba:', 'settings.importNothing': 'Brak nowych formacji do dodania', 'settings.importDupes': 'duplikatów pominięto', 'settings.importSkipped': 'błędnych wierszy', 'settings.backupTitle': 'Kopia zapasowa (JSON)', 'settings.backupDesc': 'Pobierz pełną kopię: formacje, bohaterowie, pety, dane Obrony', 'settings.backupBtn': 'Pobierz kopię JSON', 'settings.backupDone': 'Pobrano kopię zapasową', 'settings.restoreTitle': 'Przywróć z kopii (JSON)', 'settings.restoreDesc': 'Wczytaj kopię JSON — dodaje tylko nowe rekordy, istniejące pomija, nic nie kasuje', 'settings.restoreBtn': 'Wczytaj kopię JSON', 'settings.restoreConfirm': 'Przywrócić z kopii? Dodane zostaną tylko nowe rekordy (nic nie jest kasowane). Nowych rekordów:', 'settings.restoreBad': 'Nieprawidłowy plik kopii', 'settings.restoreNothing': 'Kopia nie zawiera nowych rekordów', 'settings.restoreDone': 'Przywrócono z kopii', 'settings.statsTitle': 'Statystyki bazy', 'settings.statFormations': 'Formacje', 'settings.statDefense': 'Składy Obrony', 'settings.statHeroes': 'Bohaterowie', 'settings.statPets': 'Pety', 'settings.statBase': 'bazowe', 'settings.statUser': 'dodane', 'settings.statPlayers': 'gracze', 'settings.statPins': 'przypięcia', 'settings.exportScope': 'Zakres', 'settings.scopeAll': 'wszystkie', 'settings.scopeFav': '⭐ ulubione', 'settings.scopeUser': 'dodane', 'settings.scopeBase': 'bazowe', 'settings.lastBackup': 'Ostatnia kopia', 'settings.noBackup': 'Brak kopii w tej przeglądarce', 'settings.restorePreviewTitle': 'Podgląd przywracania', 'settings.restorePreviewDesc': 'Dodane zostaną tylko nowe rekordy — istniejące pominięte, nic nie jest kasowane.', 'settings.diffNone': 'brak nowych', 'settings.defenseCsvTitle': 'Obrona — CSV', 'settings.defenseCsvDesc': 'Eksport/import składów Obrony do arkusza (pełna Obrona jest w kopii JSON wyżej).', 'settings.defExportBtn': 'Eksport Obrony', 'settings.defImportBtn': 'Import Obrony',
                 'admin.title': 'Panel Administratora', 'admin.enterPassword': 'Wpisz hasło administratora', 'admin.passwordPlaceholder': 'Hasło...', 'admin.login': 'ZALOGUJ',
                 'admin.panelTitle': 'Panel Administratora', 'admin.modeActive': 'Tryb Admin aktywny', 'admin.modeDesc': 'Możesz zarządzać bohaterami, petami i usuwać dowolne formacje.',
                 'admin.heroes': 'Bohaterowie', 'admin.pets': 'Pety', 'admin.heroNamePlaceholder': 'Nazwa bohatera', 'admin.petNamePlaceholder': 'Nazwa peta',
@@ -376,7 +376,7 @@
                 'settings.online': 'Connected to database.', 'settings.offline': 'No database connection.',
                 'settings.exportTitle': 'Export to CSV', 'settings.exportDesc': 'Download all formations as CSV file', 'settings.exportBtn': 'Export CSV',
                 'settings.importTitle': 'Import from CSV', 'settings.importDesc': 'Load formations from CSV file (same format as export)', 'settings.importBtn': 'Import CSV',
-                'settings.exported': 'Exported', 'settings.imported': 'Imported', 'settings.importEmpty': 'File is empty or has headers only', 'settings.importConfirm': 'Add new formations to the database (affects all players)? Count:', 'settings.importNothing': 'No new formations to add', 'settings.importDupes': 'duplicates skipped', 'settings.importSkipped': 'invalid rows', 'settings.backupTitle': 'Backup (JSON)', 'settings.backupDesc': 'Download a full backup: formations, heroes, pets, defense data', 'settings.backupBtn': 'Download JSON backup', 'settings.backupDone': 'Backup downloaded', 'settings.restoreTitle': 'Restore from backup (JSON)', 'settings.restoreDesc': 'Load a JSON backup — adds only new records, skips existing, deletes nothing', 'settings.restoreBtn': 'Load JSON backup', 'settings.restoreConfirm': 'Restore from backup? Only new records will be added (nothing is deleted). New records:', 'settings.restoreBad': 'Invalid backup file', 'settings.restoreNothing': 'Backup contains no new records', 'settings.restoreDone': 'Restored from backup',
+                'settings.exported': 'Exported', 'settings.imported': 'Imported', 'settings.importEmpty': 'File is empty or has headers only', 'settings.importConfirm': 'Add new formations to the database (affects all players)? Count:', 'settings.importNothing': 'No new formations to add', 'settings.importDupes': 'duplicates skipped', 'settings.importSkipped': 'invalid rows', 'settings.backupTitle': 'Backup (JSON)', 'settings.backupDesc': 'Download a full backup: formations, heroes, pets, defense data', 'settings.backupBtn': 'Download JSON backup', 'settings.backupDone': 'Backup downloaded', 'settings.restoreTitle': 'Restore from backup (JSON)', 'settings.restoreDesc': 'Load a JSON backup — adds only new records, skips existing, deletes nothing', 'settings.restoreBtn': 'Load JSON backup', 'settings.restoreConfirm': 'Restore from backup? Only new records will be added (nothing is deleted). New records:', 'settings.restoreBad': 'Invalid backup file', 'settings.restoreNothing': 'Backup contains no new records', 'settings.restoreDone': 'Restored from backup', 'settings.statsTitle': 'Database stats', 'settings.statFormations': 'Formations', 'settings.statDefense': 'Defense sets', 'settings.statHeroes': 'Heroes', 'settings.statPets': 'Pets', 'settings.statBase': 'base', 'settings.statUser': 'added', 'settings.statPlayers': 'players', 'settings.statPins': 'pins', 'settings.exportScope': 'Scope', 'settings.scopeAll': 'all', 'settings.scopeFav': '⭐ favorites', 'settings.scopeUser': 'added', 'settings.scopeBase': 'base', 'settings.lastBackup': 'Last backup', 'settings.noBackup': 'No backup in this browser', 'settings.restorePreviewTitle': 'Restore preview', 'settings.restorePreviewDesc': 'Only new records will be added — existing skipped, nothing deleted.', 'settings.diffNone': 'none new', 'settings.defenseCsvTitle': 'Defense — CSV', 'settings.defenseCsvDesc': 'Export/import defense sets to a sheet (full defense is in the JSON backup above).', 'settings.defExportBtn': 'Export defense', 'settings.defImportBtn': 'Import defense',
                 'admin.title': 'Administrator Panel', 'admin.enterPassword': 'Enter administrator password', 'admin.passwordPlaceholder': 'Password...', 'admin.login': 'LOGIN',
                 'admin.panelTitle': 'Administrator Panel', 'admin.modeActive': 'Admin mode active', 'admin.modeDesc': 'You can manage heroes, pets and delete any formations.',
                 'admin.heroes': 'Heroes', 'admin.pets': 'Pets', 'admin.heroNamePlaceholder': 'Hero name', 'admin.petNamePlaceholder': 'Pet name',
@@ -995,6 +995,7 @@
 
 			// Defense: zawsze rerenduj bieżący pod-widok przy wejściu (świeże liczniki/listy)
 			if (name === 'defense') switchDefenseView(currentDefenseView);
+			if (name === 'settings') renderImportStats();
 		}
 
 		// Formatuj datę do czytelnego formatu (z godziną jeśli != 00:00)
@@ -6888,7 +6889,11 @@
         // =====================================================
         // IMPORT / EKSPORT
         // =====================================================
-		function exportToCSV() {
+		function exportToCSV(scope) {
+			const src = scope === 'favorites' ? allFormations.filter(f => favorites.includes(f.id))
+				: scope === 'user' ? allFormations.filter(f => !f.isBase)
+				: scope === 'base' ? allFormations.filter(f => f.isBase)
+				: allFormations;
 			const headers = [
 				'Lp', 'Nazwa',
 				'moja1', 'moja2', 'moja3', 'moja4', 'moja5', 'moja6', 'moja7', 'moja8', 'mojPet',
@@ -6905,7 +6910,7 @@
 				return str;
 			};
 			
-			const rows = allFormations.map(f => {
+			const rows = src.map(f => {
 				// Upewnij się że my i enemy mają 8 elementów
 				const myArr = [...(f.my || [])];
 				const enemyArr = [...(f.enemy || [])];
@@ -6929,7 +6934,7 @@
 			a.href = URL.createObjectURL(blob);
 			a.download = `TABELA_${new Date().toISOString().slice(0,10)}.csv`;
 			a.click();
-			showToast(`${t('settings.exported')} ${allFormations.length} ${t('status.formations')}`);
+			showToast(`${t('settings.exported')} ${src.length} ${t('status.formations')}`);
 		}
 
         // Fingerprint formacji do dedupu (zgodny z checkForExactDuplicate): posortowane nazwy + pety, case-insensitive.
@@ -6954,6 +6959,8 @@
             a.href = URL.createObjectURL(blob);
             a.download = `souls-war-backup_${new Date().toISOString().slice(0,10)}.json`;
             a.click();
+            localStorage.setItem('souls_last_backup', new Date().toISOString());
+            renderImportStats();
             showToast(`💾 ${t('settings.backupDone')} (${allFormations.length} + ${allDefenseFormations.length})`);
         }
 
@@ -6988,20 +6995,126 @@
                     const newDA = DA.filter(x => x && x.id != null && !daIds.has(x.id));
                     const total = newF.length + newH.length + newP.length + newDF.length + newDP.length + newDA.length;
                     if (!total) { showToast(t('settings.restoreNothing')); return; }
-                    if (!confirm(`${t('settings.restoreConfirm')} +${total}\n${t('status.formations')} +${newF.length} · ${t('nav.defense')} +${newDF.length}/${newDP.length}/${newDA.length}`)) return;
-                    const writes = []; // thunki — odpalamy w paczkach po 200, żeby nie zalać Firebase przy dużym backupie
-                    newF.forEach(f => writes.push(() => formationsRef.child(String(f.id)).set(f)));
-                    newH.forEach(h => writes.push(() => heroesRef.child(h.name).set({ name: h.name, race: h.race || 'Human' })));
-                    newP.forEach(p => { const n = typeof p === 'string' ? p : p.name; writes.push(() => petsRef.child(n).set({ name: n })); });
-                    newDF.forEach(x => writes.push(() => defenseFormationsRef.child(String(x.id)).set(x)));
-                    newDP.forEach(x => writes.push(() => defensePlayersRef.child(String(x.id)).set(x)));
-                    newDA.forEach(x => writes.push(() => defenseAssignmentsRef.child(String(x.id)).set(x)));
-                    for (let i = 0; i < writes.length; i += 200) await Promise.all(writes.slice(i, i + 200).map(fn => fn()));
-                    showToast(`♻️ ${t('settings.restoreDone')} (+${total})`);
+                    pendingRestore = { newF, newH, newP, newDF, newDP, newDA, total };
+                    showRestoreDiff();
                 } catch (err) {
                     console.error('Restore error:', err);
                     showToast(`${t('common.error')}: ${err.message}`, true);
                 }
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        }
+
+        // ── Zakładka Import: statystyki, podgląd diff restore, Obrona CSV ──
+        let pendingRestore = null;
+
+        // Liczniki bazy + etykieta ostatniej kopii (wołane przy wejściu na zakładkę Import).
+        function renderImportStats() {
+            const base = allFormations.filter(f => f.isBase).length;
+            const fav = allFormations.filter(f => favorites.includes(f.id)).length;
+            if ($('stat-formations')) $('stat-formations').textContent = allFormations.length.toLocaleString('pl-PL');
+            if ($('stat-formations-sub')) $('stat-formations-sub').textContent = `${t('settings.statBase')} ${base} · ${t('settings.statUser')} ${allFormations.length - base} · ⭐ ${fav}`;
+            const players = allDefensePlayers.filter(p => !p.deletedAt).length;
+            const pins = allDefenseAssignments.filter(a => !a.unassignedAt).length;
+            if ($('stat-defense')) $('stat-defense').textContent = allDefenseFormations.length;
+            if ($('stat-defense-sub')) $('stat-defense-sub').textContent = `${t('settings.statPlayers')} ${players} · ${t('settings.statPins')} ${pins}`;
+            if ($('stat-heroes')) $('stat-heroes').textContent = heroes.length;
+            if ($('stat-pets')) $('stat-pets').textContent = pets.length;
+            const last = localStorage.getItem('souls_last_backup');
+            if ($('last-backup-label')) $('last-backup-label').textContent = last ? `${t('settings.lastBackup')}: ${formatDate(last)}` : t('settings.noBackup');
+        }
+
+        // Podgląd diff przed przywróceniem (modal). pendingRestore ustawia restoreBackupJSON.
+        function showRestoreDiff() {
+            if (!pendingRestore) return;
+            const p = pendingRestore;
+            const esc = s => String(s == null ? '' : s).replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
+            const cat = (label, items, render) => {
+                const shown = items.slice(0, 30).map(render).join('');
+                const more = items.length > 30 ? `<div style="color:var(--text-muted)">… +${items.length - 30}</div>` : '';
+                const body = items.length ? shown + more : `<div style="color:var(--text-muted)">${t('settings.diffNone')}</div>`;
+                return `<div class="diff-cat"><div class="diff-cat-head" onclick="this.parentElement.classList.toggle('open')"><span class="admin-toggle-icon">▶</span> ${label} <span class="c">+${items.length}</span></div><div class="diff-list">${body}</div></div>`;
+            };
+            let html = cat(t('settings.statFormations'), p.newF, f => `<div>#${esc(f.id)} — ${esc(f.name)}</div>`);
+            html += cat(t('settings.statHeroes'), p.newH, h => `<div>${esc(h.name)}</div>`);
+            html += cat(t('settings.statPets'), p.newP, x => `<div>${esc(typeof x === 'string' ? x : x && x.name)}</div>`);
+            html += cat(t('settings.statDefense'), p.newDF, x => `<div>${esc(x.name || '#' + x.id)}</div>`);
+            html += cat(t('settings.statPlayers'), p.newDP, x => `<div>${esc(x.name || '#' + x.id)}</div>`);
+            html += cat(t('settings.statPins'), p.newDA, x => `<div>#${esc(x.id)}</div>`);
+            $('restore-diff-body').innerHTML = html;
+            if ($('restore-confirm-btn')) $('restore-confirm-btn').innerHTML = `✓ ${t('settings.restoreBtn')} (+${p.total})`;
+            $('restore-diff-modal').classList.add('show');
+        }
+        function closeRestoreDiff() { $('restore-diff-modal').classList.remove('show'); pendingRestore = null; }
+        async function confirmRestore() {
+            if (!pendingRestore) return;
+            const p = pendingRestore;
+            $('restore-diff-modal').classList.remove('show');
+            try {
+                const writes = [];
+                p.newF.forEach(f => writes.push(() => formationsRef.child(String(f.id)).set(f)));
+                p.newH.forEach(h => writes.push(() => heroesRef.child(h.name).set({ name: h.name, race: h.race || 'Human' })));
+                p.newP.forEach(x => { const n = typeof x === 'string' ? x : x.name; writes.push(() => petsRef.child(n).set({ name: n })); });
+                p.newDF.forEach(x => writes.push(() => defenseFormationsRef.child(String(x.id)).set(x)));
+                p.newDP.forEach(x => writes.push(() => defensePlayersRef.child(String(x.id)).set(x)));
+                p.newDA.forEach(x => writes.push(() => defenseAssignmentsRef.child(String(x.id)).set(x)));
+                for (let i = 0; i < writes.length; i += 200) await Promise.all(writes.slice(i, i + 200).map(fn => fn()));
+                showToast(`♻️ ${t('settings.restoreDone')} (+${p.total})`);
+            } catch (err) { console.error('Restore error:', err); showToast(`${t('common.error')}: ${err.message}`, true); }
+            pendingRestore = null;
+        }
+
+        // Eksport składów Obrony do CSV (same kompozycje; pełna Obrona z przypięciami siedzi w kopii JSON).
+        function exportDefenseCSV() {
+            const headers = ['id', 'name', 'my1', 'my2', 'my3', 'my4', 'my5', 'my6', 'my7', 'my8', 'myPet', 'comment'];
+            const esc = v => { const s = String(v == null ? '' : v); return /[;,"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+            const rows = allDefenseFormations.map(f => {
+                const my = [...(f.my || [])]; while (my.length < 8) my.push('');
+                return [f.id, esc(f.name), ...my.map(esc), esc(f.myPet), esc(f.comment)].join(';');
+            });
+            const blob = new Blob(['﻿' + [headers.join(';'), ...rows].join('\n')], { type: 'text/csv;charset=utf-8;' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `OBRONA_${new Date().toISOString().slice(0, 10)}.csv`;
+            a.click();
+            showToast(`${t('settings.exported')} ${allDefenseFormations.length}`);
+        }
+
+        async function importDefenseCSV(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            if (!isOnline) { showToast(t('common.noConnection'), true); return; }
+            const reader = new FileReader();
+            reader.onload = async e => {
+                try {
+                    const text = e.target.result;
+                    const sep = ((text.split(/\r?\n/, 1)[0]) || '').includes(';') ? ';' : ',';
+                    const rows = parseCSV(text, sep).filter(r => r.some(c => c.trim() !== ''));
+                    if (rows.length < 2) { showToast(t('settings.importEmpty'), true); return; }
+                    const seen = new Set(allDefenseFormations.map(f => f.fingerprint));
+                    const existingIds = new Set(allDefenseFormations.map(f => f.id));
+                    let maxId = allDefenseFormations.length ? Math.max(...allDefenseFormations.map(f => f.id)) : 0;
+                    const toAdd = []; let skipped = 0, dupes = 0;
+                    for (let i = 1; i < rows.length; i++) {
+                        const v = rows[i];
+                        if (v.length < 11) { skipped++; continue; }
+                        const b = (v[0] || '').match(/^\d+$/) ? 1 : 0;
+                        const my = v.slice(b + 1, b + 9).map(cleanVal);
+                        const myPet = cleanVal(v[b + 9]);
+                        const comment = cleanVal(v[b + 10]);
+                        const fp = defenseFingerprint(my, myPet);
+                        if (seen.has(fp)) { dupes++; continue; }
+                        seen.add(fp);
+                        while (existingIds.has(++maxId));
+                        existingIds.add(maxId);
+                        toAdd.push({ id: maxId, my, myPet, name: cleanVal(v[b]) || `Import #${maxId}`, comment, createdAt: new Date().toISOString(), fingerprint: fp });
+                    }
+                    if (!toAdd.length) { showToast(`${t('settings.importNothing')} (${dupes} ${t('settings.importDupes')}, ${skipped} ${t('settings.importSkipped')})`, true); return; }
+                    if (!confirm(`${t('settings.importConfirm')} ${toAdd.length}\n${dupes} ${t('settings.importDupes')}, ${skipped} ${t('settings.importSkipped')}`)) return;
+                    await Promise.all(toAdd.map(f => defenseFormationsRef.child(String(f.id)).set(f)));
+                    showToast(`${t('settings.imported')} ${toAdd.length}`);
+                } catch (err) { console.error('Defense import error:', err); showToast(`${t('common.error')}: ${err.message}`, true); }
             };
             reader.readAsText(file);
             event.target.value = '';

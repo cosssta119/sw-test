@@ -1558,6 +1558,28 @@
 		}
 		.admin-card-title.clickable { cursor: pointer; user-select: none; }
 		.admin-card .entity-list { background: transparent; padding: 0; margin-bottom: 10px; }
+		/* === Zakładka Import — statystyki, duże przyciski, podgląd diff === */
+		.import-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+		.import-stat { background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; padding: 12px; text-align: center; }
+		.import-stat .num { font-family: 'Cinzel', serif; font-size: 1.5rem; color: var(--accent-gold); line-height: 1; }
+		.import-stat .lbl { font-size: 0.7rem; color: var(--text-muted); margin-top: 4px; }
+		.import-stat .sub { font-size: 0.62rem; color: var(--text-muted); margin-top: 6px; }
+		.import-desc { font-size: 0.75rem; color: var(--text-muted); margin: 2px 0 14px; }
+		.import-field { display: flex; align-items: center; gap: 10px; justify-content: center; margin-bottom: 14px; font-size: 0.82rem; color: var(--text-muted); }
+		.import-actions { display: flex; justify-content: center; }
+		.import-actions .btn { width: 100%; max-width: 320px; font-size: 1rem; padding: 14px; margin-top: 0; }
+		.import-pair { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+		.import-lastbak { font-size: 0.7rem; color: var(--text-muted); text-align: center; margin-top: 10px; }
+		.diff-modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; align-items: center; justify-content: center; padding: 20px; z-index: 1000; }
+		.diff-modal-bg.show { display: flex; }
+		.diff-modal { background: var(--bg-card); border: 1px solid var(--accent-gold); border-radius: 12px; max-width: 460px; width: 100%; max-height: 80vh; overflow: auto; padding: 20px; }
+		.diff-cat { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; overflow: hidden; }
+		.diff-cat-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px; cursor: pointer; background: var(--bg-input); font-size: 0.85rem; }
+		.diff-cat-head .c { margin-left: auto; color: var(--accent-green); font-weight: 700; }
+		.diff-list { display: none; padding: 8px 14px; font-size: 0.78rem; }
+		.diff-cat.open .diff-list { display: block; }
+		.diff-list div { padding: 2px 0; border-bottom: 1px dashed #2a2a2a; }
+		.diff-modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
 		.admin-tile.editing { grid-column: 1 / -1; background: var(--bg-input); flex-wrap: wrap; }
 		.admin-hero-edit-name {
 			flex: 1 1 140px;

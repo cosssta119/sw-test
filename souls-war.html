@@ -754,23 +754,85 @@
                 <strong>🔗 <span data-i18n="settings.status">Status</span>:</strong> <span data-i18n="settings.checking">Sprawdzanie połączenia...</span>
             </div>
             
-            <h3 style="font-size: 0.85rem; color: var(--text-muted); margin: 20px 0 10px;">📤 <span data-i18n="settings.exportTitle">Eksport do CSV</span></h3>
-            <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 10px;" data-i18n="settings.exportDesc">Pobierz wszystkie formacje jako plik CSV</p>
-            <button class="btn" onclick="exportToCSV()">📤 <span data-i18n="settings.exportBtn">Eksportuj CSV</span></button>
-            
-            <h3 style="font-size: 0.85rem; color: var(--text-muted); margin: 25px 0 10px;">📥 <span data-i18n="settings.importTitle">Import z CSV</span></h3>
-            <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 10px;" data-i18n="settings.importDesc">Wczytaj formacje z pliku CSV (ten sam format co eksport)</p>
-            <button class="btn btn-success" onclick="document.getElementById('csv-input').click()">📥 <span data-i18n="settings.importBtn">Importuj CSV</span></button>
-            <input type="file" id="csv-input" accept=".csv" style="display:none" onchange="importFromCSV(event)">
+            <!-- Statystyki bazy -->
+            <div class="admin-card">
+                <h3 class="admin-card-title clickable" onclick="toggleAdminSection('imp-stats')"><span class="admin-toggle-icon" id="imp-stats-toggle">▼</span> 📊 <span data-i18n="settings.statsTitle">Statystyki bazy</span></h3>
+                <div id="imp-stats-body">
+                    <div class="import-stats">
+                        <div class="import-stat"><div class="num" id="stat-formations">0</div><div class="lbl" data-i18n="settings.statFormations">Formacje</div><div class="sub" id="stat-formations-sub"></div></div>
+                        <div class="import-stat"><div class="num" id="stat-defense">0</div><div class="lbl" data-i18n="settings.statDefense">Składy Obrony</div><div class="sub" id="stat-defense-sub"></div></div>
+                        <div class="import-stat"><div class="num" id="stat-heroes">0</div><div class="lbl" data-i18n="settings.statHeroes">Bohaterowie</div></div>
+                        <div class="import-stat"><div class="num" id="stat-pets">0</div><div class="lbl" data-i18n="settings.statPets">Pety</div></div>
+                    </div>
+                </div>
+            </div>
 
-            <h3 style="font-size: 0.85rem; color: var(--text-muted); margin: 25px 0 10px;">💾 <span data-i18n="settings.backupTitle">Kopia zapasowa (JSON)</span></h3>
-            <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 10px;" data-i18n="settings.backupDesc">Pobierz pełną kopię: formacje, bohaterowie, pety, dane Obrony</p>
-            <button class="btn" onclick="exportBackupJSON()">💾 <span data-i18n="settings.backupBtn">Pobierz kopię JSON</span></button>
+            <!-- Eksport CSV -->
+            <div class="admin-card">
+                <h3 class="admin-card-title clickable" onclick="toggleAdminSection('imp-exportcsv')"><span class="admin-toggle-icon" id="imp-exportcsv-toggle">▼</span> 📤 <span data-i18n="settings.exportTitle">Eksport do CSV</span></h3>
+                <div id="imp-exportcsv-body">
+                    <p class="import-desc" data-i18n="settings.exportDesc">Pobierz formacje jako plik CSV.</p>
+                    <div class="import-field"><span data-i18n="settings.exportScope">Zakres</span>:
+                        <select id="export-scope" class="admin-config-select">
+                            <option value="all" data-i18n="settings.scopeAll">wszystkie</option>
+                            <option value="favorites" data-i18n="settings.scopeFav">⭐ ulubione</option>
+                            <option value="user" data-i18n="settings.scopeUser">dodane</option>
+                            <option value="base" data-i18n="settings.scopeBase">bazowe</option>
+                        </select>
+                    </div>
+                    <div class="import-actions"><button class="btn" onclick="exportToCSV($('export-scope').value)">📤 <span data-i18n="settings.exportBtn">Eksportuj CSV</span></button></div>
+                </div>
+            </div>
 
-            <h3 style="font-size: 0.85rem; color: var(--text-muted); margin: 25px 0 10px;">♻️ <span data-i18n="settings.restoreTitle">Przywróć z kopii (JSON)</span></h3>
-            <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 10px;" data-i18n="settings.restoreDesc">Wczytaj kopię JSON — dodaje tylko nowe rekordy, istniejące pomija, nic nie kasuje</p>
-            <button class="btn btn-success" onclick="document.getElementById('json-input').click()">♻️ <span data-i18n="settings.restoreBtn">Wczytaj kopię JSON</span></button>
-            <input type="file" id="json-input" accept=".json,application/json" style="display:none" onchange="restoreBackupJSON(event)">
+            <!-- Import CSV -->
+            <div class="admin-card">
+                <h3 class="admin-card-title clickable" onclick="toggleAdminSection('imp-importcsv')"><span class="admin-toggle-icon" id="imp-importcsv-toggle">▼</span> 📥 <span data-i18n="settings.importTitle">Import z CSV</span></h3>
+                <div id="imp-importcsv-body">
+                    <p class="import-desc" data-i18n="settings.importDesc">Wczytaj formacje z CSV (duplikaty pomijane, z potwierdzeniem).</p>
+                    <div class="import-actions"><button class="btn btn-success" onclick="document.getElementById('csv-input').click()">📥 <span data-i18n="settings.importBtn">Importuj CSV</span></button></div>
+                    <input type="file" id="csv-input" accept=".csv" style="display:none" onchange="importFromCSV(event)">
+                </div>
+            </div>
+
+            <!-- Kopia / przywracanie JSON -->
+            <div class="admin-card">
+                <h3 class="admin-card-title clickable" onclick="toggleAdminSection('imp-json')"><span class="admin-toggle-icon" id="imp-json-toggle">▼</span> 💾 <span data-i18n="settings.backupTitle">Kopia zapasowa (JSON)</span></h3>
+                <div id="imp-json-body">
+                    <p class="import-desc" data-i18n="settings.backupDesc">Pełna kopia (formacje + bohaterowie + pety + Obrona). Przywracanie dodaje tylko nowe rekordy.</p>
+                    <div class="import-pair">
+                        <button class="btn" onclick="exportBackupJSON()">💾 <span data-i18n="settings.backupBtn">Pobierz kopię</span></button>
+                        <button class="btn btn-secondary" onclick="document.getElementById('json-input').click()">♻️ <span data-i18n="settings.restoreBtn">Przywróć z kopii</span></button>
+                    </div>
+                    <div class="import-lastbak" id="last-backup-label"></div>
+                    <input type="file" id="json-input" accept=".json,application/json" style="display:none" onchange="restoreBackupJSON(event)">
+                </div>
+            </div>
+
+            <!-- Obrona CSV -->
+            <div class="admin-card">
+                <h3 class="admin-card-title clickable" onclick="toggleAdminSection('imp-defcsv')"><span class="admin-toggle-icon" id="imp-defcsv-toggle">▶</span> 🛡️ <span data-i18n="settings.defenseCsvTitle">Obrona — CSV</span></h3>
+                <div id="imp-defcsv-body" style="display:none">
+                    <p class="import-desc" data-i18n="settings.defenseCsvDesc">Eksport/import składów Obrony do arkusza (pełna Obrona jest w kopii JSON wyżej).</p>
+                    <div class="import-pair">
+                        <button class="btn btn-secondary" onclick="exportDefenseCSV()">📤 <span data-i18n="settings.defExportBtn">Eksport Obrony</span></button>
+                        <button class="btn btn-secondary" onclick="document.getElementById('defcsv-input').click()">📥 <span data-i18n="settings.defImportBtn">Import Obrony</span></button>
+                    </div>
+                    <input type="file" id="defcsv-input" accept=".csv" style="display:none" onchange="importDefenseCSV(event)">
+                </div>
+            </div>
+
+            <!-- Modal: podgląd diff przed restore JSON -->
+            <div class="diff-modal-bg" id="restore-diff-modal" onclick="if(event.target===this) closeRestoreDiff()">
+                <div class="diff-modal">
+                    <h3>♻️ <span data-i18n="settings.restorePreviewTitle">Podgląd przywracania</span></h3>
+                    <p class="import-desc" data-i18n="settings.restorePreviewDesc">Dodane zostaną tylko nowe rekordy — istniejące pominięte, nic nie jest kasowane.</p>
+                    <div id="restore-diff-body"></div>
+                    <div class="diff-modal-actions">
+                        <button class="btn btn-secondary" onclick="closeRestoreDiff()"><span data-i18n="duplicates.cancel">Anuluj</span></button>
+                        <button class="btn btn-success" id="restore-confirm-btn" onclick="confirmRestore()">✓ <span data-i18n="settings.restoreBtn">Przywróć</span></button>
+                    </div>
+                </div>
+            </div>
             
         </div>
     </div>
