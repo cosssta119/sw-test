@@ -1562,10 +1562,11 @@
 		.admin-card .entity-list { background: transparent; padding: 0; margin-bottom: 10px; }
 		/* === Zakładka Import — statystyki, duże przyciski, podgląd diff === */
 		/* Dopasowanie do makiety: węższa kolumna, złote tytuły do lewej, podświetlenie segmentu na hover */
-		#tab-settings .section { max-width: 600px; margin-left: auto; margin-right: auto; }
-		/* Admin: węższe karty (margin auto), ale Bohaterowie/Pety zostają na pełną szerokość (admin-card-wide) */
-		#tab-admin .admin-card { max-width: 600px; margin-left: auto; margin-right: auto; }
-		#tab-admin .admin-card.admin-card-wide { max-width: none; }
+		#tab-settings .section { max-width: 600px; }
+		/* Admin: jednolite wąskie karty do lewej (Bohaterowie/Pety też — listy chipów zawijają się w kolumnie) */
+		#tab-admin .admin-card { max-width: 600px; }
+		#tools-body .btn { width: auto; } /* przycisk w Narzędziach: normalna szerokość, nie na całą kartę */
+		#tools-body > div { justify-content: flex-start !important; }
 		.import-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 		.import-stat { background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; padding: 12px; text-align: center; }
 		.import-stat .num { font-family: 'Cinzel', serif; font-size: 1.5rem; color: var(--accent-gold); line-height: 1; }
