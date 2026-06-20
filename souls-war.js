@@ -158,7 +158,7 @@
                 'admin.dragHint': 'Przeciągnij, aby zmienić kolejność',
                 'admin.configHint': 'Zmiana działa dla wszystkich graczy gildii.', 'admin.configSaved': 'Zapisano konfigurację',
                 'admin.configInvalidDays': 'Podaj liczbę dni większą od 0!', 'admin.configInvalidMin': 'Podaj próg trafności większy od 0!',
-                'admin.petAdded': 'Dodano peta', 'admin.petExists': 'Pet już istnieje!', 'admin.enterHeroName': 'Podaj nazwę bohatera!', 'admin.enterPetName': 'Podaj nazwę peta!',
+                'admin.petAdded': 'Dodano peta', 'admin.petExists': 'Pet już istnieje!', 'admin.enterHeroName': 'Podaj nazwę bohatera!', 'admin.enterPetName': 'Podaj nazwę peta!', 'admin.invalidKey': 'Nazwa nie może zawierać znaków . # $ [ ] /',
                 'admin.confirmDeleteHero': 'Usunąć bohatera', 'admin.confirmDeletePet': 'Usunąć peta',
                 'quickSelect.title': 'Szybki wybór', 'quickSelect.selectFor': 'Wybierz dla',
                 'quickTags.expandAll': 'Rozwiń wszystkie tagi', 'quickTags.collapseAll': 'Zwiń wszystkie tagi', 'quickTags.pets': 'Pety',
@@ -396,7 +396,7 @@
                 'admin.dragHint': 'Drag to reorder',
                 'admin.configHint': 'Applies to all guild players.', 'admin.configSaved': 'Configuration saved',
                 'admin.configInvalidDays': 'Enter a number of days greater than 0!', 'admin.configInvalidMin': 'Enter a match threshold greater than 0!',
-                'admin.petAdded': 'Pet added', 'admin.petExists': 'Pet already exists!', 'admin.enterHeroName': 'Enter hero name!', 'admin.enterPetName': 'Enter pet name!',
+                'admin.petAdded': 'Pet added', 'admin.petExists': 'Pet already exists!', 'admin.enterHeroName': 'Enter hero name!', 'admin.enterPetName': 'Enter pet name!', 'admin.invalidKey': 'Name cannot contain . # $ [ ] / characters',
                 'admin.confirmDeleteHero': 'Delete hero', 'admin.confirmDeletePet': 'Delete pet',
                 'quickSelect.title': 'Quick select', 'quickSelect.selectFor': 'Select for',
                 'quickTags.expandAll': 'Expand all', 'quickTags.collapseAll': 'Collapse all', 'quickTags.pets': 'Pets',
@@ -2008,7 +2008,7 @@
 								<span class="result-id">ID: ${f.id}${f.isBase ? '' : ` <span class="badge user-badge">${t('badge.user')}</span>`}${isNewFormation(f) ? ` <span class="badge new-badge">${t('badge.new')}</span>` : ''}</span>
 								<span class="match-score match-${Math.min(Math.floor(r.score), 6)}">${r.score}/${r.maxScore}</span>
 							</div>
-							<div class="result-name">${f.name}</div>
+							<div class="result-name">${escapeHtml(f.name)}</div>
 							<div class="result-heroes">${t('search.enemy')}: ${enemyDisplay} + ${petDisplay}</div>
 							<div class="result-heroes result-my-heroes">⚔️ Kontra: ${f.my.filter(h => h).map(h => `<span class="my-hero">${h}</span>`).join(', ') || '—'}${f.myPet ? ` + <span class="my-pet">${f.myPet}</span>` : ''}</div>
 							${missingHeroes.length ? `<div class="result-missing">❌ ${t('search.missing')}: ${missingHeroes.join(', ')}</div>` : ''}
@@ -2130,9 +2130,9 @@
 		function isFormationExcluded(formation) {
 			if (excludedHeroes.length === 0) return { excluded: false, heroes: [] };
 			
-			const myHeroes = formation.my.filter(h => h).map(h => h.toLowerCase());
+			const myHeroes = formation.my.filter(h => h).map(h => normalize(h));
 			const excludedInFormation = excludedHeroes.filter(ex => 
-				myHeroes.includes(ex.toLowerCase())
+				myHeroes.includes(normalize(ex))
 			);
 			
 			return {
@@ -2601,7 +2601,7 @@
 				<div class="db-item ${hasExcluded ? 'has-excluded' : ''}" onclick="showFormation(${f.id})">
 					<div class="db-item-info">
 						<div class="db-item-header"><span class="db-item-id">#${f.id}</span><span class="badge ${f.isBase ? 'base-badge' : 'user-badge'}">${t(f.isBase ? 'badge.base' : 'badge.user')}</span>${isNewFormation(f) ? `<span class="badge new-badge">${t('badge.new')}</span>` : ''}</div>
-						<div class="db-item-name">${f.name}</div>
+						<div class="db-item-name">${escapeHtml(f.name)}</div>
 						<div class="db-item-details"><div>⚔️ ${f.my.filter(h => h).join(', ') || '—'} + ${f.myPet || '—'}</div><div>👹 ${f.enemy.filter(h => h).join(', ') || '—'} + ${f.enemyPet || '—'}</div></div>
 						${f.comment ? `<div class="result-comment clamped" onclick="event.stopPropagation(); this.classList.toggle('clamped')" title="${t('search.toggleComment')}"><span class="comment-icon">💬</span>${escapeHtml(f.comment)}</div>` : ''}
 						${hasExcluded ? `<div style="font-size:0.65rem;color:#f44336;margin-top:3px;">🚫 ${exclusionCheck.heroes.join(', ')}</div>` : ''}
@@ -2723,7 +2723,7 @@
 					<div class="compare-card">
 						<div class="compare-card-header">
 							<span class="compare-card-id">#${f.id} ${f.isBase ? '👑' : ''}</span>
-							<span class="compare-card-name" title="${f.name}">${f.name}</span>
+							<span class="compare-card-name" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</span>
 						</div>
 						<div class="compare-card-body">
 							<div class="battle-section enemy">
@@ -2740,7 +2740,7 @@
 								<div class="battle-title player-title"><span class="title-icon">⚔️</span>${t('preview.yourTeam')}</div>
 							</div>
 							
-							${f.comment ? `<div class="compare-comment">💬 ${f.comment}</div>` : ''}
+							${f.comment ? `<div class="compare-comment">💬 ${escapeHtml(f.comment)}</div>` : ''}
 						</div>
 					</div>
 				`;
@@ -2928,7 +2928,7 @@
 			$('formation-display').innerHTML = `
 				<div class="formation-preview" id="formation-preview-export">
 					<div class="preview-header">
-						<div class="preview-title"><span class="preview-id">#${f.id}</span>${f.name}<span class="formation-type-badge ${f.isBase ? 'base' : 'user'}">${t(f.isBase ? 'badge.base' : 'badge.user')}</span></div>
+						<div class="preview-title"><span class="preview-id">#${f.id}</span>${escapeHtml(f.name)}<span class="formation-type-badge ${f.isBase ? 'base' : 'user'}">${t(f.isBase ? 'badge.base' : 'badge.user')}</span></div>
 						<div class="preview-actions">
 							<button class="btn btn-small btn-secondary" onclick="exportSingleFormationAsText()">📋 Kopiuj skład tekstowo</button>
 							<button class="btn btn-small btn-secondary" onclick="copyFormationLink(${id})" title="Kopiuj link">🔗</button>
@@ -2953,7 +2953,7 @@
 						<div style="text-align:center">${renderBattlePet(f.myPet)}</div>
 						<div class="battle-title player-title"><span class="title-icon">⚔️</span>${t('preview.yourTeam')}</div>
 					</div>
-					${f.comment ? `<div class="preview-comment"><span class="comment-icon">💬</span>${f.comment}</div>` : ''}
+					${f.comment ? `<div class="preview-comment"><span class="comment-icon">💬</span>${escapeHtml(f.comment)}</div>` : ''}
 				</div>
 				${similarHtml}`;
 		}
@@ -3043,7 +3043,7 @@
 							: similar.map(f => `
 								<div class="similar-formation-item" onclick="showFormation(${f.id})">
 									<div class="similar-formation-info">
-										<div class="similar-formation-name">${f.name}</div>
+										<div class="similar-formation-name">${escapeHtml(f.name)}</div>
 										<div class="similar-formation-heroes">⚔️ ${f.my.filter(h => h).join(', ') || '—'} + ${f.myPet || '—'}</div>
 									</div>
 									<span class="similar-formation-id">#${f.id}</span>
@@ -3069,8 +3069,8 @@
 
         function getEnemyKey(formation) {
             // Tworzymy unikalny klucz dla przeciwnika (sortowane dla spójności)
-            const enemyHeroes = formation.enemy.filter(h => h).map(h => h.toLowerCase()).sort();
-            const enemyPet = (formation.enemyPet || '').toLowerCase();
+            const enemyHeroes = formation.enemy.filter(h => h).map(h => normalize(h)).sort();
+            const enemyPet = normalize(formation.enemyPet);
             return enemyHeroes.join('|') + '||' + enemyPet;
         }
 
@@ -3610,7 +3610,7 @@
 					<h4>⚠️ ${t('duplicates.warningTitle')}</h4>
 					<p>${t('duplicates.warningText')}</p>
 					<div style="background: rgba(0,0,0,0.2); padding: 10px; border-radius: 8px; margin: 10px 0;">
-						<strong>#${existing.id}</strong> - "${existing.name}"
+						<strong>#${existing.id}</strong> - "${escapeHtml(existing.name)}"
 						${existing.isBase ? '<span style="color: var(--accent-gold);"> 👑 BAZA</span>' : ''}
 					</div>
 					<div class="duplicate-warning-actions">
@@ -5146,7 +5146,7 @@
 							${f.comment ? `
 								<div class="war-comment-section">
 									<div class="war-comment-label">💬 ${t('war.comment')}</div>
-									<div class="war-comment-text">${f.comment}</div>
+									<div class="war-comment-text">${escapeHtml(f.comment)}</div>
 								</div>
 							` : `
 								<div class="war-comment-section">
@@ -5916,7 +5916,7 @@
 				return `
 					<div class="kreator-saved-item" onclick="loadKreatorSaved(${saved.id})">
 						<div class="kreator-saved-item-header">
-							<span class="kreator-saved-item-name">${saved.name}</span>
+							<span class="kreator-saved-item-name">${escapeHtml(saved.name)}</span>
 							<div style="display:flex;align-items:center;gap:8px;">
 								<span class="kreator-saved-item-date">${getTimeAgo(new Date(saved.timestamp))}</span>
 								<button class="btn btn-small btn-secondary" onclick="deleteKreatorSaved(${saved.id}, event)" title="Usuń">🗑️</button>
@@ -7343,6 +7343,7 @@
             const newName = $('edit-hero-name').value.trim();
             const newRace = $('edit-hero-race').value;
             if (!newName) { showToast(t('admin.enterHeroName'), true); return; }
+            if (/[.#$\[\]\/]/.test(newName)) { showToast(t('admin.invalidKey'), true); return; }
 
             const nameChanged = newName !== oldName;
             if (nameChanged && heroes.some(h => h.name !== oldName && h.name.toLowerCase() === newName.toLowerCase())) {
@@ -7433,6 +7434,7 @@
 
             const newName = $('edit-pet-name').value.trim();
             if (!newName) { showToast(t('admin.enterPetName'), true); return; }
+            if (/[.#$\[\]\/]/.test(newName)) { showToast(t('admin.invalidKey'), true); return; }
             if (newName === oldName) { cancelPetEdit(); return; }
             if (pets.some(p => p.toLowerCase() === newName.toLowerCase())) {
                 showToast(t('admin.petExists'), true); return;
@@ -7516,6 +7518,7 @@
             const name = $('new-hero-name').value.trim();
             const race = $('new-hero-race').value;
             if (!name) { showToast(t('admin.enterHeroName'), true); return; }
+            if (/[.#$\[\]\/]/.test(name)) { showToast(t('admin.invalidKey'), true); return; }
             if (heroes.some(h => h.name.toLowerCase() === name.toLowerCase())) { showToast(t('admin.heroExists'), true); return; }
             try {
                 await heroesRef.child(name).set({ name, race });
@@ -7533,6 +7536,7 @@
         async function addPet() {
             const name = $('new-pet-name').value.trim();
             if (!name) { showToast(t('admin.enterPetName'), true); return; }
+            if (/[.#$\[\]\/]/.test(name)) { showToast(t('admin.invalidKey'), true); return; }
             if (pets.some(p => p.toLowerCase() === name.toLowerCase())) { showToast(t('admin.petExists'), true); return; }
             try {
                 await petsRef.child(name).set({ name });
@@ -7682,7 +7686,7 @@
 						${group.formations.map(f => `
 							<div class="duplicate-item">
 								<div class="duplicate-item-info">
-									<span class="duplicate-item-name">${f.name}</span>
+									<span class="duplicate-item-name">${escapeHtml(f.name)}</span>
 									<span class="duplicate-item-id">#${f.id} ${f.isBase ? '👑 BAZA' : ''}</span>
 								</div>
 								<div class="duplicate-item-actions">
@@ -7700,7 +7704,7 @@
 			const f = allFormations.find(x => x.id === id);
 			if (!f) return;
 			
-			$('dup-preview-title').innerHTML = `👁️ #${f.id} - ${f.name} ${f.isBase ? '<span style="color: var(--accent-gold);">👑 BAZA</span>' : ''}`;
+			$('dup-preview-title').innerHTML = `👁️ #${f.id} - ${escapeHtml(f.name)} ${f.isBase ? '<span style="color: var(--accent-gold);">👑 BAZA</span>' : ''}`;
 			
 			$('dup-preview-content').innerHTML = `
 				<div class="formation-preview" style="margin-top: 15px;">
@@ -7718,7 +7722,7 @@
 						<div class="battle-title player-title"><span class="title-icon">⚔️</span>${t('preview.yourTeam')}</div>
 					</div>
 					
-					${f.comment ? `<div class="preview-comment"><span class="comment-icon">💬</span>${f.comment}</div>` : ''}
+					${f.comment ? `<div class="preview-comment"><span class="comment-icon">💬</span>${escapeHtml(f.comment)}</div>` : ''}
 				</div>
 				
 				<div style="margin-top: 20px; display: flex; gap: 10px; justify-content: center;">
