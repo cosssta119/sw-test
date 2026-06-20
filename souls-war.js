@@ -132,7 +132,7 @@
                 'preview.recentlyViewed': 'Ostatnio przeglądane', 'preview.noRecent': 'Brak historii',                'add.title': 'Dodaj nową formację', 'add.nameLabel': 'Nazwa formacji', 'add.namePlaceholder': 'np. Nick 01-01-2026 W1 / Kontra Dark-Undead v1',
                 'add.yourTeam': 'Twój skład', 'add.enemyTeam': 'Skład przeciwnika', 'add.swapSections': 'Zamień kolejność','add.commentLabel': 'Komentarz (opcjonalnie)',
                 'add.commentPlaceholder': 'np. Unikać Death, Silbren u przeciwnika, kolejność speed: xxx > yyy > zzz, Pao runa PR, itp.', 'add.saveBtn': 'ZAPISZ FORMACJĘ',
-                'add.addAtLeastOne': 'Dodaj przynajmniej jedną postać!',
+                'add.addAtLeastOne': 'Dodaj przynajmniej jedną postać!', 'add.tooManyHeroes': 'Maks. 5 bohaterów w składzie (pet liczony osobno)!',
                 'add.unknownHeroes': 'Nieznani bohaterowie', 'add.unknownPets': 'Nieznane pety', 'add.saved': 'Zapisano formację',
                 'settings.title': 'Import / Eksport', 'settings.status': 'Status', 'settings.checking': 'Sprawdzanie połączenia...',
                 'settings.online': 'Połączono z bazą danych.', 'settings.offline': 'Brak połączenia z bazą.',
@@ -295,7 +295,7 @@
 				'defense.playerAdded': 'Dodano gracza',
 				'defense.confirmDeletePlayer': 'Usunąć gracza {name}? (Składy zostaną, przypięcia będą oznaczone jako odpięte)',
 				'defense.playerDeleted': 'Gracz usunięty',
-				'defense.formationEmpty': 'Skład musi mieć przynajmniej jednego bohatera!',
+				'defense.formationEmpty': 'Skład musi mieć przynajmniej jednego bohatera!', 'defense.tooManyHeroes': 'Maks. 5 bohaterów w składzie (pet liczony osobno)!',
 				'defense.unknownHero': 'Nieznany bohater',
 				'defense.unknownPet': 'Nieznany pet',
 				'defense.formationSaved': 'Skład zapisany',
@@ -370,7 +370,7 @@
                 'add.title': 'Add new formation', 'add.nameLabel': 'Formation name', 'add.namePlaceholder': 'e.g. Nick 01-01-2026 W1 / Counter Dark-Undead v1',
                 'add.yourTeam': 'Your team', 'add.enemyTeam': 'Enemy team', 'add.swapSections': 'Swap order', 'add.commentLabel': 'Comment (optional)',
                 'add.commentPlaceholder': 'e.g. Avoid Death, Silbren on enemy, speed order: xxx > yyy > zzz, Pao rune PR, etc.', 'add.saveBtn': 'SAVE FORMATION',
-                'add.addAtLeastOne': 'Add at least one hero!',
+                'add.addAtLeastOne': 'Add at least one hero!', 'add.tooManyHeroes': 'Max 5 heroes per formation (pet counted separately)!',
                 'add.unknownHeroes': 'Unknown heroes', 'add.unknownPets': 'Unknown pets', 'add.saved': 'Formation saved',
                 'settings.title': 'Import / Export', 'settings.status': 'Status', 'settings.checking': 'Checking connection...',
                 'settings.online': 'Connected to database.', 'settings.offline': 'No database connection.',
@@ -534,7 +534,7 @@
 				'defense.playerAdded': 'Player added',
 				'defense.confirmDeletePlayer': 'Delete player {name}? (Formations stay; pins will be marked as unpinned)',
 				'defense.playerDeleted': 'Player deleted',
-				'defense.formationEmpty': 'Formation must have at least one hero!',
+				'defense.formationEmpty': 'Formation must have at least one hero!', 'defense.tooManyHeroes': 'Max 5 heroes per formation (pet counted separately)!',
 				'defense.unknownHero': 'Unknown hero',
 				'defense.unknownPet': 'Unknown pet',
 				'defense.formationSaved': 'Formation saved',
@@ -3532,6 +3532,7 @@
 				return; 
 			}
 			
+			if (my.filter(h => h).length > 5 || enemy.filter(h => h).length > 5) { showToast(t('add.tooManyHeroes'), true); return; }
 			const allHeroNames = heroes.map(h => h.name.toLowerCase());
 			const invalidHeroes = [...my, ...enemy].filter(h => h && !allHeroNames.includes(h.toLowerCase()));
 			if (invalidHeroes.length) { 
@@ -5803,6 +5804,7 @@
 				return;
 			}
 			
+			if (formations.some(f => f.heroes.filter(h => h).length > 5)) { showToast(t('add.tooManyHeroes'), true); return; }
 			const defaultName = `Skład ${kreatorSaved.length + 1}`;
 			const name = prompt('Nazwa dla tego zestawu:', defaultName);
 			if (name === null) return;
@@ -6103,6 +6105,7 @@
             if (myPet && !pets.some(p => getPetName(p).toLowerCase() === myPet.toLowerCase())) {
                 showToast('❌ ' + t('defense.unknownPet') + ': ' + myPet, true); return { ok: false };
             }
+            if (my.filter(h => h && h.trim()).length > 5) { showToast('❌ ' + t('defense.tooManyHeroes'), true); return { ok: false }; }
 
             const fp = defenseFingerprint(my, myPet);
             const existing = findDefenseFormationByFingerprint(fp);
@@ -6236,6 +6239,7 @@
             if (newPet && !pets.some(p => getPetName(p).toLowerCase() === newPet.toLowerCase())) {
                 showToast('❌ ' + t('defense.unknownPet') + ': ' + newPet, true); return;
             }
+            if (newMy.filter(h => h && h.trim()).length > 5) { showToast('❌ ' + t('defense.tooManyHeroes'), true); return; }
 
             const oldFp = old.fingerprint;
             const newFp = defenseFingerprint(newMy, newPet);
