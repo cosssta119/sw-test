@@ -121,7 +121,7 @@
                 'search.title': 'Szukaj kontr-formacji', 'search.subtitle': 'Wpisz skład przeciwnika (lub wybierz tagami)', 'search.btn': 'SZUKAJ', 'search.clear': 'Wyczyść',
                 'search.emptyState': 'Wpisz postacie przeciwnika i kliknij "Szukaj"', 'search.results': 'Wyniki', 'search.found': 'Znaleziono', 'search.noResults': 'Nie znaleziono pasujących formacji',
                 'search.enemy': 'Przeciwnik', 'search.missing': 'Brak', 'search.allSlotsFull': 'Wszystkie pola zajęte!', 'search.petSlotFull': 'Pole Pet już zajęte!',
-                'search.enterAtLeastOne': 'Wpisz przynajmniej jedną postać!', 'search.selected': 'Wybrano',
+                'search.enterAtLeastOne': 'Wpisz przynajmniej jedną postać!', 'search.selected': 'Wybrano', 'search.maxHeroes': 'wróg ma maks. 5 bohaterów',
                 'search.dataLoading': '⏳ Czekam na dane z bazy…',
                 'database.title': 'Pełna baza formacji', 'database.statsAll': 'Wszystkich', 'database.statsBase': 'Bazowych', 'database.statsUser': 'Dodanych',
                 'database.filterAll': 'Wszystkie', 'database.filterBase': 'Bazowe', 'database.filterUser': 'Dodane', 'database.filterFavorites': 'Ulubione',
@@ -359,7 +359,7 @@
                 'search.title': 'Search counter-formations', 'search.subtitle': 'Enter enemy composition (or use tags)', 'search.btn': 'SEARCH', 'search.clear': 'Clear',
                 'search.emptyState': 'Enter enemy heroes and click "Search"', 'search.results': 'Results', 'search.found': 'Found', 'search.noResults': 'No matching formations found',
                 'search.enemy': 'Enemy', 'search.missing': 'Missing', 'search.allSlotsFull': 'All slots are full!', 'search.petSlotFull': 'Pet slot is full!',
-                'search.enterAtLeastOne': 'Enter at least one hero!', 'search.selected': 'Selected',
+                'search.enterAtLeastOne': 'Enter at least one hero!', 'search.selected': 'Selected', 'search.maxHeroes': 'enemy has max 5 heroes',
                 'search.dataLoading': '⏳ Waiting for database…',
                 'database.title': 'Full formation database', 'database.statsAll': 'Total', 'database.statsBase': 'Base', 'database.statsUser': 'Added',
                 'database.filterAll': 'All', 'database.filterBase': 'Base', 'database.filterUser': 'Added', 'database.filterFavorites': 'Favorites',
@@ -1861,7 +1861,8 @@
 		}
 
         function updateSearchCounter() {
-            let count = getFieldValues('search-pos', 8).filter(v => v).length;
+            const heroCount = getFieldValues('search-pos', 8).filter(v => v).length;
+            let count = heroCount;
             if ($('search-pet').value.trim()) count++;
             
             let counter = $('search-counter');
@@ -1872,7 +1873,7 @@
                     counter.className = 'search-counter';
                     $('quick-tags-container').parentNode.insertBefore(counter, $('quick-tags-container').nextSibling);
                 }
-                counter.innerHTML = `${t('search.selected')}: <strong>${count}</strong> / 6`;
+                counter.innerHTML = `${t('search.selected')}: <strong>${count}</strong> / 6${heroCount > 5 ? ` <span style="color:#e0a030;font-size:0.78rem;font-weight:600;margin-left:8px;">⚠️ ${t('search.maxHeroes')}</span>` : ''}`;
             } else counter?.remove();
         }
 
