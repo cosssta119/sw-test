@@ -42,6 +42,7 @@
 			--accent-green: #2e7d32;
 			--accent-purple: #6a1b9a;
 			--accent-blue: #1e3a5f;
+			--admin-frame: #b22a2a;
 			--text-light: #e8e8e8;
 			--text-muted: #888;
 			--border: #333;
@@ -1350,7 +1351,7 @@
 		}
 		
 		.info-box strong { color: var(--accent-gold); }
-		.info-box.admin { border-left-color: var(--accent-purple); background: rgba(106, 27, 154, 0.1); }
+		.info-box.admin { border-left-color: var(--admin-frame); background: rgba(178, 42, 42, 0.1); }
 
 		/* ===== TOAST ===== */
 		.toast {
@@ -1435,8 +1436,8 @@
 		.compare-modal-content { max-width: 98vw !important; width: 1400px !important; max-height: 90vh !important; overflow-y: auto !important; }
 
 		/* ===== ADMIN PANEL ===== */
-		.admin-section { border: 2px solid var(--accent-purple); }
-		.admin-section h2 { color: var(--accent-purple); }
+		.admin-section { border: 2px solid var(--admin-frame); }
+		.admin-section h2 { color: var(--admin-frame); }
 
 		.entity-list {
 			background: var(--bg-input);
@@ -1562,11 +1563,12 @@
 		.admin-card .entity-list { background: transparent; padding: 0; margin-bottom: 10px; }
 		/* === Zakładka Import — statystyki, duże przyciski, podgląd diff === */
 		/* Dopasowanie do makiety: węższa kolumna, złote tytuły do lewej, podświetlenie segmentu na hover */
-		#tab-settings .section { max-width: 600px; }
-		/* Admin: jednolite wąskie karty do lewej (Bohaterowie/Pety też — listy chipów zawijają się w kolumnie) */
-		#tab-admin .admin-card { max-width: 600px; }
+		#tab-settings .section { max-width: 600px; margin-left: auto; margin-right: auto; }
+		/* Admin: jednolite i wyśrodkowane; ramka/nagłówek (680px) trochę szersze niż karty (600px) */
+		#tab-admin .section { max-width: 680px; margin-left: auto; margin-right: auto; }
+		#tab-admin .admin-card { max-width: 600px; margin-left: auto; margin-right: auto; }
+		#tab-admin .info-box { max-width: 600px; margin-left: auto; margin-right: auto; } /* info-box na szerokość kart (600px) */
 		#tools-body .btn { width: auto; } /* przycisk w Narzędziach: normalna szerokość, nie na całą kartę */
-		#tools-body > div { justify-content: flex-start !important; }
 		.import-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 		.import-stat { background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; padding: 12px; text-align: center; }
 		.import-stat .num { font-family: 'Cinzel', serif; font-size: 1.5rem; color: var(--accent-gold); line-height: 1; }
@@ -2968,9 +2970,9 @@
 		[data-theme="light"] .loading-overlay { background: rgba(248, 245, 240, 0.95); }
 		[data-theme="light"] .spinner { border-color: #d4cfc7; border-top-color: #996515; }
 
-		[data-theme="light"] .admin-section { border-color: #6a1b9a; }
+		[data-theme="light"] .admin-section { border-color: var(--admin-frame); }
 		[data-theme="light"] .info-box { background: #f8f5f0; border-left-color: #996515; }
-		[data-theme="light"] .info-box.admin { background: rgba(106, 27, 154, 0.05); border-left-color: #6a1b9a; }
+		[data-theme="light"] .info-box.admin { background: rgba(178, 42, 42, 0.06); border-left-color: var(--admin-frame); }
 		[data-theme="light"] .entity-list { background: #f8f5f0; }
 		[data-theme="light"] .entity-item { border-bottom-color: #d4cfc7; }
 
