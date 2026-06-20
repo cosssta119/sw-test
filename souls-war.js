@@ -717,7 +717,7 @@
         }
 
 		// Konfigurowalne zakładki (kolejność = w panelu). 'admin' zawsze admin-only (locked).
-		const NAV_TABS = ['search', 'database', 'view', 'add', 'settings', 'war', 'kreator', 'defense', 'admin'];
+		const NAV_TABS = ['search', 'database', 'view', 'add', 'war', 'kreator', 'defense', 'settings', 'admin'];
 		const TAB_LABELS = { search: '🔍 Szukaj', database: '📚 Baza', view: '👁️ Podgląd', add: '➕ Dodaj', settings: '⚙️ Import', war: '⚔️ Wojna', kreator: '🎯 Kreator', defense: '🛡️ Obrona', admin: '👑 Admin' };
 
 		let moreTabsActive = []; // zakładki aktualnie pokazane w menu „⋯ Więcej"
