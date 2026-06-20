@@ -117,7 +117,7 @@
             pl: {
                 'loading': 'Ładowanie danych...', 'common.loading': 'Ładowanie...', 'common.cancel': 'Anuluj', 'common.clear': 'Wyczyść', 'common.save': 'Zapisz',
                 'header.subtitle': 'Wyszukiwarka kontr-formacji', 'status.online': 'Online', 'status.offline': 'Offline', 'status.formations': 'formacji',
-                'nav.search': 'Szukaj', 'nav.database': 'Baza', 'nav.preview': 'Podgląd', 'nav.add': 'Dodaj', 'nav.import': 'Import', 'nav.more': 'Więcej',
+                'nav.search': 'Szukaj', 'nav.database': 'Baza', 'nav.preview': 'Podgląd', 'nav.add': 'Dodaj', 'nav.import': 'Import', 'nav.war': 'Wojna', 'nav.kreator': 'Kreator', 'nav.admin': 'Admin', 'nav.more': 'Więcej',
                 'search.title': 'Szukaj kontr-formacji', 'search.subtitle': 'Wpisz skład przeciwnika (lub wybierz tagami)', 'search.btn': 'SZUKAJ', 'search.clear': 'Wyczyść',
                 'search.emptyState': 'Wpisz postacie przeciwnika i kliknij "Szukaj"', 'search.results': 'Wyniki', 'search.found': 'Znaleziono', 'search.noResults': 'Nie znaleziono pasujących formacji',
                 'search.enemy': 'Przeciwnik', 'search.missing': 'Brak', 'search.allSlotsFull': 'Wszystkie pola zajęte!', 'search.petSlotFull': 'Pole Pet już zajęte!',
@@ -354,7 +354,7 @@
             en: {
                 'loading': 'Loading data...', 'common.loading': 'Loading...', 'common.cancel': 'Cancel', 'common.clear': 'Clear', 'common.save': 'Save',
                 'header.subtitle': 'Counter-formation finder', 'status.online': 'Online', 'status.offline': 'Offline', 'status.formations': 'formations',
-                'nav.search': 'Search', 'nav.database': 'Database', 'nav.preview': 'Preview', 'nav.add': 'Add', 'nav.import': 'Import', 'nav.more': 'More',
+                'nav.search': 'Search', 'nav.database': 'Database', 'nav.preview': 'Preview', 'nav.add': 'Add', 'nav.import': 'Import', 'nav.war': 'War', 'nav.kreator': 'Creator', 'nav.admin': 'Admin', 'nav.more': 'More',
                 'search.title': 'Search counter-formations', 'search.subtitle': 'Enter enemy composition (or use tags)', 'search.btn': 'SEARCH', 'search.clear': 'Clear',
                 'search.emptyState': 'Enter enemy heroes and click "Search"', 'search.results': 'Results', 'search.found': 'Found', 'search.noResults': 'No matching formations found',
                 'search.enemy': 'Enemy', 'search.missing': 'Missing', 'search.allSlotsFull': 'All slots are full!', 'search.petSlotFull': 'Pet slot is full!',
@@ -721,17 +721,19 @@
         }
 
 		// Konfigurowalne zakładki (kolejność = w panelu). 'admin' zawsze admin-only (locked).
-		const TAB_LABELS ={ search: '🔍 Szukaj', database: '📚 Baza', view: '👁️ Podgląd', add: '➕ Dodaj', settings: '⚙️ Import', war: '⚔️ Wojna', kreator: '🎯 Kreator', defense: '🛡️ Obrona', admin: '👑 Admin' };
+		const TAB_ICONS = { search: '🔍', database: '📚', view: '👁️', add: '➕', settings: '⚙️', war: '⚔️', kreator: '🎯', defense: '🛡️', admin: '👑' };
+		const TAB_I18N = { search: 'nav.search', database: 'nav.database', view: 'nav.preview', add: 'nav.add', settings: 'nav.import', war: 'nav.war', kreator: 'nav.kreator', defense: 'nav.defense', admin: 'nav.admin' };
+		const tabLabel = tab => `${TAB_ICONS[tab]} ${t(TAB_I18N[tab])}`;
 
 		let moreTabsActive = []; // zakładki aktualnie pokazane w menu „⋯ Więcej"
 		// Robocze kopie konfiguracji w formularzu admina (edytowane przed Zapisz, żeby reorder nie gubił zmian)
-		let configTabOrder = null, configTabVisibility = null, configTabPlacement = null, draggedTab = null;
+		let configTabOrder = null, configTabVisibility = null, configTabPlacement = null, draggedTab = null, configTabDirty = false;
 
 		// Walidacja/uzupełnienie kolejności: tylko znane zakładki (bez admina), brakujące dołożone wg domyślnej.
 		function sanitizeTabOrder(arr) {
 			const base = DEFAULT_CONFIG.tabOrder, out = [];
-			(Array.isArray(arr) ? arr : []).forEach(t => { if (base.includes(t) && !out.includes(t)) out.push(t); });
-			base.forEach(t => { if (!out.includes(t)) out.push(t); });
+			(Array.isArray(arr) ? arr : []).forEach(t => { if (t !== 'admin' && base.includes(t) && !out.includes(t)) out.push(t); });
+			base.forEach(t => { if (t !== 'admin' && !out.includes(t)) out.push(t); });
 			return out;
 		}
 		// Pełna kolejność do wyświetlenia: kolejność z configu + Admin zawsze na końcu.
@@ -741,7 +743,7 @@
 		// 'hidden' chowa dla wszystkich (admin może odkryć przez panel — zakładka Admin jest zablokowana).
 		function tabState(tab) {
 			const vis = tab === 'admin' ? 'admin' : (appConfig.tabVisibility?.[tab] || 'all');
-			const placement = appConfig.tabPlacement?.[tab] || 'bar';
+			const placement = tab === 'admin' ? 'bar' : (appConfig.tabPlacement?.[tab] || 'bar'); // Admin zawsze 'bar' — nie da się go ukryć/przenieść (nawet ręczną edycją bazy)
 			const audienceOK = vis === 'all' || isAdmin;
 			return { visible: audienceOK && placement !== 'hidden', placement };
 		}
@@ -777,7 +779,7 @@
 			if (!configTabOrder) return;
 			const i = configTabOrder.indexOf(tab), j = i + dir;
 			if (i < 0 || j < 0 || j >= configTabOrder.length) return;
-			[configTabOrder[i], configTabOrder[j]] = [configTabOrder[j], configTabOrder[i]];
+			[configTabOrder[i], configTabOrder[j]] = [configTabOrder[j], configTabOrder[i]]; configTabDirty = true;
 			renderTabvisList();
 		}
 		function dragTabStart(e, tab) { draggedTab = tab; e.dataTransfer.effectAllowed = 'move'; e.currentTarget.classList.add('dragging'); }
@@ -791,7 +793,7 @@
 			configTabOrder.splice(from, 1);
 			let tIdx = configTabOrder.indexOf(targetTab);
 			if (from < to) tIdx += 1;
-			configTabOrder.splice(tIdx, 0, draggedTab);
+			configTabOrder.splice(tIdx, 0, draggedTab); configTabDirty = true;
 			renderTabvisList();
 		}
 
@@ -804,17 +806,17 @@
 				const val = (configTabVisibility || appConfig.tabVisibility || {})[tab] || 'all';
 				const place = (configTabPlacement || appConfig.tabPlacement || {})[tab] || 'bar';
 				return `<div class="admin-config-row">
-					<div class="tabvis-reorder" draggable="true" data-tab="${tab}" ondragstart="dragTabStart(event,'${tab}')" ondragover="dragTabOver(event)" ondrop="dragTabDrop(event,'${tab}')" ondragend="dragTabEnd(event)">
+					<div class="tabvis-reorder" draggable="true" ondragstart="dragTabStart(event,'${tab}')" ondragover="dragTabOver(event)" ondrop="dragTabDrop(event,'${tab}')" ondragend="dragTabEnd(event)">
 						<span class="tabvis-handle" title="${t('admin.dragHint')}">⠿</span>
 						<button class="btn-icon" onclick="moveTab('${tab}',-1)"${i === 0 ? ' disabled' : ''}>▲</button>
 						<button class="btn-icon" onclick="moveTab('${tab}',1)"${i === order.length - 1 ? ' disabled' : ''}>▼</button>
 					</div>
-					<label>${TAB_LABELS[tab]}</label>
-					<select class="admin-config-select" data-tabvis="${tab}" onchange="configTabVisibility['${tab}']=this.value">
+					<label ondragover="dragTabOver(event)" ondrop="dragTabDrop(event,'${tab}')">${tabLabel(tab)}</label>
+					<select class="admin-config-select" onchange="configTabVisibility['${tab}']=this.value;configTabDirty=true">
 						<option value="all"${val === 'all' ? ' selected' : ''}>${t('admin.visAll')}</option>
 						<option value="admin"${val === 'admin' ? ' selected' : ''}>${t('admin.visAdmin')}</option>
 					</select>
-					<select class="admin-config-select" data-tabmore="${tab}" onchange="configTabPlacement['${tab}']=this.value">
+					<select class="admin-config-select" onchange="configTabPlacement['${tab}']=this.value;configTabDirty=true">
 						<option value="bar"${place === 'bar' ? ' selected' : ''}>${t('admin.placeBar')}</option>
 						<option value="more"${place === 'more' ? ' selected' : ''}>${t('admin.placeMore')}</option>
 						<option value="hidden"${place === 'hidden' ? ' selected' : ''}>${t('admin.placeHidden')}</option>
@@ -823,7 +825,7 @@
 			}).join('');
 			html += `<div class="admin-config-row">
 				<div class="tabvis-reorder"><span class="tabvis-pinned" title="${t('admin.tabLockedHint')}">📌</span></div>
-				<label>${TAB_LABELS.admin}</label>
+				<label>${tabLabel('admin')}</label>
 				<span class="tabvis-locked" title="${t('admin.tabLockedHint')}">🔒 ${t('admin.tabLocked')}</span>
 			</div>`;
 			tvList.innerHTML = html;
@@ -833,7 +835,7 @@
 			const menu = $('more-menu');
 			if (!menu) return;
 			menu.innerHTML = moreTabsActive.map(tab =>
-				`<button class="more-menu-item" onclick="switchTab('${tab}'); closeMoreMenu();">${TAB_LABELS[tab]}</button>`
+				`<button class="more-menu-item" onclick="switchTab('${tab}'); closeMoreMenu();">${tabLabel(tab)}</button>`
 			).join('');
 		}
 
@@ -863,7 +865,7 @@
 			if (baseOption) baseOption.style.display = 'block';
 			renderHeroesList();
 			renderPetsList();
-			renderConfigForm();
+			renderConfigForm(true);
 			styleRaceSelect($('new-hero-race'));
 			filterDatabase();
 		}
@@ -7228,7 +7230,7 @@
         }
 
         // Wstaw aktualne wartości globalnej konfiguracji do pól w panelu admina
-        function renderConfigForm() {
+        function renderConfigForm(force) {
             if ($('config-new-days')) $('config-new-days').value = appConfig.newFormationDays;
             if ($('config-min-match')) $('config-min-match').value = appConfig.defaultMinMatch;
             if ($('config-default-sort')) $('config-default-sort').value = appConfig.defaultSearchSort;
@@ -7236,11 +7238,17 @@
             if ($('config-pkg-support')) $('config-pkg-support').value = appConfig.defaultPackageMinSupport;
             if ($('config-pkg-window')) $('config-pkg-window').value = appConfig.defaultPackageWindow;
 
-            // Robocze kopie (edytowane w formularzu do czasu Zapisz; reorder ich nie gubi)
-            configTabOrder = sanitizeTabOrder(appConfig.tabOrder);
-            configTabVisibility = { ...DEFAULT_CONFIG.tabVisibility, ...(appConfig.tabVisibility || {}) };
-            configTabPlacement = { ...DEFAULT_CONFIG.tabPlacement, ...(appConfig.tabPlacement || {}) };
-            renderTabvisList();
+            // Robocze kopie (edytowane w formularzu do czasu Zapisz; reorder ich nie gubi).
+            // Nie nadpisuj edycji w toku: przy odświeżeniu z listenera Firebase pomiń przeseedowanie,
+            // gdy admin ma niezapisane zmiany zakładek (configTabDirty). force=true (świeże wejście do
+            // panelu admina) zawsze przeseeduje. Zapis (saveConfig) zeruje flagę → echo listenera odświeża.
+            if (force || !configTabDirty) {
+                configTabOrder = sanitizeTabOrder(appConfig.tabOrder);
+                configTabVisibility = { ...DEFAULT_CONFIG.tabVisibility, ...(appConfig.tabVisibility || {}) };
+                configTabPlacement = { ...DEFAULT_CONFIG.tabPlacement, ...(appConfig.tabPlacement || {}) };
+                configTabDirty = false;
+                renderTabvisList();
+            }
         }
 
         // Zapis globalnej konfiguracji do Firebase /config/settings (działa dla wszystkich graczy)
@@ -7280,6 +7288,7 @@
                     tabPlacement,
                     tabOrder
                 });
+                configTabDirty = false; // zapisano → pozwól listenerowi przeseedować robocze kopie ze świeżego configu
                 showToast(`✅ ${t('admin.configSaved')}`);
             } catch (e) { showToast(`${t('common.error')}: ${e.message}`, true); }
         }

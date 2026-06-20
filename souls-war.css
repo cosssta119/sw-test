@@ -156,8 +156,7 @@
 			border-top: 2px solid var(--accent-gold);
 			margin-top: -2px;
 		}
-		.nav-btn.admin-only { display: none; }
-		.nav-btn.admin-only.show { display: flex; }
+		.nav-btn.admin-only { display: none; } /* stan początkowy przed startem JS (FOUC); po starcie widoczność ustawia applyTabVisibility() inline'em */
 
 		/* Menu „⋯ Więcej" — popup nad dolnym paskiem */
 		.more-menu {
