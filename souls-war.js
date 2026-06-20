@@ -5143,8 +5143,8 @@
 							
 							<!-- Mini legenda kolorów -->
 							<div class="war-mini-legend">
-								<span><i class="m"></i>${t('war.legendMatched')}</span>
-								<span><i class="x"></i>${t('war.legendMissing')}</span>
+								<span><i class="frame-miss"></i>${t('war.legendMissing')}</span>
+								<span><i class="frame-extra"></i>${t('war.legendExtra')}</span>
 								<span><i class="c"></i>${t('war.legendConflict')}</span>
 							</div>
 							

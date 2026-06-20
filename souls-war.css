@@ -2002,18 +2002,20 @@
 		.war-zone-label.enemy { color: #ef5350; }
 		.war-zone-label.team { color: #66bb6a; }
 		.war-mini-legend { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; font-size: 0.68rem; color: var(--text-muted); margin-top: 12px; }
-		.war-mini-legend i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 4px; vertical-align: middle; }
-		.war-mini-legend i.m { background: #2e7d32; }
-		.war-mini-legend i.x { background: #f44336; opacity: 0.6; }
+		.war-mini-legend i { display: inline-block; width: 14px; height: 14px; border-radius: 3px; margin-right: 5px; vertical-align: middle; }
+		.war-mini-legend i.frame-miss { border: 2px dashed #f44336; background: rgba(244, 67, 54, 0.16); }
+		.war-mini-legend i.frame-extra { border: 2px dashed #ff9800; background: rgba(255, 152, 0, 0.16); }
 		.war-mini-legend i.c { background: #ff5722; }
 
 		.compact-grid { display: flex; flex-direction: column; align-items: center; gap: 3px; }
 		.compact-row { display: flex; gap: 4px; justify-content: center; }
 
 		/* War slot states */
-		.compact-slot.war-matched { border-color: #2e7d32 !important; background: #2e7d32 !important; color: #fff !important; box-shadow: none !important; }
-		.compact-slot.war-missing { border-color: #f44336 !important; border-style: dashed !important; background: transparent !important; color: #ef5350 !important; opacity: 0.75; text-decoration: line-through; }
-		.compact-slot.war-extra { border-color: #ff9800 !important; box-shadow: 0 0 8px rgba(255, 152, 0, 0.4) !important; color: #ff9800 !important; }
+		/* dopasowany: kafelek pozostaje w kolorze rasy (bez nadpisania) */
+		.compact-slot.war-matched { }
+		/* RÓŻNICA szukany ≠ baza — wyraźna ramka (kolor rasy zostaje na tekście) */
+		.compact-slot.war-missing { border: 2px dashed #f44336 !important; background: rgba(244, 67, 54, 0.16) !important; box-shadow: 0 0 6px rgba(244, 67, 54, 0.45) !important; }
+		.compact-slot.war-extra { border: 2px dashed #ff9800 !important; background: rgba(255, 152, 0, 0.16) !important; box-shadow: 0 0 6px rgba(255, 152, 0, 0.4) !important; }
 
 		.compact-pet.war-matched { border-color: #4caf50 !important; background: rgba(76, 175, 80, 0.15) !important; color: #4caf50 !important; }
 		.compact-pet.war-missing { border-color: #f44336 !important; border-style: dashed !important; background: rgba(244, 67, 54, 0.1) !important; color: #f44336 !important; }
