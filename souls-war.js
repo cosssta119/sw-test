@@ -1887,7 +1887,7 @@
 		function searchFormations() {
 			saveSearchToHistory();
 			
-			const searchHeroes = getFieldValues('search-pos', 8).filter(v => v).map(normalize);
+			const searchHeroes = [...new Set(getFieldValues('search-pos', 8).filter(v => v).map(normalize))];
 			const searchPet = normalize($('search-pet').value);
 			
 			if (!searchHeroes.length && !searchPet) { showToast(t('search.enterAtLeastOne'), true); return; }
@@ -3644,16 +3644,16 @@
 		}
 
 		function checkForExactDuplicate(my, myPet, enemy, enemyPet) {
-			const myClean = my.filter(h => h).map(h => h.toLowerCase()).sort();
-			const enemyClean = enemy.filter(h => h).map(h => h.toLowerCase()).sort();
-			const myPetClean = (myPet || '').toLowerCase();
-			const enemyPetClean = (enemyPet || '').toLowerCase();
+			const myClean = my.filter(h => h).map(h => normalize(h)).sort();
+			const enemyClean = enemy.filter(h => h).map(h => normalize(h)).sort();
+			const myPetClean = normalize(myPet);
+			const enemyPetClean = normalize(enemyPet);
 			
 			for (const f of allFormations) {
-				const fMyClean = f.my.filter(h => h).map(h => h.toLowerCase()).sort();
-				const fEnemyClean = f.enemy.filter(h => h).map(h => h.toLowerCase()).sort();
-				const fMyPetClean = (f.myPet || '').toLowerCase();
-				const fEnemyPetClean = (f.enemyPet || '').toLowerCase();
+				const fMyClean = f.my.filter(h => h).map(h => normalize(h)).sort();
+				const fEnemyClean = f.enemy.filter(h => h).map(h => normalize(h)).sort();
+				const fMyPetClean = normalize(f.myPet);
+				const fEnemyPetClean = normalize(f.enemyPet);
 				
 				// Sprawdź czy identyczne
 				const myMatch = myClean.length === fMyClean.length && 
@@ -3707,7 +3707,7 @@
 			const petRaw = $(`war-e${enemyNum}-pet`)?.value.trim() || '';
 			
 			return { 
-				heroes: heroesNorm,      // Do matchowania (bez pustych, lowercase)
+				heroes: [...new Set(heroesNorm)],      // Do matchowania (bez pustych, lowercase, bez duplikatów)
 				heroesRaw: heroesRaw,    // Do wyświetlania (z pozycjami, oryginalne nazwy)
 				pet: petRaw ? normalize(petRaw) : null,  // Do matchowania
 				petRaw: petRaw           // Do wyświetlania
@@ -4076,10 +4076,16 @@
                 return;
             }
             
+            // Stałe rankingu Wojny (wyniesione z inline — zmiana tu = zmiana zachowania rankingu)
+            const WAR_POOL_SIZE = 40;          // ile kontr/wroga wchodzi do iloczynu (ranking i tak utnie do WAR_RESULT_LIMIT)
+            const WAR_RESULT_LIMIT = 20;       // ile kombinacji ostatecznie pokazujemy
+            const CONFLICT_PENALTY_MULT = 8;   // mnożnik kary za konflikty bohaterów
+            const CONFLICT_PENALTY_EXP = 1.5;  // wykładnik kary (superlinearny)
+            const WAR_TIE_EPSILON = 0.1;       // próg „remisu" score przy sortowaniu
             // Znajdź pasujące formacje dla każdego wroga
-            const matches1 = findMatchingFormations(enemy1, 1).slice(0, 20);
-            const matches2 = findMatchingFormations(enemy2, 1).slice(0, 20);
-            const matches3 = findMatchingFormations(enemy3, 1).slice(0, 20);
+            const matches1 = findMatchingFormations(enemy1, 1).slice(0, WAR_POOL_SIZE);
+            const matches2 = findMatchingFormations(enemy2, 1).slice(0, WAR_POOL_SIZE);
+            const matches3 = findMatchingFormations(enemy3, 1).slice(0, WAR_POOL_SIZE);
             
             if (!matches1.length || !matches2.length || !matches3.length) {
                 $('war-results-section').innerHTML = `
@@ -4146,13 +4152,13 @@
 				const percentA = maxPossibleA > 0 ? (a.totalBaseScore / maxPossibleA) * 100 : 0;
 				const percentB = maxPossibleB > 0 ? (b.totalBaseScore / maxPossibleB) * 100 : 0;
 				
-				const conflictPenaltyA = Math.pow(a.conflicts, 1.5) * 8;
-				const conflictPenaltyB = Math.pow(b.conflicts, 1.5) * 8;
+				const conflictPenaltyA = Math.pow(a.conflicts, CONFLICT_PENALTY_EXP) * CONFLICT_PENALTY_MULT;
+				const conflictPenaltyB = Math.pow(b.conflicts, CONFLICT_PENALTY_EXP) * CONFLICT_PENALTY_MULT;
 				
 				const scoreA = percentA - conflictPenaltyA;
 				const scoreB = percentB - conflictPenaltyB;
 				
-				if (Math.abs(scoreA - scoreB) > 0.1) return scoreB - scoreA;
+				if (Math.abs(scoreA - scoreB) > WAR_TIE_EPSILON) return scoreB - scoreA;
 				return a.conflicts - b.conflicts;
 			});
             
@@ -4163,7 +4169,7 @@
 				const fingerprints = [];
 				
 				for (const combo of allCombinations) {
-					if (top.length >= 20) break; // Early exit - mamy już 20 unikalnych
+					if (top.length >= WAR_RESULT_LIMIT) break; // Early exit - mamy już komplet unikalnych
 					
 					const fp = getComboFingerprint(combo);
 					let isDuplicate = false;
@@ -4182,7 +4188,7 @@
 					}
 				}
 			} else {
-				top = allCombinations.slice(0, 20);
+				top = allCombinations.slice(0, WAR_RESULT_LIMIT);
 			}
             
             displayWarResults(top, [enemy1, enemy2, enemy3]);
@@ -7145,18 +7151,6 @@
             return rows;
         }
 
-        function parseCSVLine(line, sep = ';') {
-            const result = [];
-            let current = '', inQuotes = false;
-            for (const char of line) {
-                if (char === '"') inQuotes = !inQuotes;
-                else if (char === sep && !inQuotes) { result.push(current); current = ''; }
-                else current += char;
-            }
-            result.push(current);
-            return result;
-        }
-
 		async function importFromCSV(event) {
 			const file = event.target.files[0];
 			if (!file) return;
@@ -7570,19 +7564,26 @@
 				almostIdentical: [] // 5/5 enemy + 5/5 my (pety mogą się różnić)
 			};
 			
-			const formations = allFormations;
-			
-			for (let i = 0; i < formations.length; i++) {
-				for (let j = i + 1; j < formations.length; j++) {
-					const a = formations[i];
-					const b = formations[j];
-					
-					const similarity = compareFormations(a, b);
-					
-					if (similarity.type === 'identical') {
-						addToGroup(results.identical, a, b, similarity);
-					} else if (similarity.type === 'almostIdentical') {
-						addToGroup(results.almostIdentical, a, b, similarity);
+			// Bucketowanie: dwie formacje to duplikat TYLKO przy identycznym zestawie enemy I my
+			// (compareFormations zwraca 'none' inaczej) → porównujemy parami wyłącznie w obrębie kubełka.
+			// Wynik identyczny jak pełne O(n²), ale ~O(n). Pety POZA kluczem (almostIdentical = ten sam
+			// enemy+my, różne pety) — inaczej zgubilibyśmy „prawie identyczne".
+			const buckets = new Map();
+			for (const f of allFormations) {
+				const key = f.enemy.filter(h => h).map(normalize).sort().join('|') + '@@' + f.my.filter(h => h).map(normalize).sort().join('|');
+				if (!buckets.has(key)) buckets.set(key, []);
+				buckets.get(key).push(f);
+			}
+			for (const group of buckets.values()) {
+				if (group.length < 2) continue;
+				for (let i = 0; i < group.length; i++) {
+					for (let j = i + 1; j < group.length; j++) {
+						const similarity = compareFormations(group[i], group[j]);
+						if (similarity.type === 'identical') {
+							addToGroup(results.identical, group[i], group[j], similarity);
+						} else if (similarity.type === 'almostIdentical') {
+							addToGroup(results.almostIdentical, group[i], group[j], similarity);
+						}
 					}
 				}
 			}
@@ -7592,18 +7593,18 @@
 
 		function compareFormations(a, b) {
 			// Porównaj enemy
-			const enemyA = a.enemy.filter(h => h).map(h => h.toLowerCase()).sort();
-			const enemyB = b.enemy.filter(h => h).map(h => h.toLowerCase()).sort();
+			const enemyA = a.enemy.filter(h => h).map(h => normalize(h)).sort();
+			const enemyB = b.enemy.filter(h => h).map(h => normalize(h)).sort();
 			const enemyMatch = enemyA.length === enemyB.length && enemyA.every((h, i) => h === enemyB[i]);
 			
 			// Porównaj my
-			const myA = a.my.filter(h => h).map(h => h.toLowerCase()).sort();
-			const myB = b.my.filter(h => h).map(h => h.toLowerCase()).sort();
+			const myA = a.my.filter(h => h).map(h => normalize(h)).sort();
+			const myB = b.my.filter(h => h).map(h => normalize(h)).sort();
 			const myMatch = myA.length === myB.length && myA.every((h, i) => h === myB[i]);
 			
 			// Porównaj pety
-			const enemyPetSame = (a.enemyPet || '').toLowerCase() === (b.enemyPet || '').toLowerCase();
-			const myPetSame = (a.myPet || '').toLowerCase() === (b.myPet || '').toLowerCase();
+			const enemyPetSame = normalize(a.enemyPet) === normalize(b.enemyPet);
+			const myPetSame = normalize(a.myPet) === normalize(b.myPet);
 			
 			// Określ typ
 			if (enemyMatch && myMatch) {
