@@ -65,6 +65,7 @@
 		let appConfig = { ...DEFAULT_CONFIG };
 		let configRef = null;
 		let configInitApplied = false; // domyślne „widoku" (filtr/pakiety) stosujemy tylko raz, przy pierwszym załadowaniu
+			let navConfigReady = false;    // odsłaniamy dolny pasek dopiero gdy dotrze config z Firebase (lub fallback) — koniec FOUC zakładek
 		let currentSearchSort = DEFAULT_CONFIG.defaultSearchSort; // 'relevance' | 'newest'
 		let userTouchedSort = false; // user ręcznie zmienił sortowanie w tej sesji → nie nadpisujemy globalnym domyślnym
 		let lastSearch = null; // { results, searchHeroes } — cache do przełącznika sortowania bez ponownego szukania
@@ -781,7 +782,7 @@
 			}
 			renderMoreMenu();
 			if (!useMore) closeMoreMenu();
-			nav?.classList.remove('nav-initializing'); // odsłoń pasek po pierwszym poprawnym ułożeniu
+			if (navConfigReady) nav?.classList.remove('nav-initializing'); // odsłoń dopiero po dotarciu configu (nie przy domyślnym układzie)
 		}
 
 		// ── Kolejność zakładek w „Widoczność zakładek": ▲▼ + drag&drop (mysz) ──
@@ -7878,6 +7879,7 @@
                     appConfig.tabPlacement[k] = (v === 'bar' || v === 'more' || v === 'hidden') ? v : (v === true ? 'more' : 'bar');
                 });
                 appConfig.tabOrder = sanitizeTabOrder(c.tabOrder);
+                navConfigReady = true; // prawdziwy config dotarł → wolno odsłonić pasek (z poprawnym układem)
                 applyTabVisibility();
 
                 // Live: globalne domyślne tam, gdzie użytkownik nie ma własnego wyboru
@@ -7899,6 +7901,9 @@
                 if (allFormations.length) filterDatabase();              // odśwież badge NOWE w bazie
                 if (lastSearch) displayResults(lastSearch.results, lastSearch.searchHeroes); // odśwież aktywne wyniki
             });
+
+            // Fallback: gdyby config nie dotarł (offline/wolny Firebase), odsłoń pasek z domyślnymi po 2.5s
+            setTimeout(() => { if (!navConfigReady) { navConfigReady = true; applyTabVisibility(); } }, 2500);
 
             db.ref('.info/connected').on('value', snap => setOnlineStatus(snap.val() === true));
         } catch (e) {
