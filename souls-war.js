@@ -58,6 +58,8 @@
 			// Umiejscowienie: 'bar' = w pasku, 'more' = w menu „⋯ Więcej", 'hidden' = ukryta. Domyślnie wszystko w pasku.
 			// Przycisk „Więcej" pojawia się dopiero gdy ≥2 widoczne zakładki są w „Więcej".
 			tabPlacement: { search: 'bar', database: 'bar', view: 'bar', add: 'bar', settings: 'bar', war: 'bar', kreator: 'bar', defense: 'bar', admin: 'bar' },
+			// Kolejność zakładek (Admin zawsze przypięty na końcu, poza tą listą). Domyślnie = obecny układ.
+			tabOrder: ['search', 'database', 'view', 'add', 'war', 'kreator', 'defense', 'settings'],
 		};
 		let appConfig = { ...DEFAULT_CONFIG };
 		let configRef = null;
@@ -153,6 +155,7 @@
                 'admin.tabVisibility': 'Widoczność zakładek', 'admin.visAll': 'Wszyscy', 'admin.visAdmin': 'Tylko admin',
                 'admin.placeBar': 'W pasku', 'admin.placeMore': 'W „Więcej"', 'admin.placeHidden': 'Ukryj',
                 'admin.tabLocked': 'Zawsze dostępna (tylko admin)', 'admin.tabLockedHint': 'Tej zakładki nie można ukryć ani przenieść — to wejście do panelu admina.',
+                'admin.dragHint': 'Przeciągnij, aby zmienić kolejność',
                 'admin.configHint': 'Zmiana działa dla wszystkich graczy gildii.', 'admin.configSaved': 'Zapisano konfigurację',
                 'admin.configInvalidDays': 'Podaj liczbę dni większą od 0!', 'admin.configInvalidMin': 'Podaj próg trafności większy od 0!',
                 'admin.petAdded': 'Dodano peta', 'admin.petExists': 'Pet już istnieje!', 'admin.enterHeroName': 'Podaj nazwę bohatera!', 'admin.enterPetName': 'Podaj nazwę peta!',
@@ -390,6 +393,7 @@
                 'admin.tabVisibility': 'Tab visibility', 'admin.visAll': 'Everyone', 'admin.visAdmin': 'Admin only',
                 'admin.placeBar': 'In bar', 'admin.placeMore': 'In „More"', 'admin.placeHidden': 'Hidden',
                 'admin.tabLocked': 'Always available (admin only)', 'admin.tabLockedHint': 'This tab cannot be hidden or moved — it is the entry to the admin panel.',
+                'admin.dragHint': 'Drag to reorder',
                 'admin.configHint': 'Applies to all guild players.', 'admin.configSaved': 'Configuration saved',
                 'admin.configInvalidDays': 'Enter a number of days greater than 0!', 'admin.configInvalidMin': 'Enter a match threshold greater than 0!',
                 'admin.petAdded': 'Pet added', 'admin.petExists': 'Pet already exists!', 'admin.enterHeroName': 'Enter hero name!', 'admin.enterPetName': 'Enter pet name!',
@@ -717,10 +721,21 @@
         }
 
 		// Konfigurowalne zakładki (kolejność = w panelu). 'admin' zawsze admin-only (locked).
-		const NAV_TABS = ['search', 'database', 'view', 'add', 'war', 'kreator', 'defense', 'settings', 'admin'];
-		const TAB_LABELS = { search: '🔍 Szukaj', database: '📚 Baza', view: '👁️ Podgląd', add: '➕ Dodaj', settings: '⚙️ Import', war: '⚔️ Wojna', kreator: '🎯 Kreator', defense: '🛡️ Obrona', admin: '👑 Admin' };
+		const TAB_LABELS ={ search: '🔍 Szukaj', database: '📚 Baza', view: '👁️ Podgląd', add: '➕ Dodaj', settings: '⚙️ Import', war: '⚔️ Wojna', kreator: '🎯 Kreator', defense: '🛡️ Obrona', admin: '👑 Admin' };
 
 		let moreTabsActive = []; // zakładki aktualnie pokazane w menu „⋯ Więcej"
+		// Robocze kopie konfiguracji w formularzu admina (edytowane przed Zapisz, żeby reorder nie gubił zmian)
+		let configTabOrder = null, configTabVisibility = null, configTabPlacement = null, draggedTab = null;
+
+		// Walidacja/uzupełnienie kolejności: tylko znane zakładki (bez admina), brakujące dołożone wg domyślnej.
+		function sanitizeTabOrder(arr) {
+			const base = DEFAULT_CONFIG.tabOrder, out = [];
+			(Array.isArray(arr) ? arr : []).forEach(t => { if (base.includes(t) && !out.includes(t)) out.push(t); });
+			base.forEach(t => { if (!out.includes(t)) out.push(t); });
+			return out;
+		}
+		// Pełna kolejność do wyświetlenia: kolejność z configu + Admin zawsze na końcu.
+		function orderedTabs() { return [...(appConfig.tabOrder || DEFAULT_CONFIG.tabOrder), 'admin']; }
 
 		// Stan zakładki: kto widzi (audience) + gdzie (placement) → czy w ogóle widoczna.
 		// 'hidden' chowa dla wszystkich (admin może odkryć przez panel — zakładka Admin jest zablokowana).
@@ -731,25 +746,87 @@
 			return { visible: audienceOK && placement !== 'hidden', placement };
 		}
 
-		// Pokazuje/ukrywa przyciski dolnego menu wg appConfig (widoczność + umiejscowienie) i stanu admina.
+		// Pokazuje/ukrywa + ustawia kolejność przycisków dolnego menu wg appConfig i stanu admina.
 		// Przycisk „Więcej" pojawia się tylko gdy ≥2 widoczne zakładki są w „Więcej" (przy 1 chowanie nie ma sensu).
 		function applyTabVisibility() {
-			const moreCandidates = NAV_TABS.filter(tab => { const s = tabState(tab); return s.visible && s.placement === 'more'; });
+			const order = orderedTabs();
+			const moreCandidates = order.filter(tab => { const s = tabState(tab); return s.visible && s.placement === 'more'; });
 			const useMore = moreCandidates.length >= 2;
 			moreTabsActive = useMore ? moreCandidates : [];
 
-			NAV_TABS.forEach(tab => {
+			const nav = document.querySelector('.bottom-nav');
+			order.forEach(tab => {
 				const btn = $('nav-' + tab);
 				if (!btn) return;
 				const s = tabState(tab);
 				const inMore = useMore && s.placement === 'more';
 				btn.style.display = (s.visible && !inMore) ? 'flex' : 'none';
+				if (nav) nav.appendChild(btn); // ustaw kolejność w pasku
 			});
-
 			const moreBtn = $('nav-more');
-			if (moreBtn) moreBtn.style.display = useMore ? 'flex' : 'none';
+			if (moreBtn) {
+				moreBtn.style.display = useMore ? 'flex' : 'none';
+				if (nav) nav.appendChild(moreBtn); // „Więcej" zawsze ostatni
+			}
 			renderMoreMenu();
 			if (!useMore) closeMoreMenu();
+		}
+
+		// ── Kolejność zakładek w „Widoczność zakładek": ▲▼ + drag&drop (mysz) ──
+		function moveTab(tab, dir) {
+			if (!configTabOrder) return;
+			const i = configTabOrder.indexOf(tab), j = i + dir;
+			if (i < 0 || j < 0 || j >= configTabOrder.length) return;
+			[configTabOrder[i], configTabOrder[j]] = [configTabOrder[j], configTabOrder[i]];
+			renderTabvisList();
+		}
+		function dragTabStart(e, tab) { draggedTab = tab; e.dataTransfer.effectAllowed = 'move'; e.currentTarget.classList.add('dragging'); }
+		function dragTabOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }
+		function dragTabEnd() { document.querySelectorAll('.tabvis-reorder.dragging').forEach(el => el.classList.remove('dragging')); draggedTab = null; }
+		function dragTabDrop(e, targetTab) {
+			e.preventDefault();
+			if (!draggedTab || !configTabOrder || draggedTab === targetTab) return;
+			const from = configTabOrder.indexOf(draggedTab), to = configTabOrder.indexOf(targetTab);
+			if (from < 0 || to < 0) return;
+			configTabOrder.splice(from, 1);
+			let tIdx = configTabOrder.indexOf(targetTab);
+			if (from < to) tIdx += 1;
+			configTabOrder.splice(tIdx, 0, draggedTab);
+			renderTabvisList();
+		}
+
+		// Buduje listę „Widoczność zakładek" z roboczych kopii (configTab*), Admin przypięty na końcu.
+		function renderTabvisList() {
+			const tvList = $('tabvis-list');
+			if (!tvList) return;
+			const order = configTabOrder || sanitizeTabOrder(appConfig.tabOrder);
+			let html = order.map((tab, i) => {
+				const val = (configTabVisibility || appConfig.tabVisibility || {})[tab] || 'all';
+				const place = (configTabPlacement || appConfig.tabPlacement || {})[tab] || 'bar';
+				return `<div class="admin-config-row">
+					<div class="tabvis-reorder" draggable="true" data-tab="${tab}" ondragstart="dragTabStart(event,'${tab}')" ondragover="dragTabOver(event)" ondrop="dragTabDrop(event,'${tab}')" ondragend="dragTabEnd(event)">
+						<span class="tabvis-handle" title="${t('admin.dragHint')}">⠿</span>
+						<button class="btn-icon" onclick="moveTab('${tab}',-1)"${i === 0 ? ' disabled' : ''}>▲</button>
+						<button class="btn-icon" onclick="moveTab('${tab}',1)"${i === order.length - 1 ? ' disabled' : ''}>▼</button>
+					</div>
+					<label>${TAB_LABELS[tab]}</label>
+					<select class="admin-config-select" data-tabvis="${tab}" onchange="configTabVisibility['${tab}']=this.value">
+						<option value="all"${val === 'all' ? ' selected' : ''}>${t('admin.visAll')}</option>
+						<option value="admin"${val === 'admin' ? ' selected' : ''}>${t('admin.visAdmin')}</option>
+					</select>
+					<select class="admin-config-select" data-tabmore="${tab}" onchange="configTabPlacement['${tab}']=this.value">
+						<option value="bar"${place === 'bar' ? ' selected' : ''}>${t('admin.placeBar')}</option>
+						<option value="more"${place === 'more' ? ' selected' : ''}>${t('admin.placeMore')}</option>
+						<option value="hidden"${place === 'hidden' ? ' selected' : ''}>${t('admin.placeHidden')}</option>
+					</select>
+				</div>`;
+			}).join('');
+			html += `<div class="admin-config-row">
+				<div class="tabvis-reorder"><span class="tabvis-pinned" title="${t('admin.tabLockedHint')}">📌</span></div>
+				<label>${TAB_LABELS.admin}</label>
+				<span class="tabvis-locked" title="${t('admin.tabLockedHint')}">🔒 ${t('admin.tabLocked')}</span>
+			</div>`;
+			tvList.innerHTML = html;
 		}
 
 		function renderMoreMenu() {
@@ -7159,33 +7236,11 @@
             if ($('config-pkg-support')) $('config-pkg-support').value = appConfig.defaultPackageMinSupport;
             if ($('config-pkg-window')) $('config-pkg-window').value = appConfig.defaultPackageWindow;
 
-            // Widoczność zakładek — lista przełączników (zakładka 'admin' zablokowana na Admin)
-            const tvList = $('tabvis-list');
-            if (tvList) {
-                tvList.innerHTML = NAV_TABS.map(tab => {
-                    if (tab === 'admin') {
-                        // Zakładka Admin — zablokowana (zawsze admin, w pasku), żeby nie zablokować sobie dostępu
-                        return `<div class="admin-config-row">
-                            <label>${TAB_LABELS[tab]}</label>
-                            <span class="tabvis-locked" title="${t('admin.tabLockedHint')}">🔒 ${t('admin.tabLocked')}</span>
-                        </div>`;
-                    }
-                    const val = appConfig.tabVisibility?.[tab] || 'all';
-                    const place = appConfig.tabPlacement?.[tab] || 'bar';
-                    return `<div class="admin-config-row">
-                        <label>${TAB_LABELS[tab]}</label>
-                        <select class="admin-config-select" data-tabvis="${tab}">
-                            <option value="all"${val === 'all' ? ' selected' : ''}>${t('admin.visAll')}</option>
-                            <option value="admin"${val === 'admin' ? ' selected' : ''}>${t('admin.visAdmin')}</option>
-                        </select>
-                        <select class="admin-config-select" data-tabmore="${tab}">
-                            <option value="bar"${place === 'bar' ? ' selected' : ''}>${t('admin.placeBar')}</option>
-                            <option value="more"${place === 'more' ? ' selected' : ''}>${t('admin.placeMore')}</option>
-                            <option value="hidden"${place === 'hidden' ? ' selected' : ''}>${t('admin.placeHidden')}</option>
-                        </select>
-                    </div>`;
-                }).join('');
-            }
+            // Robocze kopie (edytowane w formularzu do czasu Zapisz; reorder ich nie gubi)
+            configTabOrder = sanitizeTabOrder(appConfig.tabOrder);
+            configTabVisibility = { ...DEFAULT_CONFIG.tabVisibility, ...(appConfig.tabVisibility || {}) };
+            configTabPlacement = { ...DEFAULT_CONFIG.tabPlacement, ...(appConfig.tabPlacement || {}) };
+            renderTabvisList();
         }
 
         // Zapis globalnej konfiguracji do Firebase /config/settings (działa dla wszystkich graczy)
@@ -7202,17 +7257,18 @@
             if (!(pkgSup > 0)) { showToast(t('admin.configInvalidMin'), true); return; }
             minMatch = Math.min(5, minMatch); // próg trafności ≤ 5 (max bohaterów w grze)
             try {
+                // Z roboczych kopii (configTab*), z fallbackiem na domyślne
                 const tabVisibility = {};
                 Object.keys(DEFAULT_CONFIG.tabVisibility).forEach(k => {
-                    const sel = document.querySelector(`[data-tabvis="${k}"]`);
-                    tabVisibility[k] = (sel && sel.value === 'admin') ? 'admin' : 'all';
+                    const v = (configTabVisibility || {})[k];
+                    tabVisibility[k] = (v === 'admin' || v === 'all') ? v : DEFAULT_CONFIG.tabVisibility[k];
                 });
                 const tabPlacement = {};
                 Object.keys(DEFAULT_CONFIG.tabPlacement).forEach(k => {
-                    const sel = document.querySelector(`[data-tabmore="${k}"]`);
-                    const v = sel ? sel.value : 'bar';
-                    tabPlacement[k] = ['bar', 'more', 'hidden'].includes(v) ? v : 'bar';
+                    const v = (configTabPlacement || {})[k];
+                    tabPlacement[k] = ['bar', 'more', 'hidden'].includes(v) ? v : DEFAULT_CONFIG.tabPlacement[k];
                 });
+                const tabOrder = sanitizeTabOrder(configTabOrder);
                 await configRef.update({
                     newFormationDays: days,
                     defaultMinMatch: minMatch,
@@ -7221,7 +7277,8 @@
                     defaultPackageMinSupport: pkgSup,
                     defaultPackageWindow: ['all', '30', '90'].includes(pkgWindow) ? pkgWindow : 'all',
                     tabVisibility,
-                    tabPlacement
+                    tabPlacement,
+                    tabOrder
                 });
                 showToast(`✅ ${t('admin.configSaved')}`);
             } catch (e) { showToast(`${t('common.error')}: ${e.message}`, true); }
@@ -7555,6 +7612,7 @@
                     // migracja starego boola (true = 'more') + walidacja stringa
                     appConfig.tabPlacement[k] = (v === 'bar' || v === 'more' || v === 'hidden') ? v : (v === true ? 'more' : 'bar');
                 });
+                appConfig.tabOrder = sanitizeTabOrder(c.tabOrder);
                 applyTabVisibility();
 
                 // Live: globalne domyślne tam, gdzie użytkownik nie ma własnego wyboru

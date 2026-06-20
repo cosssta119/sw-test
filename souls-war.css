@@ -1536,10 +1536,16 @@
 		}
 		.admin-config-save { display: flex; justify-content: center; margin-top: 16px; }
 		.admin-config-save .btn { width: auto; margin-top: 0; padding: 11px 30px; font-size: 0.9rem; }
-		/* Widoczność zakładek: 3 kolumny — etykieta | select widoczności | select umiejscowienia */
-		#tabvis-list { grid-template-columns: max-content max-content max-content; }
+		/* Widoczność zakładek: 4 kolumny — reorder (⠿▲▼) | etykieta | widoczność | umiejscowienie */
+		#tabvis-list { grid-template-columns: max-content max-content max-content max-content; }
 		#tabvis-list .admin-config-select { width: auto; min-width: 110px; }
-		.tabvis-locked { grid-column: 2 / -1; font-size: 0.76rem; font-style: italic; color: #e57373; display: flex; align-items: center; }
+		.tabvis-reorder { display: flex; align-items: center; gap: 1px; }
+		.tabvis-reorder[draggable="true"] { cursor: grab; }
+		.tabvis-reorder.dragging { opacity: 0.45; }
+		.tabvis-handle { color: var(--text-muted); font-size: 0.95rem; padding: 0 2px; }
+		.tabvis-pinned { color: var(--text-muted); font-size: 0.9rem; padding: 0 4px; }
+		.tabvis-reorder .btn-icon { font-size: 0.7rem; padding: 2px 3px; }
+		.tabvis-locked { grid-column: 3 / -1; font-size: 0.76rem; font-style: italic; color: #e57373; display: flex; align-items: center; }
 		.admin-config-hint { font-size: 0.7rem; color: var(--text-muted); margin-top: 8px; text-align: center; }
 		.admin-config-subhead { font-size: 0.8rem; font-weight: 700; color: var(--accent-gold); margin: 14px 0 4px; padding-top: 10px; border-top: 1px solid var(--border); }
 
