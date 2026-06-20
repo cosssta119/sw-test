@@ -3742,33 +3742,36 @@
         function countHeroConflicts(formations) {
             const heroCount = {};
             const petCount = {};
+            const displayName = {}; // znormalizowany klucz -> ładna pisownia (kanoniczna z bazy lub oryginał)
             const conflicts = [];
-            
+
             formations.forEach((f, idx) => {
                 f.formation.my.filter(h => h).forEach(hero => {
                     const h = normalize(hero);
                     if (!heroCount[h]) heroCount[h] = [];
                     heroCount[h].push(idx);
+                    if (!displayName[h]) displayName[h] = findHero(hero)?.name || hero;
                 });
                 // Sprawdź też pety
                 if (f.formation.myPet) {
                     const p = normalize(f.formation.myPet);
                     if (!petCount[p]) petCount[p] = [];
                     petCount[p].push(idx);
+                    if (!displayName[p]) displayName[p] = f.formation.myPet;
                 }
             });
-            
+
             // Znajdź konflikty (bohaterowie użyci więcej niż raz)
             Object.entries(heroCount).forEach(([hero, indices]) => {
                 if (indices.length > 1) {
-                    conflicts.push({ hero, usedIn: indices, count: indices.length, type: 'hero' });
+                    conflicts.push({ hero, display: displayName[hero], usedIn: indices, count: indices.length, type: 'hero' });
                 }
             });
-            
+
             // Znajdź konflikty petów
             Object.entries(petCount).forEach(([pet, indices]) => {
                 if (indices.length > 1) {
-                    conflicts.push({ hero: pet, usedIn: indices, count: indices.length, type: 'pet' });
+                    conflicts.push({ hero: pet, display: displayName[pet], usedIn: indices, count: indices.length, type: 'pet' });
                 }
             });
             
@@ -4378,7 +4381,7 @@
 						${combo.conflictDetails.length ? `
 							<div class="war-conflicts-summary">
 								⚠️ <strong>Konflikty:</strong> ${combo.conflictDetails.map(c => 
-									`<span class="conflict-hero">${c.hero}</span>`
+									`<span class="conflict-hero">${c.display || c.hero}</span>`
 								).join(', ')}
 							</div>` : ''}
 						${hasExcluded ? `
@@ -4994,17 +4997,20 @@
 			// Zbierz wszystkich bohaterów użytych w "TWÓJ SKŁAD" aby wykryć konflikty
 			const allMyHeroes = {};
 			const allMyPets = {};
+			const conflictDisplay = {}; // znormalizowany klucz -> ładna pisownia
 			combo.formations.forEach((match, idx) => {
 				match.formation.my.filter(h => h).forEach(hero => {
 					const h = normalize(hero);
 					if (!allMyHeroes[h]) allMyHeroes[h] = [];
 					allMyHeroes[h].push(idx);
+					if (!conflictDisplay[h]) conflictDisplay[h] = findHero(hero)?.name || hero;
 				});
 				// Sprawdź też pety
 				if (match.formation.myPet) {
 					const p = normalize(match.formation.myPet);
 					if (!allMyPets[p]) allMyPets[p] = [];
 					allMyPets[p].push(idx);
+					if (!conflictDisplay[p]) conflictDisplay[p] = match.formation.myPet;
 				}
 			});
 			
@@ -5201,7 +5207,7 @@
 				Object.entries(allMyHeroes).forEach(([hero, indices]) => {
 					if (indices.length > 1) {
 						conflictList.push({
-							name: hero.charAt(0).toUpperCase() + hero.slice(1),
+							name: conflictDisplay[hero] || hero,
 							battles: indices.map(i => i + 1),
 							type: 'hero'
 						});
@@ -5210,7 +5216,7 @@
 				Object.entries(allMyPets).forEach(([pet, indices]) => {
 					if (indices.length > 1) {
 						conflictList.push({
-							name: pet.charAt(0).toUpperCase() + pet.slice(1),
+							name: conflictDisplay[pet] || pet,
 							battles: indices.map(i => i + 1),
 							type: 'pet'
 						});
