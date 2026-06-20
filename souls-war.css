@@ -600,7 +600,7 @@
 		
 		.result-card {
 			background: var(--bg-card);
-			border: 1px solid var(--border);
+			border: 2px solid var(--border);
 			border-radius: 8px;
 			padding: 12px;
 			margin-bottom: 10px;
@@ -618,10 +618,9 @@
 			to { opacity: 1; transform: translateY(0); }
 		}
 		
-		.result-card:hover { 
-			border-color: var(--accent-gold); 
-			transform: translateX(5px);
-			box-shadow: 0 2px 8px rgba(212, 175, 55, 0.2);
+		.result-card:hover {
+			border-color: var(--accent-gold);
+			box-shadow: inset 4px 0 0 var(--accent-gold), 0 4px 14px rgba(0, 0, 0, 0.25);
 		}
 		
 		.result-card-checkbox { flex-shrink: 0; display: flex; align-items: center; padding-top: 5px; }
@@ -632,22 +631,22 @@
 		.result-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 		.result-id { font-family: 'Cinzel', serif; color: var(--accent-gold); font-size: 0.85rem; }
 		
-		.match-score { padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: 700; }
+		.match-score { padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: 700; border: 2px solid rgba(0, 0, 0, 0.3); }
 		.match-6, .match-5 { background: #2e7d32; }
 		.match-4 { background: #f9a825; color: #000; }
 		.match-3 { background: #ef6c00; }
 		.match-2 { background: #c62828; }
 		.match-1 { background: #757575; }
 		
-		.result-name { font-size: 0.9rem; margin-bottom: 5px; }
-		.result-heroes { font-size: 0.75rem; color: var(--text-muted); line-height: 1.4; }
-		
-		.matched-hero { 
-			color: #4caf50; 
+		.result-name { font-size: 1rem; font-weight: 700; margin-bottom: 5px; }
+		.result-heroes { font-size: 0.8rem; color: var(--text-muted); line-height: 1.4; }
+
+		.matched-hero {
+			color: #fff;
 			font-weight: 600;
-			background: rgba(76, 175, 80, 0.15);
-			padding: 1px 4px;
-			border-radius: 3px;
+			background: #2e7d32;
+			padding: 1px 6px;
+			border-radius: 4px;
 		}
 		
 		.result-my-heroes {
@@ -1711,25 +1710,27 @@
 		.war-planner-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
 
 		.war-enemy-section {
-			background: rgba(139, 0, 0, 0.1);
-			border: 1px solid rgba(139, 0, 0, 0.3);
+			background: rgba(244, 67, 54, 0.07);
+			border: 2px solid #f44336;
 			border-radius: 10px;
-			padding: 12px;
+			padding: 14px;
 		}
-		
+
 		.war-enemy-title {
-			font-size: 0.85rem;
+			font-size: 0.9rem;
 			color: #f44336;
 			text-align: center;
 			margin-bottom: 10px;
 			padding-bottom: 8px;
-			border-bottom: 1px solid rgba(139, 0, 0, 0.3);
+			border-bottom: 1px solid rgba(244, 67, 54, 0.4);
 		}
-		
+
 		.war-enemy-grid { display: flex; flex-direction: column; gap: 4px; align-items: center; }
 		.war-row { display: flex; gap: 3px; justify-content: center; }
 		.war-row .autocomplete-wrapper { margin-bottom: 0; width: 70px; }
 		.war-row input { padding: 6px 4px; font-size: 0.7rem; text-align: center; }
+		/* Opcja 1+: większy oddech inputów wrogów (tylko Planer Wojny, nie Kreator) */
+		.war-enemy-section .war-row input { padding: 8px 4px; font-size: 0.75rem; }
 		.war-pet-row .autocomplete-wrapper { width: 100px; }
 		.war-pet-row input { font-size: 0.65rem; }
 
@@ -1772,55 +1773,60 @@
 		.war-result-card {
 			background: var(--bg-card);
 			border: 2px solid var(--border);
-			border-radius: 12px;
-			padding: 15px;
+			border-radius: 14px;
+			padding: 18px;
 			margin-bottom: 15px;
 			animation: fadeIn 0.3s ease;
 		}
-		
-		.war-result-card.perfect { border-color: var(--accent-green); box-shadow: 0 0 15px rgba(46, 125, 50, 0.3); }
-		.war-result-card.good { border-color: var(--accent-gold); }
-		.war-result-card.conflicts { border-color: #ef6c00; }
+
+		.war-result-card.perfect { border-color: var(--accent-green); background: rgba(46, 125, 50, 0.08); box-shadow: 0 0 12px rgba(46, 125, 50, 0.2); }
+		.war-result-card.good { border-color: var(--accent-gold); background: rgba(212, 175, 55, 0.07); }
+		.war-result-card.conflicts { border-color: #ef6c00; background: rgba(239, 108, 0, 0.08); }
 
 		.war-result-header {
 			display: flex;
 			justify-content: space-between;
 			align-items: center;
-			margin-bottom: 15px;
+			margin-bottom: 16px;
 			padding-bottom: 10px;
-			border-bottom: 1px solid var(--border);
+			border-bottom: 2px solid var(--border);
 		}
-		
-		.war-result-rank { font-family: 'Cinzel', serif; font-size: 1.1rem; color: var(--accent-gold); }
-		
-		.war-conflict-badge { padding: 4px 12px; border-radius: 15px; font-size: 0.8rem; font-weight: 600; }
+
+		.war-result-rank { font-family: 'Cinzel', serif; font-size: 1.35rem; color: var(--accent-gold); }
+
+		.war-conflict-badge { padding: 4px 12px; border-radius: 15px; font-size: 0.8rem; font-weight: 700; border: 2px solid currentColor; }
 		.war-conflict-badge.perfect { background: var(--accent-green); color: white; }
 		.war-conflict-badge.good { background: var(--accent-gold); color: #000; }
 		.war-conflict-badge.bad { background: #ef6c00; color: white; }
 
-		.war-formations-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+		.war-formations-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
 
 		.war-formation-box {
 			background: var(--bg-input);
-			border-radius: 8px;
-			padding: 10px;
-			border: 1px solid var(--border);
+			border-radius: 10px;
+			padding: 0;
+			overflow: hidden;
+			border: 2px solid var(--border);
 		}
-		
+
 		.war-formation-box h4 {
-			font-size: 0.75rem;
+			font-size: 0.78rem;
 			color: var(--accent-gold);
-			margin-bottom: 8px;
+			margin: 0;
+			padding: 9px 11px;
+			background: rgba(212, 175, 55, 0.18);
+			border-bottom: 2px solid var(--border);
+			font-weight: 700;
 			display: flex;
 			justify-content: space-between;
 			align-items: center;
 		}
-		
+
 		.war-formation-box .formation-id { font-size: 0.65rem; color: var(--text-muted); }
-		.war-formation-box .heroes-list { font-size: 0.75rem; color: var(--text-light); line-height: 1.5; }
+		.war-formation-box .heroes-list { font-size: 0.75rem; color: var(--text-light); line-height: 1.5; font-weight: 600; }
 		.war-formation-box .hero-conflict { color: #ff5722; font-weight: 700; background: rgba(255, 87, 34, 0.2); padding: 1px 4px; border-radius: 3px; }
 
-		.war-vs-enemy { font-size: 0.65rem; color: var(--text-muted); margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--border); }
+		.war-vs-enemy { font-size: 0.65rem; color: var(--text-muted); margin-top: 8px; padding: 8px 11px 11px; border-top: 1px dashed var(--border); }
 		
 		.war-match-score { font-size: 0.7rem; padding: 2px 6px; border-radius: 10px; margin-left: 5px; }
 		.war-match-score.high { background: var(--accent-green); color: white; }
@@ -1829,7 +1835,7 @@
 
 		.war-summary-box {
 			background: linear-gradient(135deg, rgba(212, 175, 55, 0.1), rgba(212, 175, 55, 0.02));
-			border: 1px solid rgba(212, 175, 55, 0.3);
+			border: 2px solid var(--accent-gold);
 			border-radius: 12px;
 			padding: 15px;
 			margin-bottom: 15px;
@@ -1853,16 +1859,17 @@
 
 		.war-result-badges { display: flex; gap: 8px; align-items: center; }
 		
-		.war-score-badge { padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
-		.war-score-badge.high { background: rgba(76, 175, 80, 0.2); color: #4caf50; border: 1px solid #4caf50; }
-		.war-score-badge.medium { background: rgba(255, 193, 7, 0.2); color: #ffc107; border: 1px solid #ffc107; }
-		.war-score-badge.low { background: rgba(255, 152, 0, 0.2); color: #ff9800; border: 1px solid #ff9800; }
+		.war-score-badge { padding: 4px 11px; border-radius: 12px; font-size: 0.75rem; font-weight: 700; border: none; }
+		.war-score-badge.high { background: #2e7d32; color: #fff; }
+		.war-score-badge.medium { background: #e08600; color: #000; }
+		.war-score-badge.low { background: #ff9800; color: #000; }
 
-		.war-match-bar { height: 4px; background: var(--bg-dark); border-radius: 2px; overflow: hidden; margin-bottom: 5px; }
-		.war-match-fill { height: 100%; border-radius: 2px; transition: width 0.3s; }
-		.war-match-fill.high { background: #4caf50; }
-		.war-match-fill.medium { background: #ffc107; }
-		.war-match-fill.low { background: #ff9800; }
+		/* Opcja 1+: segmentowy pasek trafień (10 kratek = %) */
+		.war-match-bar { height: 9px; display: flex; gap: 2px; padding: 1px; background: var(--bg-dark); border: 1px solid var(--border); border-radius: 5px; overflow: hidden; margin-bottom: 5px; }
+		.war-match-seg { flex: 1; border-radius: 2px; background: rgba(136, 136, 136, 0.22); }
+		.war-match-seg.on { background: #4caf50; }
+		.war-match-bar.medium .war-match-seg.on { background: #ffc107; }
+		.war-match-bar.low .war-match-seg.on { background: #ff9800; }
 
 		.war-conflicts-summary {
 			margin-top: 12px;
@@ -2943,7 +2950,7 @@
 		[data-theme="light"] .db-item-id { color: #996515; }
 		[data-theme="light"] .db-item-date { color: #6b6560; }
 
-		[data-theme="light"] .matched-hero { background: rgba(46, 125, 50, 0.15); color: #2e7d32; }
+		[data-theme="light"] .matched-hero { background: #2e7d32; color: #fff; }
 
 		[data-theme="light"] .formation-preview { background: linear-gradient(180deg, #ffffff 0%, #f8f5f0 100%); border: 1px solid #d4cfc7; }
 		[data-theme="light"] .battle-section.enemy { background: rgba(198, 40, 40, 0.05); border-color: rgba(198, 40, 40, 0.2); }
@@ -2952,7 +2959,7 @@
 		[data-theme="light"] .battle-pet.filled { background: linear-gradient(135deg, rgba(153, 101, 21, 0.1), rgba(153, 101, 21, 0.05)); border-color: #996515; color: #996515; }
 		[data-theme="light"] .vs-badge { background: rgba(153, 101, 21, 0.1); border-color: rgba(153, 101, 21, 0.3); color: #996515; }
 
-		[data-theme="light"] .war-enemy-section { background: rgba(198, 40, 40, 0.04); border-color: rgba(198, 40, 40, 0.15); }
+		[data-theme="light"] .war-enemy-section { background: rgba(244, 67, 54, 0.05); border-color: rgba(244, 67, 54, 0.55); }
 		[data-theme="light"] .war-formation-box,
 		[data-theme="light"] .war-compare-side { background: #f8f5f0; border-color: #d4cfc7; }
 		[data-theme="light"] .war-summary-box { background: linear-gradient(135deg, rgba(153, 101, 21, 0.08), rgba(153, 101, 21, 0.02)); border-color: rgba(153, 101, 21, 0.2); }
@@ -3074,7 +3081,9 @@
 		/* Etykiety sekcji w kartach wyników */
 		.war-formation-section {
 			margin-bottom: 10px;
+			padding: 0 11px;
 		}
+		.war-formation-section:first-of-type { padding-top: 11px; }
 		.war-section-label {
 			font-size: 0.65rem;
 			color: var(--text-muted);

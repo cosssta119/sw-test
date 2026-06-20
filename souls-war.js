@@ -4367,8 +4367,8 @@
 											</div>
 										</div>
 										<div class="war-vs-enemy">
-											<div class="war-match-bar">
-												<div class="war-match-fill ${scoreClass}" style="width: ${matchPercent}%"></div>
+											<div class="war-match-bar ${scoreClass}">
+												${Array.from({ length: 10 }, (_, s) => `<span class="war-match-seg ${s < Math.round(matchPercent / 10) ? 'on' : ''}"></span>`).join('')}
 											</div>
 											<span class="war-match-score ${scoreClass}">${displayScore}/${m.maxScore}</span>
 										</div>
