@@ -781,6 +781,7 @@
 			}
 			renderMoreMenu();
 			if (!useMore) closeMoreMenu();
+			nav?.classList.remove('nav-initializing'); // odsłoń pasek po pierwszym poprawnym ułożeniu
 		}
 
 		// ── Kolejność zakładek w „Widoczność zakładek": ▲▼ + drag&drop (mysz) ──
@@ -4130,6 +4131,28 @@
                 return union > 0 && (intersection / union) >= similarityThreshold;
             };
             
+            // Pre-normalizacja bohaterów/petów per kontra (raz, nie w pętli 125k×) — tańsze liczenie konfliktów
+            const prep = arr => arr.forEach(m => {
+                m._myNorm = m.formation.my.filter(h => h).map(normalize);
+                m._petNorm = m.formation.myPet ? normalize(m.formation.myPet) : null;
+            });
+            prep(matches1); prep(matches2); prep(matches3);
+
+            // Szybka suma konfliktów bez budowania obiektów: |A∩B|+|A∩C|+|B∩C| - |A∩B∩C| (+ analogicznie pety)
+            const warConflictTotal = (m1, m2, m3) => {
+                const a = m1._myNorm, b = m2._myNorm, c = m3._myNorm;
+                const inter = (x, y) => { let n = 0; for (const e of x) if (y.includes(e)) n++; return n; };
+                let triple = 0; for (const e of a) if (b.includes(e) && c.includes(e)) triple++;
+                let total = inter(a, b) + inter(a, c) + inter(b, c) - triple;
+                const p1 = m1._petNorm, p2 = m2._petNorm, p3 = m3._petNorm;
+                if (p1 || p2 || p3) {
+                    const pab = (p1 && p1 === p2) ? 1 : 0, pac = (p1 && p1 === p3) ? 1 : 0, pbc = (p2 && p2 === p3) ? 1 : 0;
+                    const ptri = (p1 && p1 === p2 && p2 === p3) ? 1 : 0;
+                    total += pab + pac + pbc - ptri;
+                }
+                return total;
+            };
+
             // KROK 1: Generuj WSZYSTKIE kombinacje (bez filtrowania)
             let allCombinations = [];
             
@@ -4140,17 +4163,21 @@
                     for (const m3 of matches3) {
                         if (m1.formation.id === m3.formation.id || m2.formation.id === m3.formation.id) continue;
                         
-                        const conflicts = countHeroConflicts([m1, m2, m3]);
+                        const conflicts = warConflictTotal(m1, m2, m3);
                         const totalScore = m1.score + m2.score + m3.score;
                         const totalBaseScore = (m1.baseScore || m1.score) + (m2.baseScore || m2.score) + (m3.baseScore || m3.score);
-                        
+                        const maxPossible = m1.maxScore + m2.maxScore + m3.maxScore;
+                        const percent = maxPossible > 0 ? (totalBaseScore / maxPossible) * 100 : 0;
+                        const rankScore = percent - Math.pow(conflicts, CONFLICT_PENALTY_EXP) * CONFLICT_PENALTY_MULT;
+
                         allCombinations.push({
                             formations: [m1, m2, m3],
-                            conflicts: conflicts.total,
-                            conflictDetails: conflicts.details,
+                            conflicts,
                             totalScore,
                             totalBaseScore,
-                            avgScore: totalBaseScore / 3
+                            avgScore: totalBaseScore / 3,
+                            maxPossible,
+                            rankScore
                         });
                     }
                 }
@@ -4166,20 +4193,8 @@
 			}
 			// KROK 2: Sortuj WSZYSTKIE po jakości (najlepsze na górze)
 			allCombinations.sort((a, b) => {
-				const maxPossibleA = a.formations.reduce((sum, m) => sum + m.maxScore, 0);
-				const maxPossibleB = b.formations.reduce((sum, m) => sum + m.maxScore, 0);
-				
-				// Używamy totalBaseScore (bez bonusu za pozycję) - to samo co wyświetlane procenty
-				const percentA = maxPossibleA > 0 ? (a.totalBaseScore / maxPossibleA) * 100 : 0;
-				const percentB = maxPossibleB > 0 ? (b.totalBaseScore / maxPossibleB) * 100 : 0;
-				
-				const conflictPenaltyA = Math.pow(a.conflicts, CONFLICT_PENALTY_EXP) * CONFLICT_PENALTY_MULT;
-				const conflictPenaltyB = Math.pow(b.conflicts, CONFLICT_PENALTY_EXP) * CONFLICT_PENALTY_MULT;
-				
-				const scoreA = percentA - conflictPenaltyA;
-				const scoreB = percentB - conflictPenaltyB;
-				
-				if (Math.abs(scoreA - scoreB) > WAR_TIE_EPSILON) return scoreB - scoreA;
+				// rankScore (percent − kara za konflikty) policzony raz przy generowaniu kombinacji
+				if (Math.abs(a.rankScore - b.rankScore) > WAR_TIE_EPSILON) return b.rankScore - a.rankScore;
 				return a.conflicts - b.conflicts;
 			});
             
@@ -4212,6 +4227,8 @@
 				top = allCombinations.slice(0, WAR_RESULT_LIMIT);
 			}
             
+            // Szczegóły konfliktów liczymy dopiero dla wyświetlanych kombinacji (tanio, ~20 szt.)
+            top.forEach(c => { if (!c.conflictDetails) c.conflictDetails = countHeroConflicts(c.formations).details; });
             displayWarResults(top, [enemy1, enemy2, enemy3]);
         }
 

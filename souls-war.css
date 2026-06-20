@@ -132,7 +132,10 @@
 			border-top: 2px solid var(--accent-gold);
 			display: flex;
 			z-index: 100;
+			transition: opacity 0.18s ease;
 		}
+		/* Zanim applyTabVisibility() ułoży zakładki wg configu — ukryj pasek, by nie migały złe/wszystkie zakładki (FOUC) */
+		.bottom-nav.nav-initializing { opacity: 0; pointer-events: none; }
 		
 		.nav-btn {
 			flex: 1;
