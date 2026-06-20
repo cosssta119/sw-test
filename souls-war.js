@@ -6967,7 +6967,8 @@
             reader.onload = async e => {
                 try {
                     const data = JSON.parse(e.target.result);
-                    if (!data || typeof data !== 'object') { showToast(t('settings.restoreBad'), true); return; }
+                    if (!data || typeof data !== 'object' || (data._meta && data._meta.app && data._meta.app !== 'souls-war')) { showToast(t('settings.restoreBad'), true); return; }
+                    if (!data.formations && !data.defenseFormations && !data.heroes && !data.pets) { showToast(t('settings.restoreBad'), true); return; }
                     const arr = x => Array.isArray(x) ? x : [];
                     const F = arr(data.formations), H = arr(data.heroes), P = arr(data.pets),
                           DF = arr(data.defenseFormations), DP = arr(data.defensePlayers), DA = arr(data.defenseAssignments);
@@ -6979,22 +6980,23 @@
                     const dpIds = new Set(allDefensePlayers.map(x => x.id));
                     const daIds = new Set(allDefenseAssignments.map(x => x.id));
                     const newF = F.filter(f => f && f.id != null && !fIds.has(f.id) && !fFps.has(formationFingerprint(f.my, f.myPet, f.enemy, f.enemyPet)));
-                    const newH = H.filter(h => h && h.name && !hNames.has(String(h.name).toLowerCase()));
-                    const newP = P.filter(p => { const n = typeof p === 'string' ? p : (p && p.name); return n && !pNames.has(String(n).toLowerCase()); });
+                    const validKey = k => k && !/[.#$\[\]\/]/.test(String(k)); // klucze Firebase nie mogą mieć . # $ [ ] /
+                    const newH = H.filter(h => h && validKey(h.name) && !hNames.has(String(h.name).toLowerCase()));
+                    const newP = P.filter(p => { const n = typeof p === 'string' ? p : (p && p.name); return validKey(n) && !pNames.has(String(n).toLowerCase()); });
                     const newDF = DF.filter(x => x && x.id != null && !dfIds.has(x.id));
                     const newDP = DP.filter(x => x && x.id != null && !dpIds.has(x.id));
                     const newDA = DA.filter(x => x && x.id != null && !daIds.has(x.id));
                     const total = newF.length + newH.length + newP.length + newDF.length + newDP.length + newDA.length;
                     if (!total) { showToast(t('settings.restoreNothing')); return; }
                     if (!confirm(`${t('settings.restoreConfirm')} +${total}\n${t('status.formations')} +${newF.length} · ${t('nav.defense')} +${newDF.length}/${newDP.length}/${newDA.length}`)) return;
-                    const writes = [];
-                    newF.forEach(f => writes.push(formationsRef.child(String(f.id)).set(f)));
-                    newH.forEach(h => writes.push(heroesRef.child(h.name).set({ name: h.name, race: h.race || 'Human' })));
-                    newP.forEach(p => { const n = typeof p === 'string' ? p : p.name; writes.push(petsRef.child(n).set({ name: n })); });
-                    newDF.forEach(x => writes.push(defenseFormationsRef.child(String(x.id)).set(x)));
-                    newDP.forEach(x => writes.push(defensePlayersRef.child(String(x.id)).set(x)));
-                    newDA.forEach(x => writes.push(defenseAssignmentsRef.child(String(x.id)).set(x)));
-                    await Promise.all(writes);
+                    const writes = []; // thunki — odpalamy w paczkach po 200, żeby nie zalać Firebase przy dużym backupie
+                    newF.forEach(f => writes.push(() => formationsRef.child(String(f.id)).set(f)));
+                    newH.forEach(h => writes.push(() => heroesRef.child(h.name).set({ name: h.name, race: h.race || 'Human' })));
+                    newP.forEach(p => { const n = typeof p === 'string' ? p : p.name; writes.push(() => petsRef.child(n).set({ name: n })); });
+                    newDF.forEach(x => writes.push(() => defenseFormationsRef.child(String(x.id)).set(x)));
+                    newDP.forEach(x => writes.push(() => defensePlayersRef.child(String(x.id)).set(x)));
+                    newDA.forEach(x => writes.push(() => defenseAssignmentsRef.child(String(x.id)).set(x)));
+                    for (let i = 0; i < writes.length; i += 200) await Promise.all(writes.slice(i, i + 200).map(fn => fn()));
                     showToast(`♻️ ${t('settings.restoreDone')} (+${total})`);
                 } catch (err) {
                     console.error('Restore error:', err);
@@ -7003,6 +7005,24 @@
             };
             reader.readAsText(file);
             event.target.value = '';
+        }
+
+        // Pełny parser CSV (RFC-4180): obsługuje cudzysłowy, podwojone "" i znaki nowej linii wewnątrz pól.
+        function parseCSV(text, sep) {
+            const rows = [];
+            let row = [], field = '', inQuotes = false;
+            for (let i = 0; i < text.length; i++) {
+                const c = text[i];
+                if (inQuotes) {
+                    if (c === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else inQuotes = false; }
+                    else field += c;
+                } else if (c === '"') inQuotes = true;
+                else if (c === sep) { row.push(field); field = ''; }
+                else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
+                else if (c !== '\r') field += c;
+            }
+            if (field !== '' || row.length) { row.push(field); rows.push(row); }
+            return rows;
         }
 
         function parseCSVLine(line, sep = ';') {
@@ -7025,11 +7045,12 @@
 			const reader = new FileReader();
 			reader.onload = async e => {
 				try {
-					const lines = e.target.result.split('\n').filter(l => l.trim());
+					const sep = ((e.target.result.split(/\r?\n/, 1)[0]) || '').includes(';') ? ';' : ',';
+						const lines = parseCSV(e.target.result, sep).filter(r => r.some(c => c.trim() !== ''));
 					if (lines.length < 2) { showToast(t('settings.importEmpty'), true); return; }
 					
-					const sep = lines[0].includes(';') ? ';' : ',';
-					const headers = parseCSVLine(lines[0], sep).map(h => h.toLowerCase().trim());
+					// separator wyznaczony wyżej przy parsowaniu (parseCSV)
+					const headers = (lines[0] || []).map(h => h.toLowerCase().trim());
 					
 					// Sprawdź czy mamy nowy format (z komentarzem) czy stary
 					const hasComment = headers.includes('komentarz') || headers.length >= 22;
@@ -7041,7 +7062,7 @@
 					const existingIds = allFormations.map(f => f.id);
 					
 					for (let i = 1; i < lines.length; i++) {
-						const vals = parseCSVLine(lines[i], sep);
+						const vals = lines[i];
 						if (vals.length < 20) { skipped++; continue; }
 						
 						// Określ czy pierwsza kolumna to ID
