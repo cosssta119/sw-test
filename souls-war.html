@@ -756,8 +756,8 @@
             
             <!-- Statystyki bazy -->
             <div class="admin-card">
-                <h3 class="admin-card-title clickable" onclick="toggleAdminSection('imp-stats')"><span class="admin-toggle-icon" id="imp-stats-toggle">▼</span> 📊 <span data-i18n="settings.statsTitle">Statystyki bazy</span></h3>
-                <div id="imp-stats-body">
+                <h3 class="admin-card-title clickable" onclick="toggleAdminSection('imp-stats')"><span class="admin-toggle-icon" id="imp-stats-toggle">▶</span> 📊 <span data-i18n="settings.statsTitle">Statystyki bazy</span></h3>
+                <div id="imp-stats-body" style="display:none">
                     <div class="import-stats">
                         <div class="import-stat"><div class="num" id="stat-formations">0</div><div class="lbl" data-i18n="settings.statFormations">Formacje</div><div class="sub" id="stat-formations-sub"></div></div>
                         <div class="import-stat"><div class="num" id="stat-defense">0</div><div class="lbl" data-i18n="settings.statDefense">Składy Obrony</div><div class="sub" id="stat-defense-sub"></div></div>
@@ -769,8 +769,8 @@
 
             <!-- Eksport CSV -->
             <div class="admin-card">
-                <h3 class="admin-card-title clickable" onclick="toggleAdminSection('imp-exportcsv')"><span class="admin-toggle-icon" id="imp-exportcsv-toggle">▼</span> 📤 <span data-i18n="settings.exportTitle">Eksport do CSV</span></h3>
-                <div id="imp-exportcsv-body">
+                <h3 class="admin-card-title clickable" onclick="toggleAdminSection('imp-exportcsv')"><span class="admin-toggle-icon" id="imp-exportcsv-toggle">▶</span> 📤 <span data-i18n="settings.exportTitle">Eksport do CSV</span></h3>
+                <div id="imp-exportcsv-body" style="display:none">
                     <p class="import-desc" data-i18n="settings.exportDesc">Pobierz formacje jako plik CSV.</p>
                     <div class="import-field"><span data-i18n="settings.exportScope">Zakres</span>:
                         <select id="export-scope" class="admin-config-select">
@@ -786,8 +786,8 @@
 
             <!-- Import CSV -->
             <div class="admin-card">
-                <h3 class="admin-card-title clickable" onclick="toggleAdminSection('imp-importcsv')"><span class="admin-toggle-icon" id="imp-importcsv-toggle">▼</span> 📥 <span data-i18n="settings.importTitle">Import z CSV</span></h3>
-                <div id="imp-importcsv-body">
+                <h3 class="admin-card-title clickable" onclick="toggleAdminSection('imp-importcsv')"><span class="admin-toggle-icon" id="imp-importcsv-toggle">▶</span> 📥 <span data-i18n="settings.importTitle">Import z CSV</span></h3>
+                <div id="imp-importcsv-body" style="display:none">
                     <p class="import-desc" data-i18n="settings.importDesc">Wczytaj formacje z CSV (duplikaty pomijane, z potwierdzeniem).</p>
                     <div class="import-actions"><button class="btn btn-success" onclick="document.getElementById('csv-input').click()">📥 <span data-i18n="settings.importBtn">Importuj CSV</span></button></div>
                     <input type="file" id="csv-input" accept=".csv" style="display:none" onchange="importFromCSV(event)">
@@ -796,8 +796,8 @@
 
             <!-- Kopia / przywracanie JSON -->
             <div class="admin-card">
-                <h3 class="admin-card-title clickable" onclick="toggleAdminSection('imp-json')"><span class="admin-toggle-icon" id="imp-json-toggle">▼</span> 💾 <span data-i18n="settings.backupTitle">Kopia zapasowa (JSON)</span></h3>
-                <div id="imp-json-body">
+                <h3 class="admin-card-title clickable" onclick="toggleAdminSection('imp-json')"><span class="admin-toggle-icon" id="imp-json-toggle">▶</span> 💾 <span data-i18n="settings.backupTitle">Kopia zapasowa (JSON)</span></h3>
+                <div id="imp-json-body" style="display:none">
                     <p class="import-desc" data-i18n="settings.backupDesc">Pełna kopia (formacje + bohaterowie + pety + Obrona). Przywracanie dodaje tylko nowe rekordy.</p>
                     <div class="import-pair">
                         <button class="btn" onclick="exportBackupJSON()">💾 <span data-i18n="settings.backupBtn">Pobierz kopię</span></button>
@@ -858,7 +858,7 @@
 				</div>
 			</div>
 			
-            <div class="admin-card">
+            <div class="admin-card admin-card-wide">
             <h3 class="admin-card-title clickable" onclick="toggleAdminSection('heroes')"><span class="admin-toggle-icon" id="heroes-toggle">▶</span> ⚔️ <span data-i18n="admin.heroes">Bohaterowie</span> (<span id="heroes-count">0</span>)</h3>
             <div id="heroes-body" style="display: none;">
                 <div class="entity-list" id="heroes-list"></div>
@@ -877,7 +877,7 @@
             </div>
             </div>
 
-            <div class="admin-card">
+            <div class="admin-card admin-card-wide">
             <h3 class="admin-card-title clickable" onclick="toggleAdminSection('pets')"><span class="admin-toggle-icon" id="pets-toggle">▶</span> 🐾 <span data-i18n="admin.pets">Pety</span> (<span id="pets-count">0</span>)</h3>
             <div id="pets-body" style="display: none;">
                 <div class="entity-list" id="pets-list"></div>

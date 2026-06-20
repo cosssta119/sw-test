@@ -1549,21 +1549,23 @@
 		.admin-config-subhead { font-size: 0.8rem; font-weight: 700; color: var(--accent-gold); margin: 14px 0 4px; padding-top: 10px; border-top: 1px solid var(--border); }
 
 		/* Panel admina — spójne karty sekcji (bez ramki-w-ramce) */
-		.admin-card { background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; margin-bottom: 14px; }
+		.admin-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; margin-bottom: 14px; }
 		.admin-card:last-child { margin-bottom: 0; }
 		.admin-card-title {
-			font-size: 1rem; font-weight: 700; text-align: center; color: var(--accent-purple);
+			font-size: 1rem; font-weight: 700; text-align: left; color: var(--accent-gold);
 			margin: 0 0 10px; padding-bottom: 8px; border-bottom: 1px solid var(--border);
-			display: flex; align-items: center; justify-content: center; gap: 6px;
+			display: flex; align-items: center; justify-content: flex-start; gap: 6px;
+			border-radius: 6px; transition: background 0.12s;
 		}
 		.admin-card-title.clickable { cursor: pointer; user-select: none; }
+		.admin-card-title.clickable:hover { background: rgba(212, 175, 55, 0.07); }
 		.admin-card .entity-list { background: transparent; padding: 0; margin-bottom: 10px; }
 		/* === Zakładka Import — statystyki, duże przyciski, podgląd diff === */
 		/* Dopasowanie do makiety: węższa kolumna, złote tytuły do lewej, podświetlenie segmentu na hover */
 		#tab-settings .section { max-width: 600px; margin-left: auto; margin-right: auto; }
-		#tab-settings .admin-card { background: var(--bg-card); }
-		#tab-settings .admin-card-title { color: var(--accent-gold); justify-content: flex-start; text-align: left; border-radius: 6px; transition: background 0.12s; }
-		#tab-settings .admin-card-title.clickable:hover { background: rgba(212, 175, 55, 0.07); }
+		/* Admin: węższe karty (margin auto), ale Bohaterowie/Pety zostają na pełną szerokość (admin-card-wide) */
+		#tab-admin .admin-card { max-width: 600px; margin-left: auto; margin-right: auto; }
+		#tab-admin .admin-card.admin-card-wide { max-width: none; }
 		.import-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 		.import-stat { background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; padding: 12px; text-align: center; }
 		.import-stat .num { font-family: 'Cinzel', serif; font-size: 1.5rem; color: var(--accent-gold); line-height: 1; }
