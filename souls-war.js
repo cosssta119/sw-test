@@ -197,7 +197,7 @@
 				'war.totalMatch': 'Dopasowanie',
 				'war.heroesMatched': 'Trafień',
 				'war.conflicts': 'Konflikty',
-				'war.noConflicts': 'Brak konfliktów',
+				'war.noConflicts': 'Brak konfliktów', 'war.conflictFree': 'Tylko grywalne (bez konfliktów)', 'war.noConflictFree': 'Brak grywalnych kombinacji bez konfliktów. Odznacz filtr, aby zobaczyć opcje z konfliktami.',
 				'war.conflictsCount': 'konfliktów',
 				'war.battle': 'Walka',
 				'war.match': 'trafień',
@@ -436,7 +436,7 @@
 				'war.totalMatch': 'Match',
 				'war.heroesMatched': 'Hits',
 				'war.conflicts': 'Conflicts',
-				'war.noConflicts': 'No conflicts',
+				'war.noConflicts': 'No conflicts', 'war.conflictFree': 'Only playable (no conflicts)', 'war.noConflictFree': 'No conflict-free playable combinations. Uncheck the filter to see options with conflicts.',
 				'war.conflictsCount': 'conflicts',
 				'war.battle': 'Battle',
 				'war.match': 'match',
@@ -3781,6 +3781,8 @@
 		// DOMYŚLNA WARTOŚĆ SUWAKA PO ZAZNACZENIU CHECKBOX - ZMIEŃ TUTAJ:
 		const SIMILARITY_DEFAULT_VALUE = 60; // Możesz zmienić na 40, 50, 70, 80, 90
 
+		function toggleWarConflictFree(checked) { storage.setBool('souls_war_conflict_free', checked); }
+
 		function toggleSimilarityFilter(enabled) {
 			const container = $('similarity-slider-container');
 			const slider = $('war-similarity-threshold');
@@ -3824,6 +3826,7 @@
 		}
 
 		function initWarFields() {
+			if ($('war-conflict-free')) $('war-conflict-free').checked = storage.getBool('souls_war_conflict_free', false);
 			// Dodaj listenery do wszystkich pól Wojny
 			for (let e = 1; e <= 3; e++) {
 				for (let h = 1; h <= 8; h++) {
@@ -4077,7 +4080,7 @@
             }
             
             // Stałe rankingu Wojny (wyniesione z inline — zmiana tu = zmiana zachowania rankingu)
-            const WAR_POOL_SIZE = 40;          // ile kontr/wroga wchodzi do iloczynu (ranking i tak utnie do WAR_RESULT_LIMIT)
+            const WAR_POOL_SIZE = 50;          // ile kontr/wroga wchodzi do iloczynu (ranking i tak utnie do WAR_RESULT_LIMIT)
             const WAR_RESULT_LIMIT = 20;       // ile kombinacji ostatecznie pokazujemy
             const CONFLICT_PENALTY_MULT = 8;   // mnożnik kary za konflikty bohaterów
             const CONFLICT_PENALTY_EXP = 1.5;  // wykładnik kary (superlinearny)
@@ -4118,7 +4121,7 @@
             };
             
             // KROK 1: Generuj WSZYSTKIE kombinacje (bez filtrowania)
-            const allCombinations = [];
+            let allCombinations = [];
             
             for (const m1 of matches1) {
                 for (const m2 of matches2) {
@@ -4143,6 +4146,14 @@
                 }
             }
             
+			// Filtr „tylko grywalne" (bez konfliktów) — per-user, domyślnie off
+			if ($('war-conflict-free')?.checked) {
+				allCombinations = allCombinations.filter(c => c.conflicts === 0);
+				if (!allCombinations.length) {
+					$('war-results-section').innerHTML = `<div class="empty-state"><p>${t('war.noConflictFree')}</p></div>`;
+					return;
+				}
+			}
 			// KROK 2: Sortuj WSZYSTKIE po jakości (najlepsze na górze)
 			allCombinations.sort((a, b) => {
 				const maxPossibleA = a.formations.reduce((sum, m) => sum + m.maxScore, 0);

@@ -502,6 +502,12 @@
             </div>
             
 			<button class="btn btn-success" onclick="findWarFormations()" style="margin-top: 15px;">🎯 ZNAJDŹ OPTYMALNE SKŁADY</button>
+			<div style="margin-top: 12px; padding: 10px 12px; background: var(--bg-input); border-radius: 8px; border: 1px solid var(--border);">
+				<label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+					<input type="checkbox" id="war-conflict-free" onchange="toggleWarConflictFree(this.checked)" style="width: 16px; height: 16px; cursor: pointer;">
+					<span style="font-size: 0.85rem; color: var(--text-secondary);">🚫 <span data-i18n="war.conflictFree">Tylko grywalne (bez konfliktów)</span></span>
+				</label>
+			</div>
 			<div class="similarity-filter" style="margin-top: 12px; padding: 10px 12px; background: var(--bg-input); border-radius: 8px; border: 1px solid var(--border);">
 				<label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
 					<input type="checkbox" id="war-similarity-enabled" onchange="toggleSimilarityFilter(this.checked)" style="width: 16px; height: 16px; cursor: pointer;">
