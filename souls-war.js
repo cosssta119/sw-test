@@ -48,6 +48,7 @@
 		const DEFAULT_CONFIG = {
 			newFormationDays: 7,        // próg badge „NOWE"
 			defaultMinMatch: 3,         // domyślny próg trafności wyszukiwania
+			warResultLimit: 20,         // ile kombinacji pokazuje Planer Wojny (konfigurowalne, clamp 5–100)
 			defaultSearchSort: 'relevance', // domyślne sortowanie wyników
 			defaultDbFilter: 'all',     // domyślny filtr bazy na starcie
 			defaultPackageMinSupport: 5,// domyślne „min. wystąpień" w pakietach
@@ -151,7 +152,7 @@
                 'admin.editPet': 'Edytuj peta', 'admin.petSaved': 'Zapisano peta',
                 'admin.renamePetConfirm': 'Zmiana nazwy zaktualizuje też wszystkie formacje i składy obrony używające tego peta. Kontynuować?',
                 'admin.config': 'Konfiguracja (globalna)', 'admin.configNewDays': 'Próg „NOWE" (dni)',
-                'admin.configMinMatch': 'Domyślny próg trafności', 'admin.configSort': 'Domyślne sortowanie wyników',
+                'admin.configMinMatch': 'Domyślny próg trafności', 'admin.configWarResult': 'Wyników w Planerze Wojny (5–100)', 'admin.configSort': 'Domyślne sortowanie wyników',
                 'admin.configDbFilter': 'Domyślny filtr bazy', 'admin.configPkgSupport': 'Pakiety: domyślne min. wystąpień', 'admin.configPkgWindow': 'Pakiety: domyślne okno',
                 'admin.tabVisibility': 'Widoczność zakładek', 'admin.visAll': 'Wszyscy', 'admin.visAdmin': 'Tylko admin',
                 'admin.placeBar': 'W pasku', 'admin.placeMore': 'W „Więcej"', 'admin.placeHidden': 'Ukryj',
@@ -390,7 +391,7 @@
                 'admin.editPet': 'Edit pet', 'admin.petSaved': 'Pet saved',
                 'admin.renamePetConfirm': 'Renaming will also update all formations and defense setups using this pet. Continue?',
                 'admin.config': 'Configuration (global)', 'admin.configNewDays': '"NEW" threshold (days)',
-                'admin.configMinMatch': 'Default match threshold', 'admin.configSort': 'Default results sorting',
+                'admin.configMinMatch': 'Default match threshold', 'admin.configWarResult': 'War Planner results (5–100)', 'admin.configSort': 'Default results sorting',
                 'admin.configDbFilter': 'Default database filter', 'admin.configPkgSupport': 'Packages: default min. occurrences', 'admin.configPkgWindow': 'Packages: default window',
                 'admin.tabVisibility': 'Tab visibility', 'admin.visAll': 'Everyone', 'admin.visAdmin': 'Admin only',
                 'admin.placeBar': 'In bar', 'admin.placeMore': 'In „More"', 'admin.placeHidden': 'Hidden',
@@ -4081,9 +4082,9 @@
             
             // Stałe rankingu Wojny (wyniesione z inline — zmiana tu = zmiana zachowania rankingu)
             const WAR_POOL_SIZE = 50;          // ile kontr/wroga wchodzi do iloczynu (ranking i tak utnie do WAR_RESULT_LIMIT)
-            const WAR_RESULT_LIMIT = 20;       // ile kombinacji ostatecznie pokazujemy
+            const WAR_RESULT_LIMIT = Math.min(100, Math.max(5, appConfig.warResultLimit || 20)); // konfigurowalne (panel admina), clamp 5–100
             const CONFLICT_PENALTY_MULT = 8;   // mnożnik kary za konflikty bohaterów
-            const CONFLICT_PENALTY_EXP = 1.7;  // wykładnik kary (superlinearny) — 1 konflikt = MULT, 2+ rosną szybciej
+            const CONFLICT_PENALTY_EXP = 1.5;  // wykładnik kary (superlinearny)
             const WAR_TIE_EPSILON = 0.1;       // próg „remisu" score przy sortowaniu
             // Znajdź pasujące formacje dla każdego wroga
             const matches1 = findMatchingFormations(enemy1, 1).slice(0, WAR_POOL_SIZE);
@@ -7462,6 +7463,7 @@
         function renderConfigForm(force) {
             if ($('config-new-days')) $('config-new-days').value = appConfig.newFormationDays;
             if ($('config-min-match')) $('config-min-match').value = appConfig.defaultMinMatch;
+            if ($('config-war-result')) $('config-war-result').value = appConfig.warResultLimit;
             if ($('config-default-sort')) $('config-default-sort').value = appConfig.defaultSearchSort;
             if ($('config-db-filter')) $('config-db-filter').value = appConfig.defaultDbFilter;
             if ($('config-pkg-support')) $('config-pkg-support').value = appConfig.defaultPackageMinSupport;
@@ -7489,6 +7491,8 @@
             const dbFilter = $('config-db-filter')?.value;
             const pkgSup = parseInt($('config-pkg-support')?.value, 10);
             const pkgWindow = $('config-pkg-window')?.value;
+            let warResult = parseInt($('config-war-result')?.value, 10);
+            warResult = Math.min(100, Math.max(5, warResult > 0 ? warResult : 20));
             if (!(days > 0)) { showToast(t('admin.configInvalidDays'), true); return; }
             if (!(minMatch > 0)) { showToast(t('admin.configInvalidMin'), true); return; }
             if (!(pkgSup > 0)) { showToast(t('admin.configInvalidMin'), true); return; }
@@ -7515,7 +7519,8 @@
                     defaultPackageWindow: ['all', '30', '90'].includes(pkgWindow) ? pkgWindow : 'all',
                     tabVisibility,
                     tabPlacement,
-                    tabOrder
+                    tabOrder,
+                    warResultLimit: warResult
                 });
                 configTabDirty = false; // zapisano → pozwól listenerowi przeseedować robocze kopie ze świeżego configu
                 showToast(`✅ ${t('admin.configSaved')}`);
@@ -7840,6 +7845,8 @@
                 const pkgSup = Number(c.defaultPackageMinSupport);
                 appConfig.newFormationDays = days > 0 ? days : DEFAULT_CONFIG.newFormationDays;
                 appConfig.defaultMinMatch = minMatch > 0 ? minMatch : DEFAULT_CONFIG.defaultMinMatch;
+                const warRes = Number(c.warResultLimit);
+                appConfig.warResultLimit = (warRes >= 5 && warRes <= 100) ? warRes : DEFAULT_CONFIG.warResultLimit;
                 appConfig.defaultSearchSort = (c.defaultSearchSort === 'newest' || c.defaultSearchSort === 'relevance')
                     ? c.defaultSearchSort : DEFAULT_CONFIG.defaultSearchSort;
                 appConfig.defaultDbFilter = ['all', 'base', 'user', 'favorites'].includes(c.defaultDbFilter)
