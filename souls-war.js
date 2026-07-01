@@ -35,8 +35,10 @@
             }
         });
 
-        let db, formationsRef, heroesRef, petsRef, heroSkillsRef, petSkillsRef;
+        let db, formationsRef, heroesRef, petsRef, heroSkillsRef, petSkillsRef, synonymsRef;
         let allFormations = [];
+        let allSynonyms = [];            // cache /synonyms (słownik synonimów wyszukiwarki; live przez .on)
+        let editingSynId = null;         // id edytowanego wiersza słownika (null = tryb dodawania)
         let allHeroSkills = {};          // cache /heroSkills (lazy-load przy 1. wejściu na zakładkę Bohaterowie)
         let heroSkillsLoaded = false;    // czy już pobrano (kolejne wejścia nie odpytują Firebase)
         let allPetSkills = {};           // cache /petSkills (analogicznie do heroSkills)
@@ -124,7 +126,15 @@
                 'loading': 'Ładowanie danych...', 'common.loading': 'Ładowanie...', 'common.cancel': 'Anuluj', 'common.clear': 'Wyczyść', 'common.save': 'Zapisz',
                 'header.subtitle': 'Wyszukiwarka kontr-formacji', 'status.online': 'Online', 'status.offline': 'Offline', 'status.formations': 'formacji',
                 'nav.search': 'Szukaj', 'nav.database': 'Baza', 'nav.preview': 'Podgląd', 'nav.add': 'Dodaj', 'nav.import': 'Import', 'nav.war': 'Wojna', 'nav.kreator': 'Kreator', 'nav.heroes': 'Bohaterowie', 'nav.admin': 'Admin', 'nav.more': 'Więcej',
-                'heroes.title': 'Bohaterowie', 'heroes.subtitle': 'Przeglądaj umiejętności bohaterów', 'heroes.searchPlaceholder': '🔍 Szukaj bohatera lub umiejętności (np. Shock, Silence)...', 'heroes.searchExamples': 'Szukaj po treści, np.:',
+                'heroes.title': 'Bohaterowie', 'heroes.subtitle': 'Przeglądaj umiejętności bohaterów', 'heroes.searchPlaceholder': '🔍 Szukaj: crit increase, "fraza", stun|silence, active:stun…', 'heroes.searchExamples': 'Szukaj po treści, np.:',
+                'heroes.helpTitle': '🔍 Zaawansowane wyszukiwanie', 'heroes.helpAnd': 'oba słowa muszą być w tym samym skillu', 'heroes.helpPhrase': 'dokładna fraza (słowa obok siebie)', 'heroes.helpOr': 'którekolwiek ze słów', 'heroes.helpNot': 'ma „crit", ale bez „heal"', 'heroes.helpField': 'szukaj tylko w wybranym skillu', 'heroes.helpFields': 'Pola do „pole:słowo": active, passive, awaken, engraving, exclusive, name (pet: active, passive, energy). Reguły można łączyć.',
+                'heroes.fuzzyToggle': 'Literówki', 'heroes.fuzzyHint': 'Tolerancja literówek — dopasowuje mimo drobnej pomyłki (np. „incrase" → „increase")',
+                'heroes.synTitle': 'Słownik synonimów', 'heroes.synNote': 'Wpisz skrót, a szukajka znajdzie pełną formę (np. „cc" → „crowd control"). Klik = szukaj.',
+                'syn.delete': 'Usuń', 'syn.add': 'Dodaj', 'syn.update': '💾 Zapisz zmiany', 'syn.cancel': 'Anuluj', 'syn.seed': 'Zapisz domyślne do bazy',
+                'syn.seeded': 'Zapisano domyślny słownik do bazy', 'syn.saved': 'Zapisano wiersz słownika', 'syn.needForms': 'Podaj przynajmniej jedną formę', 'syn.writeFail': 'Zapis nieudany (sprawdź reguły Firebase /synonyms)',
+                'syn.confirmDel': 'Usunąć ten wiersz słownika?', 'syn.confirmSeed': 'Zapisać domyślny słownik synonimów do bazy? (staną się edytowalne)',
+                'syn.formsPh': 'Formy równoważne, po przecinku (np. acc, accuracy)', 'syn.expandPh': 'Rozszerzenie — opcjonalne, po przecinku (np. stun, silence)',
+                'syn.formatNote': 'Formy = szukane w obie strony. Rozszerzenie = szukane tylko po wpisaniu formy (asymetria). Skróty ≤3 znaki dopasowują się całym słowem.', 'syn.fallbackNote': 'Słownik jest teraz domyślny (z kodu). Zapisz do bazy, aby móc edytować i dodawać wiersze.',
                 'heroes.allRaces': 'Wszystkie rasy', 'heroes.allRoles': 'Wszystkie role', 'heroes.count': '{n} bohaterów', 'heroes.none': 'Brak bohaterów spełniających filtr',
                 'heroes.noData': 'Brak danych o umiejętnościach', 'heroes.noDataHint': 'Zaimportuj skille w zakładce Import (panel admina).', 'heroes.loading': 'Ładowanie umiejętności…',
                 'heroes.back': '← Wróć do listy', 'heroes.pickHint': 'Wybierz bohatera, aby zobaczyć jego umiejętności',
@@ -381,7 +391,15 @@
                 'loading': 'Loading data...', 'common.loading': 'Loading...', 'common.cancel': 'Cancel', 'common.clear': 'Clear', 'common.save': 'Save',
                 'header.subtitle': 'Counter-formation finder', 'status.online': 'Online', 'status.offline': 'Offline', 'status.formations': 'formations',
                 'nav.search': 'Search', 'nav.database': 'Database', 'nav.preview': 'Preview', 'nav.add': 'Add', 'nav.import': 'Import', 'nav.war': 'War', 'nav.kreator': 'Creator', 'nav.heroes': 'Heroes', 'nav.admin': 'Admin', 'nav.more': 'More',
-                'heroes.title': 'Heroes', 'heroes.subtitle': 'Browse hero skills', 'heroes.searchPlaceholder': '🔍 Search hero or skill (e.g. Shock, Silence)...', 'heroes.searchExamples': 'Search by content, e.g.:',
+                'heroes.title': 'Heroes', 'heroes.subtitle': 'Browse hero skills', 'heroes.searchPlaceholder': '🔍 Search: crit increase, "phrase", stun|silence, active:stun…', 'heroes.searchExamples': 'Search by content, e.g.:',
+                'heroes.helpTitle': '🔍 Advanced search', 'heroes.helpAnd': 'both words must be in the same skill', 'heroes.helpPhrase': 'exact phrase (words adjacent)', 'heroes.helpOr': 'either word', 'heroes.helpNot': 'has "crit" but no "heal"', 'heroes.helpField': 'search only in the chosen skill', 'heroes.helpFields': 'Fields for "field:word": active, passive, awaken, engraving, exclusive, name (pet: active, passive, energy). Rules can be combined.',
+                'heroes.fuzzyToggle': 'Typos', 'heroes.fuzzyHint': 'Typo tolerance — matches despite a small mistake (e.g. "incrase" → "increase")',
+                'heroes.synTitle': 'Synonyms', 'heroes.synNote': 'Type a shorthand and search finds the full form (e.g. "cc" → "crowd control"). Click to search.',
+                'syn.delete': 'Delete', 'syn.add': 'Add', 'syn.update': '💾 Save changes', 'syn.cancel': 'Cancel', 'syn.seed': 'Save defaults to database',
+                'syn.seeded': 'Default dictionary saved to database', 'syn.saved': 'Dictionary row saved', 'syn.needForms': 'Provide at least one form', 'syn.writeFail': 'Write failed (check Firebase rules for /synonyms)',
+                'syn.confirmDel': 'Delete this dictionary row?', 'syn.confirmSeed': 'Save the default synonym dictionary to the database? (they become editable)',
+                'syn.formsPh': 'Equivalent forms, comma-separated (e.g. acc, accuracy)', 'syn.expandPh': 'Expansion — optional, comma-separated (e.g. stun, silence)',
+                'syn.formatNote': 'Forms = searched both ways. Expansion = searched only when you type a form (asymmetric). Shorthands ≤3 chars match whole-word.', 'syn.fallbackNote': 'The dictionary is currently the default (from code). Save it to the database to edit and add rows.',
                 'heroes.allRaces': 'All races', 'heroes.allRoles': 'All roles', 'heroes.count': '{n} heroes', 'heroes.none': 'No heroes match the filter',
                 'heroes.noData': 'No skill data', 'heroes.noDataHint': 'Import skills in the Import tab (admin panel).', 'heroes.loading': 'Loading skills…',
                 'heroes.back': '← Back to list', 'heroes.pickHint': 'Pick a hero to see their skills',
@@ -915,6 +933,8 @@
 			renderConfigForm(true);
 			styleRaceSelect($('new-hero-race'));
 			filterDatabase();
+			// jeśli admin odblokował będąc na zakładce Bohaterowie — pokaż od razu edycję słownika
+			if ($('tab-heroes')?.classList.contains('active')) renderHeroesSynonyms();
 		}
 
 		function adminLogout() {
@@ -987,6 +1007,7 @@
         function applyTranslations() {
             document.querySelectorAll('[data-i18n]').forEach(el => el.textContent = t(el.getAttribute('data-i18n')));
             document.querySelectorAll('[data-i18n-placeholder]').forEach(el => el.placeholder = t(el.getAttribute('data-i18n-placeholder')));
+            document.querySelectorAll('[data-i18n-title]').forEach(el => el.title = t(el.getAttribute('data-i18n-title')));
             setOnlineStatus(isOnline);
         }
 
@@ -6040,6 +6061,7 @@
 
         let heroesFilterRaces = new Set(), heroesFilterRoles = new Set(), heroesFilterStats = new Set(), heroesSearchQuery = ''; // wielokrotny wybór (pusty zbiór = wszystkie)
         let heroCompareMode = false, heroCompareSel = []; // tryb porównywania: wybór 2–3 bohaterów
+        let heroesFuzzy = storage.getBool('souls_heroes_fuzzy', false); // tolerancja literówek w wyszukiwarce (przełącznik)
         const ENGRAVING_TIERS = ['10', '20', '30', '40']; // poziomy grawerunku (na razie wypełniony tylko +40)
         // Ikony klas/typów — emoji dobrane pod grę (Dealer=miecze, Tank=tarcza, Healer=serce, Support=iskra;
         // STR=mięsień, AGI=łuk jak w grze, INT=kula). Łatwa podmiana na grafiki gdyby pojawiło się dobre źródło.
@@ -6057,33 +6079,239 @@
 
         // Przykłady wyszukiwania po treści skilla (pokazywane gdy pole puste).
         const HEROES_SEARCH_EXAMPLES = ['Shock', 'Silence', 'Stun', 'Heal', 'Energy', 'Crit', 'Shield', 'Dodge', 'Bleed'];
-        // Cały tekst skilli bohatera (nazwy + opisy + rola/stat) — do wyszukiwania po treści. Oryginalna wielkość liter.
-        function heroSkillsText(s) {
-            if (!s) return '';
-            const p = [];
-            if (s.active) p.push(s.active.name, s.active.desc);
-            (s.passives || []).forEach(x => p.push(x.name, x.desc));
-            if (s.awaken) p.push(s.awaken.name, s.awaken.desc);
-            if (s.engraving) Object.values(s.engraving).forEach(v => p.push(v));
-            if (s.exclusive) p.push(s.exclusive.name, s.exclusive.desc);
-            if (s.role) p.push(s.role);
-            if (s.stat) p.push(s.stat);
-            return p.filter(Boolean).join(' · ');
+        // ── Zaawansowane wyszukiwanie skilli: bloki + parser mini-języka zapytań + dopasowanie per-skill ──
+        // Aliasy pól do scopingu (active:, passive: …) → kanoniczne pole bloku. Pusty scope = szukaj wszędzie.
+        const HERO_FIELD_ALIAS = {
+            active: 'active', aktywna: 'active', aktywne: 'active',
+            passive: 'passive', passives: 'passive', pasywna: 'passive', pasywne: 'passive', pasywka: 'passive',
+            awaken: 'awaken', przebudzenie: 'awaken',
+            engraving: 'engraving', eng: 'engraving', grawerunek: 'engraving',
+            exclusive: 'exclusive', excl: 'exclusive', ekwipunek: 'exclusive',
+            energy: 'energy', energia: 'energy',
+            name: 'name', nazwa: 'name', role: 'meta', rola: 'meta', stat: 'meta'
+        };
+        // Rozbij skille bohatera na bloki { field, text } — dopasowanie leci PER BLOK (słowa muszą trafić w JEDEN skill).
+        function heroSkillBlocks(name, s) {
+            const b = [];
+            if (name) b.push({ field: 'name', text: String(name) });
+            if (s) {
+                if (s.active) b.push({ field: 'active', text: `${s.active.name || ''} ${s.active.desc || ''}` });
+                (s.passives || []).forEach(x => b.push({ field: 'passive', text: `${x.name || ''} ${x.desc || ''}` }));
+                if (s.awaken) b.push({ field: 'awaken', text: `${s.awaken.name || ''} ${s.awaken.desc || ''}` });
+                if (s.engraving) Object.values(s.engraving).forEach(v => v && b.push({ field: 'engraving', text: String(v) }));
+                if (s.exclusive) b.push({ field: 'exclusive', text: `${s.exclusive.name || ''} ${s.exclusive.desc || ''}` });
+                const meta = [s.role, s.stat].filter(Boolean).join(' ');
+                if (meta) b.push({ field: 'meta', text: meta });
+            }
+            b.forEach(x => x.lc = x.text.toLowerCase());
+            return b;
         }
-        function petSkillsText(s) {
-            if (!s) return '';
-            const p = [];
-            if (s.active) p.push(s.active.name, s.active.desc);
-            if (s.passive) p.push(s.passive.name, s.passive.desc);
-            if (s.energy) p.push(s.energy);
-            return p.filter(Boolean).join(' · ');
+        function petSkillBlocks(name, s) {
+            const b = [];
+            if (name) b.push({ field: 'name', text: String(name) });
+            if (s) {
+                if (s.active) b.push({ field: 'active', text: `${s.active.name || ''} ${s.active.desc || ''}` });
+                if (s.passive) b.push({ field: 'passive', text: `${s.passive.name || ''} ${s.passive.desc || ''}` });
+                if (s.energy) b.push({ field: 'energy', text: String(s.energy) });
+            }
+            b.forEach(x => x.lc = x.text.toLowerCase());
+            return b;
         }
-        // Fragment treści wokół trafienia (do podpowiedzi na kafelku przy szukaniu po skillu).
-        function matchSnippet(text, q) {
-            const i = text.toLowerCase().indexOf(q);
-            if (i < 0) return '';
-            const start = Math.max(0, i - 18), end = Math.min(text.length, i + q.length + 34);
+        // ── Słownik synonimów (dane w Firebase /synonyms, edytowalne przez admina w UI) ──
+        // Każda grupa: { forms: [...] } — formy równoważne (wpisanie dowolnej szuka wszystkich, symetrycznie),
+        //   opcjonalnie + expand: [...] — dodatkowe terminy szukane TYLKO gdy wpiszesz formę (asymetria:
+        //   „cc" znajdzie stun/silence…, ale samo „stun" nie ciągnie reszty).
+        // Krótkie skróty (≤3 znaki) dopasowują się CAŁYM SŁOWEM („cc" nie trafi w „accuracy"); dłuższe/pełne
+        // formy podłańcuchem (łapią odmianę, np. „resistances").
+        // DEFAULT_SYNONYMS = fallback gdy /synonyms w bazie puste (dopóki admin nie zapisze do bazy przyciskiem).
+        const DEFAULT_SYNONYMS = [
+            { forms: ['acc', 'accuracy'] },
+            { forms: ['res', 'resistance'] },
+            { forms: ['atk', 'attack'] },
+            { forms: ['def', 'defense'] },
+            { forms: ['spd', 'speed'] },
+            { forms: ['dmg', 'damage'] },
+            { forms: ['hot', 'heal over time'] },
+            { forms: ['dot', 'damage over time'] },
+            { forms: ['cc', 'crowd control'], expand: ['stun', 'silence', 'freeze', 'shock'] }
+        ];
+        // Efektywny słownik: dane z bazy jeśli są, inaczej domyślne (żeby szukajka działała od razu).
+        function getSynonymGroups() { return allSynonyms.length ? allSynonyms : DEFAULT_SYNONYMS; }
+        let SYNONYM_INDEX = new Map();
+        function rebuildSynonymIndex() {
+            const m = new Map();
+            for (const g of getSynonymGroups()) {
+                const forms = (g.forms || []).map(x => String(x).toLowerCase()).filter(Boolean);
+                const all = forms.concat((g.expand || []).map(x => String(x).toLowerCase()).filter(Boolean));
+                for (const f of forms) m.set(f, all); // tylko `forms` są kluczami (triggerami); `expand` — nie
+            }
+            SYNONYM_INDEX = m;
+        }
+        rebuildSynonymIndex();
+        function findSynonymGroup(text) { return SYNONYM_INDEX.get(text) || null; }
+        // Dopasowanie „całym słowem": trafienie musi mieć nie-alfanumeryczne granice (albo brzeg tekstu).
+        function wordishHit(hay, needle) {
+            let from = 0;
+            while (true) {
+                const i = hay.indexOf(needle, from);
+                if (i < 0) return false;
+                const before = i === 0 ? '' : hay[i - 1];
+                const after = i + needle.length >= hay.length ? '' : hay[i + needle.length];
+                if (!/[a-z0-9]/.test(before) && !/[a-z0-9]/.test(after)) return true;
+                from = i + 1;
+            }
+        }
+        // Scal sąsiadujące słowa w jeden token, gdy tworzą wielosłowową formę synonimu (np. „damage over time" → 1 token),
+        // żeby wpisanie pełnej frazy trigerowało grupę TAK SAMO jak skrót (słownik działa w obie strony). Najdłuższe formy najpierw.
+        function mergeSynonymPhrases(tokens) {
+            const multi = [...SYNONYM_INDEX.keys()].filter(k => k.includes(' ')).map(f => ({ form: f, words: f.split(' ') })).sort((a, b) => b.words.length - a.words.length);
+            if (!multi.length) return tokens;
+            const out = [];
+            let i = 0;
+            while (i < tokens.length) {
+                const tk = tokens[i];
+                let matched = null;
+                if (!tk.or && !tk.neg && !tk.field && !tk.quoted && tk.text && !tk.text.includes(' ')) {
+                    for (const m of multi) {
+                        if (i + m.words.length > tokens.length) continue;
+                        let ok = true;
+                        for (let j = 0; j < m.words.length; j++) {
+                            const t2 = tokens[i + j];
+                            if (t2.or || t2.neg || t2.field || t2.quoted || t2.text !== m.words[j]) { ok = false; break; }
+                        }
+                        if (ok) { matched = m; break; }
+                    }
+                }
+                if (matched) { out.push({ neg: false, field: null, text: matched.form, quoted: false }); i += matched.words.length; }
+                else { out.push(tk); i++; }
+            }
+            return out;
+        }
+        // Parser: "a b" = AND w jednym skillu, "fraza" = dokładna fraza (całe słowa), a|b = OR, -x = bez, pole:x = scope.
+        function parseHeroQuery(raw) {
+            const str = String(raw || ''), tokens = [];
+            let i = 0;
+            while (i < str.length) {
+                const c = str[i];
+                if (c === ' ' || c === '\t' || c === '\n') { i++; continue; }
+                if (c === '|') { tokens.push({ or: true }); i++; continue; }
+                let neg = false;
+                if (str[i] === '-' && str[i + 1] && str[i + 1] !== ' ') { neg = true; i++; }
+                let field = null;
+                const fm = /^([a-zżźćńółęąś]+):/i.exec(str.slice(i));
+                if (fm && HERO_FIELD_ALIAS[fm[1].toLowerCase()]) { field = HERO_FIELD_ALIAS[fm[1].toLowerCase()]; i += fm[0].length; }
+                let text = '', quoted = false;
+                if (str[i] === '"') { quoted = true; i++; while (i < str.length && str[i] !== '"') text += str[i++]; if (str[i] === '"') i++; }
+                else { while (i < str.length && str[i] !== ' ' && str[i] !== '\t' && str[i] !== '|') text += str[i++]; }
+                text = text.trim();
+                if (text) tokens.push({ neg, field, text: text.toLowerCase(), quoted });
+            }
+            // token {or:true} dokleja następną klauzulę jako alternatywę poprzedniej (grupa OR)
+            const clauses = [];
+            let pendingOr = false;
+            for (const tk of mergeSynonymPhrases(tokens)) {
+                if (tk.or) { pendingOr = true; continue; }
+                // boundary = całe słowo: dla cudzysłowu (dokładna fraza) ORAZ dla synonimów (skróty typu „cc").
+                const alt = { field: tk.field, text: tk.text, boundary: tk.quoted };
+                if (pendingOr && clauses.length) clauses[clauses.length - 1].alts.push(alt);
+                else clauses.push({ neg: tk.neg, alts: [alt] });
+                pendingOr = false;
+            }
+            // rozwiń synonimy: term należący do grupy → OR wszystkich form (dopasowanie całym słowem)
+            for (const cl of clauses) {
+                const out = [], seen = new Set();
+                for (const a of cl.alts) {
+                    const grp = a.text && findSynonymGroup(a.text);
+                    // krótkie skróty (≤3 znaki) = całe słowo (żeby „cc" nie łapało „accuracy"); pełne formy podłańcuchem (łapią odmianę)
+                    const list = grp ? grp.map(form => ({ field: a.field, text: form, boundary: a.boundary || (form.length <= 3 && !form.includes(' ')) })) : [a];
+                    for (const x of list) { const k = x.field + ' ' + x.text; if (!seen.has(k)) { seen.add(k); out.push(x); } }
+                }
+                cl.alts = out;
+            }
+            const positives = clauses.filter(c => !c.neg), negatives = clauses.filter(c => c.neg);
+            return {
+                empty: clauses.length === 0,
+                unscoped: positives.filter(c => c.alts.every(a => !a.field)), // współwystępują w jednym skillu
+                scoped: positives.filter(c => c.alts.some(a => a.field)),     // każda w bloku swojego pola
+                negatives,
+                terms: positives.flatMap(c => c.alts.map(a => a.text)).filter(Boolean)
+            };
+        }
+        // Odległość edycyjna z ograniczeniem (early-exit gdy przekroczy max) — do tolerancji literówek.
+        function withinEdit(a, b, max) {
+            const la = a.length, lb = b.length;
+            if (Math.abs(la - lb) > max) return false;
+            let prev = Array.from({ length: lb + 1 }, (_, i) => i);
+            for (let i = 1; i <= la; i++) {
+                const cur = [i];
+                let best = i;
+                for (let j = 1; j <= lb; j++) {
+                    const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+                    cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
+                    if (cur[j] < best) best = cur[j];
+                }
+                if (best > max) return false; // cały wiersz > max → nie da się już zejść ≤ max
+                prev = cur;
+            }
+            return prev[lb] <= max;
+        }
+        // Fuzzy: pojedyncze słowo (≥4 znaki) trafia jeśli któreś słowo bloku jest w odległości ≤1 od szukanej frazy.
+        // Sprawdzamy też prefiks słowa (inflekcja: „increases" vs literówka „incrase" → prefiks „increase" ≤1).
+        function fuzzyHit(term, blk) {
+            if (term.includes(' ') || term.length < 4) return false; // frazy i krótkie słowa — bez fuzzy
+            if (!blk.words) blk.words = blk.lc.split(/[^a-z0-9]+/).filter(w => w.length >= 3);
+            const tl = term.length;
+            return blk.words.some(w => {
+                if (withinEdit(w, term, 1)) return true;
+                if (w.length > tl) for (let L = tl - 1; L <= tl + 1; L++) if (L > 0 && L <= w.length && withinEdit(w.slice(0, L), term, 1)) return true;
+                return false;
+            });
+        }
+        // Czy pojedyncza alternatywa trafia w blok? boundary (cudzysłów/synonim) = całe słowo, bez fuzzy;
+        // zwykły term = podłańcuch, z opcjonalną tolerancją literówek (heroesFuzzy).
+        function altHitsBlock(a, blk) {
+            if (!a.text || (a.field && a.field !== blk.field)) return false;
+            if (a.boundary) return wordishHit(blk.lc, a.text);
+            return blk.lc.includes(a.text) || (heroesFuzzy && fuzzyHit(a.text, blk));
+        }
+        // Czy klauzula (grupa OR) trafia w dany blok? (respektuje scope pola i tolerancję literówek)
+        function clauseHitsBlock(clause, blk) {
+            return clause.alts.some(a => altHitsBlock(a, blk));
+        }
+        // Dopasowanie bohatera/peta. Zwraca { ok, block } — block = skill do podpowiedzi/podświetlenia.
+        function matchBlocks(blocks, parsed) {
+            for (const c of parsed.negatives) if (blocks.some(b => clauseHitsBlock(c, b))) return { ok: false, block: null };
+            let best = null;
+            if (parsed.unscoped.length) {
+                best = blocks.find(b => parsed.unscoped.every(c => clauseHitsBlock(c, b))); // wszystkie w JEDNYM skillu
+                if (!best) return { ok: false, block: null };
+            }
+            for (const c of parsed.scoped) {
+                const hit = blocks.find(b => clauseHitsBlock(c, b));
+                if (!hit) return { ok: false, block: null };
+                if (!best) best = hit;
+            }
+            return { ok: true, block: best };
+        }
+        // Fragment treści wokół pierwszego trafienia któregokolwiek słowa (podpowiedź na kafelku).
+        function matchSnippet(text, terms) {
+            const lc = text.toLowerCase();
+            let idx = -1, len = 0;
+            for (const term of terms) { const j = lc.indexOf(term); if (j >= 0 && (idx < 0 || j < idx)) { idx = j; len = term.length; } }
+            if (idx < 0) return '';
+            const start = Math.max(0, idx - 18), end = Math.min(text.length, idx + len + 34);
             return (start > 0 ? '…' : '') + text.slice(start, end).trim() + (end < text.length ? '…' : '');
+        }
+        // Podświetl trafione słowa (escape'uje HTML; matchujemy na surowym tekście, więc encje nie kolidują).
+        const HL_OPEN = String.fromCharCode(1), HL_CLOSE = String.fromCharCode(2);
+        function highlightHTML(text, terms) {
+            const uniq = Array.from(new Set((terms || []).filter(Boolean))).sort((a, b) => b.length - a.length);
+            let marked = String(text == null ? '' : text);
+            for (const term of uniq) {
+                const re = new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+                marked = marked.replace(re, m => HL_OPEN + m + HL_CLOSE);
+            }
+            return escSkill(marked).split(HL_OPEN).join('<mark class="hero-hl">').split(HL_CLOSE).join('</mark>');
         }
 
         // Lookup skilli bohatera po nazwie (case-insensitive). Zwraca obiekt lub null.
@@ -6137,8 +6365,11 @@
                 if (grid) grid.innerHTML = `<div class="heroes-empty">${t('heroes.loading')}</div>`;
                 await Promise.all([loadHeroSkills(), loadPetSkills()]);
             }
+            $('heroes-fuzzy-toggle')?.classList.toggle('active', heroesFuzzy);
             renderHeroesFilters();
             renderSearchExamples();
+            renderHeroesHelp();
+            renderHeroesSynonyms();
             renderHeroesGrid();
         }
 
@@ -6188,18 +6419,116 @@
             const inp = $('heroes-search'); if (inp) inp.value = '';
             heroesSearchQuery = ''; renderSearchExamples(); renderHeroesGrid();
         }
+        // Rozwijana legenda składni zaawansowanego wyszukiwania (przykłady klikalne wypełniają pole).
+        const HEROES_HELP = [
+            { ex: 'crit increase', key: 'heroes.helpAnd' },
+            { ex: '"crit rate"', key: 'heroes.helpPhrase' },
+            { ex: 'stun|silence', key: 'heroes.helpOr' },
+            { ex: 'crit -heal', key: 'heroes.helpNot' },
+            { ex: 'active:stun', key: 'heroes.helpField' }
+        ];
+        function renderHeroesHelp() {
+            const el = $('heroes-search-help');
+            if (!el) return;
+            const open = storage.getBool('souls_heroes_help_open', false);
+            const rows = HEROES_HELP.map(h => {
+                const on = jsStr(h.ex).replace(/"/g, '&quot;');
+                return `<div class="hero-help-row"><button class="hero-help-ex" onclick="setHeroesSearchExample('${on}')">${escSkill(h.ex)}</button>`
+                    + `<span class="hero-help-desc">${escSkill(t(h.key))}</span></div>`;
+            }).join('');
+            el.innerHTML = `<div class="hero-help-body${open ? ' open' : ''}"><div class="hero-help-title">${escSkill(t('heroes.helpTitle'))}</div>`
+                + rows + `<div class="hero-help-note">${escSkill(t('heroes.helpFields'))}</div></div>`;
+            $('heroes-help-toggle')?.classList.toggle('active', open);
+        }
+        function toggleHeroesHelp() {
+            storage.setBool('souls_heroes_help_open', !storage.getBool('souls_heroes_help_open', false));
+            renderHeroesHelp();
+        }
+        // Kafelek „Słownik synonimów" obok szukajki — lista grup (klik = szuka). Admin edytuje wiersze (dane w /synonyms).
+        function renderHeroesSynonyms() {
+            const el = $('heroes-synonyms');
+            if (!el) return;
+            const open = storage.getBool('souls_heroes_syn_open', false);
+            const groups = getSynonymGroups();
+            const dbEmpty = allSynonyms.length === 0;
+            const rows = groups.map(g => {
+                const on = jsStr((g.forms && g.forms[0]) || '').replace(/"/g, '&quot;');
+                const label = (g.forms || []).join('  =  ') + (g.expand && g.expand.length ? '  →  ' + g.expand.join(', ') : '');
+                const acts = (isAdmin && g.id)
+                    ? `<span class="hero-syn-actions"><button class="hero-syn-act" onclick="editSynonymRow('${jsStr(g.id)}')" title="${escSkill(t('skills.edit'))}">✏️</button>`
+                        + `<button class="hero-syn-act" onclick="deleteSynonymRow('${jsStr(g.id)}')" title="${escSkill(t('syn.delete'))}">🗑️</button></span>`
+                    : '';
+                return `<div class="hero-syn-row"><button class="hero-syn-term" onclick="setHeroesSearchExample('${on}')">${escSkill(label)}</button>${acts}</div>`;
+            }).join('') || `<div class="hero-help-note">—</div>`;
+            let adminUI = '';
+            if (isAdmin && dbEmpty) {
+                adminUI = `<div class="hero-syn-admin"><div class="hero-help-note">${escSkill(t('syn.fallbackNote'))}</div>`
+                    + `<button class="btn btn-small" onclick="seedDefaultSynonyms()">📥 ${escSkill(t('syn.seed'))}</button></div>`;
+            } else if (isAdmin) {
+                const editing = editingSynId != null;
+                adminUI = `<div class="hero-syn-admin">`
+                    + `<input id="syn-forms-input" class="hse-input" placeholder="${escSkill(t('syn.formsPh'))}">`
+                    + `<input id="syn-expand-input" class="hse-input" placeholder="${escSkill(t('syn.expandPh'))}">`
+                    + `<div class="hero-syn-admin-btns"><button class="btn btn-small" onclick="saveSynonymRow()">${editing ? escSkill(t('syn.update')) : '➕ ' + escSkill(t('syn.add'))}</button>`
+                    + (editing ? `<button class="btn btn-small btn-secondary" onclick="cancelSynonymEdit()">${escSkill(t('syn.cancel'))}</button>` : '')
+                    + `</div><div class="hero-help-note">${escSkill(t('syn.formatNote'))}</div></div>`;
+            }
+            el.innerHTML = `<button class="hero-syn-chip${open ? ' active' : ''}" onclick="toggleHeroesSynonyms()">📖 ${escSkill(t('heroes.synTitle'))} (${groups.length})</button>`
+                + `<div class="hero-syn-body${open ? ' open' : ''}">${rows}${adminUI}<div class="hero-help-note">${escSkill(t('heroes.synNote'))}</div></div>`;
+            // przywróć wartości do inputów w trybie edycji (innerHTML je zeruje)
+            if (isAdmin && editingSynId != null) {
+                const g = allSynonyms.find(x => x.id === editingSynId);
+                if (g) { const fi = $('syn-forms-input'), ei = $('syn-expand-input'); if (fi) fi.value = (g.forms || []).join(', '); if (ei) ei.value = (g.expand || []).join(', '); }
+            }
+        }
+        function toggleHeroesSynonyms() {
+            storage.setBool('souls_heroes_syn_open', !storage.getBool('souls_heroes_syn_open', false));
+            renderHeroesSynonyms();
+        }
+        // ── CRUD słownika synonimów (admin; dane w Firebase /synonyms) ──
+        function parseSynInput(v) { return String(v || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean); }
+        function saveSynonymRow() {
+            if (!isAdmin || !synonymsRef) return;
+            const forms = parseSynInput($('syn-forms-input')?.value);
+            const expand = parseSynInput($('syn-expand-input')?.value);
+            if (!forms.length) { showToast(t('syn.needForms')); return; }
+            const rec = { forms };
+            if (expand.length) rec.expand = expand;
+            const p = editingSynId ? synonymsRef.child(editingSynId).set(rec) : synonymsRef.push(rec);
+            editingSynId = null;
+            Promise.resolve(p).then(() => showToast(t('syn.saved'))).catch(() => showToast(t('syn.writeFail')));
+        }
+        function editSynonymRow(id) { editingSynId = id; renderHeroesSynonyms(); }
+        function cancelSynonymEdit() { editingSynId = null; renderHeroesSynonyms(); }
+        function deleteSynonymRow(id) {
+            if (!isAdmin || !synonymsRef) return;
+            if (!confirm(t('syn.confirmDel'))) return;
+            if (editingSynId === id) editingSynId = null;
+            synonymsRef.child(id).remove().catch(() => showToast(t('syn.writeFail')));
+        }
+        // Zapisz domyślny słownik (DEFAULT_SYNONYMS) do bazy, żeby stał się edytowalny.
+        function seedDefaultSynonyms() {
+            if (!isAdmin || !synonymsRef) return;
+            if (!confirm(t('syn.confirmSeed'))) return;
+            const updates = {};
+            for (const g of DEFAULT_SYNONYMS) {
+                const key = synonymsRef.push().key;
+                updates[key] = g.expand ? { forms: g.forms, expand: g.expand } : { forms: g.forms };
+            }
+            synonymsRef.update(updates).then(() => showToast(t('syn.seeded'))).catch(() => showToast(t('syn.writeFail')));
+        }
 
         // Siatka kafelków pogrupowana po rasie + sekcja Pety na dole — sekcje ZWIJANE (mechanika jak w Tagach,
         // ale własny przycisk/etykiety bez słowa „tagi"). Kolejność ras = RACE_ORDER (jak w Tagach).
         function renderHeroesGrid() {
             const grid = $('heroes-grid');
             if (!grid) return;
-            const q = normalize(heroesSearchQuery);
+            const parsed = parseHeroQuery(heroesSearchQuery);
             let list = heroes.slice();
             if (heroesFilterRaces.size) list = list.filter(h => heroesFilterRaces.has(h.race));
             if (heroesFilterRoles.size) list = list.filter(h => { const s = getHeroSkills(h.name); return s && heroesFilterRoles.has(s.role); });
             if (heroesFilterStats.size) list = list.filter(h => { const s = getHeroSkills(h.name); return s && heroesFilterStats.has(s.stat); });
-            if (q) list = list.filter(h => normalize(h.name).includes(q) || heroSkillsText(getHeroSkills(h.name)).toLowerCase().includes(q));
+            if (!parsed.empty) list = list.filter(h => matchBlocks(heroSkillBlocks(h.name, getHeroSkills(h.name)), parsed).ok);
             const cnt = $('heroes-count');
             if (cnt) cnt.textContent = t('heroes.count', { n: list.length });
             const groups = {};
@@ -6209,13 +6538,13 @@
                 + `<span class="toggle-icon">▶</span>${label} (${count})</div>`
                 + `<div class="quick-tags-content show"><div class="heroes-race-tiles">${tiles}</div></div></div>`;
             let html = order.map(race => section(`${RACE_EMOJI[race] || '🧙'} ${escSkill(raceLabel(race))}`, groups[race].length,
-                groups[race].sort((a, b) => a.name.localeCompare(b.name)).map(h => heroTileHTML(h, q)).join(''))).join('');
+                groups[race].sort((a, b) => a.name.localeCompare(b.name)).map(h => heroTileHTML(h, parsed)).join(''))).join('');
             // sekcja Pety — gdy brak filtra rasy/roli (pety ich nie mają); szukajka działa po nazwie I treści skilla
             if (!heroesFilterRaces.size && !heroesFilterRoles.size && !heroesFilterStats.size) {
                 let petList = Array.from(new Set([...pets, ...Object.keys(allPetSkills)]));
-                if (q) petList = petList.filter(p => normalize(p).includes(q) || petSkillsText(getPetSkills(p)).toLowerCase().includes(q));
+                if (!parsed.empty) petList = petList.filter(p => matchBlocks(petSkillBlocks(p, getPetSkills(p)), parsed).ok);
                 petList.sort((a, b) => a.localeCompare(b));
-                if (petList.length) html += section(`🐾 ${t('quickTags.pets')}`, petList.length, petList.map(p => petTileHTML(p, q)).join(''));
+                if (petList.length) html += section(`🐾 ${t('quickTags.pets')}`, petList.length, petList.map(p => petTileHTML(p, parsed)).join(''));
             }
             // Pasek porównania (tryb compare) — zawsze widoczny gdy tryb włączony
             let compareBar = '';
@@ -6244,21 +6573,25 @@
             btn.textContent = allExpanded ? `▼ ${t('heroes.expandAll')}` : `▲ ${t('heroes.collapseAll')}`;
         }
 
-        // Snippet trafienia w treści skilla (gdy szukasz po treści, nie po nazwie) — podpowiedź na kafelku.
-        function tileMatchHTML(name, q, text) {
-            if (!q || normalize(name).includes(q)) return '';
-            const snip = matchSnippet(text, q);
-            return snip ? `<span class="hero-tile-match">${escSkill(snip)}</span>` : '';
+        // Snippet trafienia w treści skilla (gdy trafienie jest w skillu, nie w nazwie) — podpowiedź na kafelku
+        // z podświetlonymi słowami. `blocks` = bloki bohatera/peta, `parsed` = sparsowane zapytanie.
+        function tileMatchHTML(parsed, blocks) {
+            if (parsed.empty) return '';
+            const { ok, block } = matchBlocks(blocks, parsed);
+            if (!ok || !block || block.field === 'name') return ''; // trafienie tylko w nazwie → bez snippetu
+            // przy trafieniu fuzzy nie ma dokładnego indeksu słowa → pokaż początek skilla jako kontekst
+            const snip = matchSnippet(block.text, parsed.terms) || (block.text.length > 60 ? block.text.slice(0, 60).trim() + '…' : block.text);
+            return snip ? `<span class="hero-tile-match">${highlightHTML(snip, parsed.terms)}</span>` : '';
         }
 
-        function petTileHTML(name, q) {
+        function petTileHTML(name, parsed) {
             const s = getPetSkills(name);
             const sub = s ? `<span class="hero-tile-role">${t('petTab.pet')}</span>` : `<span class="hero-tile-nodata">${t('heroes.noData')}</span>`;
-            return `<button class="hero-tile race-pet${s ? '' : ' no-data'}" onclick="showPetSkills('${jsStr(name)}')">`
-                + `<span class="hero-tile-emoji">🐾</span><span class="hero-tile-name">${escSkill(name)}${verifiedBadge(s)}</span>${sub}${tileMatchHTML(name, q, petSkillsText(s))}</button>`;
+            return `<button class="hero-tile race-pet${s ? '' : ' no-data'}" onclick="onPetTileClick('${jsStr(name)}')">`
+                + `<span class="hero-tile-emoji">🐾</span><span class="hero-tile-name">${escSkill(name)}${verifiedBadge(s)}</span>${sub}${tileMatchHTML(parsed, petSkillBlocks(name, s))}</button>`;
         }
 
-        function heroTileHTML(h, q) {
+        function heroTileHTML(h, parsed) {
             const s = getHeroSkills(h.name);
             const rc = `race-${String(h.race || '').toLowerCase()}`;
             const sel = heroCompareMode && heroCompareSel.includes(h.name) ? ' selected' : '';
@@ -6267,12 +6600,16 @@
                 : `<span class="hero-tile-nodata">${t('heroes.noData')}</span>`;
             return `<button class="hero-tile ${rc}${s ? '' : ' no-data'}${sel}" onclick="onHeroTileClick('${jsStr(h.name)}')">`
                 + `<span class="hero-tile-emoji">${RACE_EMOJI[h.race] || '🧙'}</span>`
-                + `<span class="hero-tile-name">${escSkill(h.name)}${verifiedBadge(s)}</span>${sub}${tileMatchHTML(h.name, q, heroSkillsText(s))}</button>`;
+                + `<span class="hero-tile-name">${escSkill(h.name)}${verifiedBadge(s)}</span>${sub}${tileMatchHTML(parsed, heroSkillBlocks(h.name, s))}</button>`;
         }
+
+        // Aktualne słowa do podświetlenia w modalu (z pola szukajki) — puste gdy zapytanie puste.
+        function heroesHlTerms() { return parseHeroQuery(heroesSearchQuery).terms; }
+        function onPetTileClick(name) { showPetSkills(name, heroesHlTerms()); }
 
         // Klik w kafelek: w trybie porównania zaznacza (max 3), inaczej otwiera skille.
         function onHeroTileClick(name) {
-            if (!heroCompareMode) { showHeroSkills(name); return; }
+            if (!heroCompareMode) { showHeroSkills(name, heroesHlTerms()); return; }
             const i = heroCompareSel.indexOf(name);
             if (i >= 0) heroCompareSel.splice(i, 1);
             else { if (heroCompareSel.length >= 3) { showToast(t('heroes.compareMax')); return; } heroCompareSel.push(name); }
@@ -6285,6 +6622,13 @@
             renderHeroesGrid();
         }
         function clearHeroCompare() { heroCompareSel = []; renderHeroesGrid(); }
+        // Przełącznik tolerancji literówek (persystowany) — po zmianie przerysuj wyniki.
+        function toggleHeroesFuzzy() {
+            heroesFuzzy = !heroesFuzzy;
+            storage.setBool('souls_heroes_fuzzy', heroesFuzzy);
+            $('heroes-fuzzy-toggle')?.classList.toggle('active', heroesFuzzy);
+            renderHeroesGrid();
+        }
 
         // Modal porównania — reużywa szerokiego #hero-skills-modal; kolumny obok siebie (1 bohater = 1 kolumna).
         function showHeroCompare() {
@@ -6320,8 +6664,12 @@
                 + `</div>`;
         }
 
+        // Podświetlenie treści w modalu gdy przyszło z szukajki (hl = słowa); inaczej zwykły escape.
+        function hlx(text, hl) { return hl && hl.length ? highlightHTML(text, hl) : escSkill(text == null ? '' : text); }
+
         // Modal z kartą skilli — wywoływany z kafelka ORAZ z klikalnych nazw w formacjach.
-        function showHeroSkills(name) {
+        // hl (opcjonalne) = słowa do podświetlenia (przekazywane tylko z zakładki Bohaterowie).
+        function showHeroSkills(name, hl) {
             const modal = $('hero-skills-modal');
             if (!modal) return;
             if (!heroSkillsLoaded) {
@@ -6329,16 +6677,16 @@
                 if (titleEl) titleEl.textContent = name;
                 if (body) body.innerHTML = `<div class="heroes-empty">${t('heroes.loading')}</div>`;
                 modal.classList.add('show');
-                loadHeroSkills().then(() => renderHeroSkillsModal(name));
+                loadHeroSkills().then(() => renderHeroSkillsModal(name, hl));
                 return;
             }
-            renderHeroSkillsModal(name);
+            renderHeroSkillsModal(name, hl);
             modal.classList.add('show');
         }
 
         // Render zawartości modalu (kolumny obok siebie: Active | Pasywne | Przebudzenie | Grawerunek | Exclusive).
         // Exclusive i poziomy grawerunku są ZAWSZE pokazane — brak danych = „Niedostępne".
-        function renderHeroSkillsModal(name) {
+        function renderHeroSkillsModal(name, hl) {
             const titleEl = $('hero-skills-title'), body = $('hero-skills-body');
             const hero = findHero(name);
             const s = getHeroSkills(name);
@@ -6350,8 +6698,8 @@
             if (titleEl) titleEl.innerHTML = `<div class="hsk-titletext"><span class="hsk-name">${escSkill(name)}${verifiedBadge(s)}</span>`
                 + ((raceTxt || meta) ? `<span class="hsk-meta">${raceTxt}${raceTxt && meta ? ' · ' : ''}${meta}</span>` : '') + `</div>${editBtn}`;
             if (!body) return;
-            const item = sk => `<div class="skill-item"><div class="skill-name">${escSkill(sk.name)}</div>`
-                + (sk.desc ? `<div class="skill-desc">${escSkill(sk.desc)}</div>` : '') + `</div>`;
+            const item = sk => `<div class="skill-item"><div class="skill-name">${hlx(sk.name, hl)}</div>`
+                + (sk.desc ? `<div class="skill-desc">${hlx(sk.desc, hl)}</div>` : '') + `</div>`;
             const na = `<div class="skill-item skill-na">${t('skills.unavailable')}</div>`;
             const col = (key, inner) => `<div class="skill-col"><h4 class="skill-col-title">${t(key)}</h4>${inner}</div>`;
             const engHtml = ENGRAVING_TIERS.map(tier => {
@@ -6359,7 +6707,7 @@
                 const open = engravingExpanded[tier];
                 return `<div class="skill-item eng-tier${open ? ' open' : ''}${v ? '' : ' skill-na'}">`
                     + `<div class="skill-name eng-tier-head" onclick="toggleEngravingTier(this,'${tier}')"><span class="toggle-icon">▶</span> +${tier}</div>`
-                    + `<div class="skill-desc eng-tier-body">${v ? escSkill(v) : t('skills.unavailable')}</div></div>`;
+                    + `<div class="skill-desc eng-tier-body">${v ? hlx(v, hl) : t('skills.unavailable')}</div></div>`;
             }).join('');
             body.innerHTML = `<div class="skill-cols">`
                 + col('skills.active', s && s.active ? item(s.active) : na)
@@ -6379,7 +6727,7 @@
         }
 
         // ── Pety: ten sam modal co bohaterowie, ale 3 kolumny (Active | Pasywne | Ładowanie energii) ──
-        function showPetSkills(name) {
+        function showPetSkills(name, hl) {
             const modal = $('hero-skills-modal');
             if (!modal) return;
             if (!petSkillsLoaded) {
@@ -6387,23 +6735,23 @@
                 if (titleEl) titleEl.textContent = name;
                 if (body) body.innerHTML = `<div class="heroes-empty">${t('heroes.loading')}</div>`;
                 modal.classList.add('show');
-                loadPetSkills().then(() => renderPetSkillsModal(name));
+                loadPetSkills().then(() => renderPetSkillsModal(name, hl));
                 return;
             }
-            renderPetSkillsModal(name);
+            renderPetSkillsModal(name, hl);
             modal.classList.add('show');
         }
-        function renderPetSkillsModal(name) {
+        function renderPetSkillsModal(name, hl) {
             const titleEl = $('hero-skills-title'), body = $('hero-skills-body');
             const s = getPetSkills(name);
             const editBtn = isAdmin ? `<button class="hsk-edit-btn" onclick="openPetSkillsEdit('${jsStr(name)}')" title="${escSkill(t('skills.edit'))}" aria-label="${escSkill(t('skills.edit'))}">✏️</button>` : '';
             if (titleEl) titleEl.innerHTML = `<div class="hsk-titletext"><span class="hsk-name">🐾 ${escSkill(name)}${verifiedBadge(s)}</span><span class="hsk-meta">${t('petTab.pet')}</span></div>${editBtn}`;
             if (!body) return;
-            const item = sk => `<div class="skill-item"><div class="skill-name">${escSkill(sk.name)}</div>`
-                + (sk.desc ? `<div class="skill-desc">${escSkill(sk.desc)}</div>` : '') + `</div>`;
+            const item = sk => `<div class="skill-item"><div class="skill-name">${hlx(sk.name, hl)}</div>`
+                + (sk.desc ? `<div class="skill-desc">${hlx(sk.desc, hl)}</div>` : '') + `</div>`;
             const na = `<div class="skill-item skill-na">${t('skills.unavailable')}</div>`;
             const col = (key, inner) => `<div class="skill-col"><h4 class="skill-col-title">${t(key)}</h4>${inner}</div>`;
-            const energy = s && s.energy ? `<div class="skill-item"><div class="skill-desc">${escSkill(s.energy)}</div></div>` : na;
+            const energy = s && s.energy ? `<div class="skill-item"><div class="skill-desc">${hlx(s.energy, hl)}</div></div>` : na;
             body.innerHTML = `<div class="skill-cols">`
                 + col('skills.active', s && s.active ? item(s.active) : na)
                 + col('skills.passive', s && s.passive ? item(s.passive) : na)
@@ -8414,7 +8762,8 @@
             petsRef = db.ref('pets');
             heroSkillsRef = db.ref('heroSkills');
             petSkillsRef = db.ref('petSkills');
-            
+            synonymsRef = db.ref('synonyms');
+
             formationsRef.on('value', snap => {
                 allFormations = snap.val() ? Object.values(snap.val()).sort((a, b) => a.id - b.id) : [];
                 updateUI();
@@ -8447,6 +8796,14 @@
                 }
             });
             
+            // ─── Słownik synonimów (live; przy pustym /synonyms szukajka używa DEFAULT_SYNONYMS) ───
+            synonymsRef.on('value', snap => {
+                const v = snap.val();
+                allSynonyms = v ? Object.entries(v).map(([id, g]) => ({ id, forms: (g && g.forms) || [], expand: (g && g.expand) || [] })) : [];
+                rebuildSynonymIndex();
+                if ($('tab-heroes')?.classList.contains('active')) { renderHeroesSynonyms(); renderHeroesGrid(); }
+            }, () => {});
+
             // ─── Defense (obrona gildii) ───
             defenseFormationsRef = db.ref('defenseFormations');
             defensePlayersRef = db.ref('defensePlayers');

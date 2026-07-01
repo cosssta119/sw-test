@@ -760,8 +760,12 @@
             <p class="section-subtitle" data-i18n="heroes.subtitle">Przeglądaj umiejętności bohaterów</p>
             <div class="heroes-toolbar">
                 <input type="text" id="heroes-search" class="heroes-search" data-i18n-placeholder="heroes.searchPlaceholder" placeholder="🔍 Szukaj bohatera..." oninput="setHeroesSearch(this.value)">
+                <button id="heroes-help-toggle" class="heroes-help-toggle" onclick="toggleHeroesHelp()" title="Zaawansowane wyszukiwanie">❔</button>
+                <button id="heroes-fuzzy-toggle" class="heroes-compare-btn" onclick="toggleHeroesFuzzy()" data-i18n-title="heroes.fuzzyHint" title="Tolerancja literówek">🔤~ <span data-i18n="heroes.fuzzyToggle">Literówki</span></button>
                 <button id="heroes-compare-toggle" class="heroes-compare-btn" onclick="toggleHeroCompareMode()">⚖️ <span data-i18n="heroes.compareToggle">Porównaj</span></button>
             </div>
+            <div class="heroes-search-help" id="heroes-search-help"></div>
+            <div class="heroes-synonyms" id="heroes-synonyms"></div>
             <div class="heroes-search-examples" id="heroes-search-examples"></div>
             <div class="heroes-chips" id="heroes-race-chips"></div>
             <div class="heroes-chips" id="heroes-role-chips"></div>
