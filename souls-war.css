@@ -24,6 +24,7 @@
 		   19. PORÓWNYWARKA
 		   20. WYKLUCZANIE BOHATERÓW
 		   21. MATCH INFO / OSTATNIO / PODOBNE / SEARCH OPTIONS
+		   21b. HEROES TAB + SKILLS MODAL
 		   22. SCROLLBAR
 		   23. LIGHT THEME — overrides [data-theme="light"]
 		   24. PINEZKI
@@ -2878,6 +2879,158 @@
 
 		@media (max-width: 700px) {
 			.defense-player-slots { grid-template-columns: 1fr; }
+		}
+
+		/* ═══ 21b. HEROES TAB + SKILLS MODAL ═══ */
+		.section-subtitle { color: var(--text-muted); font-size: 0.8rem; margin: -4px 0 14px; }
+		.heroes-toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+		.heroes-search { flex: 1 1 200px; min-width: 0; padding: 9px 12px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; color: var(--text-light); font-size: 0.85rem; }
+		.heroes-search:focus { outline: none; border-color: var(--accent-gold); }
+		/* chipy filtrów — wielokrotny wybór ras i klas */
+		.heroes-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+		.heroes-chip { padding: 6px 11px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 16px; color: var(--text-light); font-size: 0.78rem; font-family: inherit; cursor: pointer; transition: all 0.15s; display: inline-flex; align-items: center; gap: 4px; }
+		.heroes-chip:hover { border-color: var(--accent-gold); }
+		.heroes-chip.active { background: var(--accent-gold); border-color: var(--accent-gold); color: #1a1a1a; font-weight: 600; }
+		.heroes-chip.race-dark { border-color: var(--race-dark); }
+		.heroes-chip.race-light { border-color: var(--race-light); }
+		.heroes-chip.race-undead { border-color: var(--race-undead); }
+		.heroes-chip.race-elf { border-color: var(--race-elf); }
+		.heroes-chip.race-fire { border-color: var(--race-fire); }
+		.heroes-chip.race-human { border-color: var(--race-human); }
+		.heroes-chip.race-dark.active { background: var(--race-dark); border-color: var(--race-dark); color: #fff; }
+		.heroes-chip.race-light.active { background: var(--race-light); border-color: var(--race-light); color: #1a1a1a; }
+		.heroes-chip.race-undead.active { background: var(--race-undead); border-color: var(--race-undead); color: #fff; }
+		.heroes-chip.race-elf.active { background: var(--race-elf); border-color: var(--race-elf); color: #1a1a1a; }
+		.heroes-chip.race-fire.active { background: var(--race-fire); border-color: var(--race-fire); color: #fff; }
+		.heroes-chip.race-human.active { background: var(--race-human); border-color: var(--race-human); color: #1a1a1a; }
+		.heroes-chip-clear { border-style: dashed; color: var(--text-muted); }
+		.heroes-chip-clear:hover { border-color: var(--accent-red); color: var(--accent-red); }
+		.heroes-count { color: var(--text-muted); font-size: 0.72rem; margin-bottom: 10px; }
+		/* przykłady wyszukiwania po treści (gdy pole puste) */
+		.heroes-search-examples { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 8px; }
+		.hse-ex-label { font-size: 0.74rem; color: var(--text-muted); }
+		.hse-ex-chip { padding: 3px 10px; background: transparent; border: 1px dashed var(--border); border-radius: 14px; color: var(--text-muted); font-size: 0.74rem; font-family: inherit; cursor: pointer; transition: all 0.15s; }
+		.hse-ex-chip:hover { border-color: var(--accent-gold); color: var(--accent-gold); border-style: solid; }
+		/* snippet trafienia w treści skilla na kafelku */
+		.hero-tile-match { font-size: 0.6rem; color: var(--accent-gold); line-height: 1.25; margin-top: 2px; opacity: 0.92; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+		/* znaczek „zweryfikowany" — niebieski krążek z ptaszkiem (jak na social media) */
+		.verified-badge { display: inline-flex; align-items: center; justify-content: center; width: 1.05em; height: 1.05em; border-radius: 50%; background: #1d9bf0; color: #fff; font-size: 0.7em; font-weight: 900; line-height: 1; margin-left: 4px; vertical-align: 0.05em; flex: 0 0 auto; }
+		.hse-verified-row { display: flex; align-items: center; gap: 6px; font-size: 0.82rem; color: var(--text-light); cursor: pointer; }
+		.hse-verified-row input { width: 16px; height: 16px; cursor: pointer; }
+		.heroes-empty { color: var(--text-muted); text-align: center; padding: 30px 12px; font-size: 0.85rem; }
+
+		/* lista pogrupowana po rasie */
+		.heroes-grid { display: flex; flex-direction: column; gap: 16px; }
+		.heroes-race-head { font-family: 'Cinzel', serif; font-size: 0.92rem; font-weight: 600; color: var(--text-light); padding: 4px 0 8px 10px; margin-bottom: 10px; border-left: 4px solid var(--border); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
+		.heroes-race-head.race-dark { border-left-color: var(--race-dark); }
+		.heroes-race-head.race-light { border-left-color: var(--race-light); }
+		.heroes-race-head.race-undead { border-left-color: var(--race-undead); }
+		.heroes-race-head.race-elf { border-left-color: var(--race-elf); }
+		.heroes-race-head.race-fire { border-left-color: var(--race-fire); }
+		.heroes-race-head.race-human { border-left-color: var(--race-human); }
+		.heroes-race-count { color: var(--text-muted); font-size: 0.72rem; font-weight: 400; }
+		.heroes-race-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+
+		.hero-tile { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 14px 10px; background: var(--bg-input); border: 1px solid transparent; border-left: 3px solid var(--border); border-radius: 8px; cursor: pointer; transition: all 0.2s; color: var(--text-light); font-family: inherit; text-align: center; animation: fadeIn 0.3s ease; }
+		.hero-tile:hover { border-color: var(--accent-gold); border-left-color: var(--accent-gold); transform: translateY(-2px); box-shadow: 0 3px 10px rgba(212,175,55,0.18); }
+		.hero-tile.no-data { opacity: 0.55; }
+		.hero-tile-emoji { font-size: 1.7rem; line-height: 1; }
+		.hero-tile-name { font-family: 'Cinzel', serif; font-size: 0.92rem; font-weight: 600; }
+		.hero-tile-role { font-size: 0.7rem; color: var(--text-muted); }
+		.hero-tile-nodata { font-size: 0.64rem; color: #e08a8a; opacity: 0.9; }
+		[data-theme="light"] .hero-tile-nodata { color: #b5524a; }
+		/* lewy pasek koloru rasy na kafelku */
+		.hero-tile.race-dark { border-left-color: var(--race-dark); }
+		.hero-tile.race-light { border-left-color: var(--race-light); }
+		.hero-tile.race-undead { border-left-color: var(--race-undead); }
+		.hero-tile.race-elf { border-left-color: var(--race-elf); }
+		.hero-tile.race-fire { border-left-color: var(--race-fire); }
+		.hero-tile.race-human { border-left-color: var(--race-human); }
+		.hero-tile.race-pet { border-left-color: #b8860b; } /* ciemne złoto (bronze) — odróżnia się od jasnego Light */
+
+		/* nagłówki ras/Pety — większe TYLKO w zakładce Bohaterowie (override domyślnych .quick-tags-header) */
+		#heroes-grid .quick-tags-header { font-size: 0.95rem; padding: 7px 12px; gap: 8px; }
+		#heroes-grid .quick-tags-header .toggle-icon { font-size: 0.78rem; }
+
+		/* klikalny cały kafelek bohatera/peta w formacjach → podgląd skilli */
+		.slot-clickable { cursor: pointer; }
+		.slot-clickable:hover { filter: brightness(1.18); box-shadow: inset 0 0 0 1px var(--accent-gold); }
+
+		/* modal karty skilli */
+		.hsk-modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.75); display: none; align-items: center; justify-content: center; padding: 16px; z-index: 1100; }
+		.hsk-modal-bg.show { display: flex; }
+		.hsk-modal { position: relative; background: var(--bg-card); border: 1px solid var(--accent-gold); border-radius: 14px; max-width: 560px; width: 100%; max-height: 88vh; overflow: auto; padding: 22px 20px; animation: fadeIn 0.2s ease; }
+		.hsk-modal-wide { max-width: 1120px; }
+		.hsk-close { position: absolute; top: 8px; right: 12px; background: none; border: none; color: var(--text-muted); font-size: 1.7rem; line-height: 1; cursor: pointer; padding: 0 4px; z-index: 2; }
+		.hsk-close:hover { color: var(--accent-gold); }
+		.hsk-title { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin: 0 30px 14px 0; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+		.hsk-titletext { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+		.hsk-name { font-family: 'Cinzel', serif; color: var(--accent-gold); font-size: 1.15rem; line-height: 1.2; }
+		.hsk-meta { font-size: 0.72rem; color: var(--text-muted); font-weight: 400; }
+		.hsk-edit-btn { flex: 0 0 auto; width: 34px; height: 34px; padding: 0; font-size: 1rem; line-height: 1; background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; color: var(--text-light); cursor: pointer; transition: all 0.2s; }
+		.hsk-edit-btn:hover { border-color: var(--accent-gold); background: var(--bg-card); }
+		.heroes-race-tiles { margin: 6px 0 4px; }
+
+		/* kolumny skilli obok siebie */
+		.skill-cols { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-start; }
+		.skill-col { flex: 1 1 190px; min-width: 180px; border-left: 3px solid var(--accent-gold); padding-left: 12px; }
+		.skill-col-title { font-size: 0.8rem; color: var(--accent-gold); margin: 0 0 8px; letter-spacing: 0.3px; }
+		.skill-item { background: var(--bg-input); border-radius: 8px; padding: 9px 11px; margin-bottom: 7px; }
+		.skill-item:last-child { margin-bottom: 0; }
+		.skill-name { font-weight: 700; font-size: 0.83rem; color: var(--text-light); margin-bottom: 3px; }
+		.skill-desc { font-size: 0.77rem; color: var(--text-muted); line-height: 1.45; white-space: pre-line; }
+		.skill-item.skill-na { opacity: 0.6; }
+		.skill-item.skill-na .skill-desc { font-style: italic; }
+		/* zwijane poziomy grawerunku (Podgląd) */
+		.eng-tier-head { cursor: pointer; display: flex; align-items: center; gap: 6px; user-select: none; }
+		.eng-tier-head .toggle-icon { font-size: 0.6rem; color: var(--text-muted); transition: transform 0.2s; }
+		.eng-tier.open .eng-tier-head .toggle-icon { transform: rotate(90deg); }
+		.eng-tier-body { display: none; margin-top: 4px; }
+		.eng-tier.open .eng-tier-body { display: block; }
+
+		/* porównywarka bohaterów */
+		.heroes-compare-btn { flex: 0 0 auto; padding: 9px 12px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; color: var(--text-light); font-size: 0.82rem; font-family: inherit; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+		.heroes-compare-btn:hover { border-color: var(--accent-gold); }
+		.heroes-compare-btn.active { background: var(--accent-gold); border-color: var(--accent-gold); color: #1a1a1a; font-weight: 600; }
+		.hero-tile.selected { box-shadow: 0 0 0 2px var(--accent-gold) inset; border-color: var(--accent-gold); }
+		.heroes-compare-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; margin-bottom: 12px; background: var(--bg-input); border: 1px solid var(--accent-gold); border-radius: 10px; position: sticky; top: 0; z-index: 5; }
+		.hcb-label { font-weight: 700; color: var(--accent-gold); font-size: 0.8rem; }
+		.hcb-hint { color: var(--text-muted); font-size: 0.78rem; }
+		.hcb-chip { background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 4px 10px; font-size: 0.78rem; cursor: pointer; }
+		.hcb-chip:hover { border-color: var(--accent-red); color: var(--accent-red); }
+		.heroes-compare-bar .btn:first-of-type { margin-left: auto; }
+		.compare-cols { display: flex; gap: 16px; align-items: flex-start; }
+		.compare-col { flex: 1 1 0; min-width: 220px; display: flex; flex-direction: column; gap: 12px; }
+		.compare-col-head { display: flex; flex-direction: column; gap: 2px; padding-bottom: 8px; border-bottom: 2px solid var(--accent-gold); }
+		.compare-col .skill-section { border-left: 3px solid var(--accent-gold); padding-left: 10px; }
+		.compare-col .skill-col-title { font-size: 0.78rem; color: var(--accent-gold); margin: 0 0 6px; }
+
+		/* formularz edycji skilli (admin) */
+		.hse-form { display: flex; flex-direction: column; gap: 12px; }
+		.hse-row2 { display: flex; gap: 10px; }
+		.hse-field { flex: 1; display: flex; flex-direction: column; gap: 4px; font-size: 0.72rem; color: var(--text-muted); }
+		.hse-input, .hse-textarea { width: 100%; padding: 7px 9px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-light); font-size: 0.82rem; font-family: inherit; }
+		.hse-input:focus, .hse-textarea:focus { outline: none; border-color: var(--accent-gold); }
+		.hse-textarea { min-height: 52px; resize: vertical; line-height: 1.4; }
+		.hse-group { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+		.hse-group legend { font-size: 0.78rem; color: var(--accent-gold); padding: 0 6px; }
+		.hse-tier { display: flex; align-items: flex-start; gap: 8px; }
+		.hse-tier > span { flex: 0 0 34px; font-weight: 700; color: var(--accent-gold); font-size: 0.8rem; padding-top: 7px; }
+		.hse-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+
+		/* podgląd importu skilli (diff) */
+		.hsk-diff-sec { margin-bottom: 12px; }
+		.hsk-diff-sec h4 { font-size: 0.82rem; color: var(--accent-gold); margin: 0 0 6px; }
+		.hsk-diff-sec > div { font-size: 0.8rem; padding: 3px 0; }
+		.hsk-diff-row { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.8rem; padding: 3px 0; }
+		.hsk-diff-none { color: var(--text-muted); font-style: italic; }
+		.hsk-diff-warn { margin-top: 10px; padding: 8px 10px; background: rgba(244,67,54,0.1); border-radius: 6px; font-size: 0.76rem; color: var(--text-light); }
+
+		@media (max-width: 480px) {
+			.heroes-race-tiles { grid-template-columns: repeat(auto-fill, minmax(108px, 1fr)); gap: 8px; }
+			.hsk-modal { padding: 18px 14px; }
+			.skill-col { flex: 1 1 100%; }
+			.hsk-title { flex-direction: column; }
 		}
 
 		/* ===== SCROLLBAR ===== */

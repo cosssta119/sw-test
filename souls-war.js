@@ -35,8 +35,12 @@
             }
         });
 
-        let db, formationsRef, heroesRef, petsRef;
+        let db, formationsRef, heroesRef, petsRef, heroSkillsRef, petSkillsRef;
         let allFormations = [];
+        let allHeroSkills = {};          // cache /heroSkills (lazy-load przy 1. wejściu na zakładkę Bohaterowie)
+        let heroSkillsLoaded = false;    // czy już pobrano (kolejne wejścia nie odpytują Firebase)
+        let allPetSkills = {};           // cache /petSkills (analogicznie do heroSkills)
+        let petSkillsLoaded = false;
         let isOnline = false, isAdmin = false;
         let headerClickCount = 0, headerClickTimer = null;
         let favorites = storage.getJson('souls_favorites', []);
@@ -55,12 +59,12 @@
 			defaultPackageWindow: 'all',// domyślne okno czasowe pakietów
 			// Widoczność zakładek: 'all' = wszyscy (też admin), 'admin' = tylko admin. Domyślne = obecny stan apki.
 			// Zakładka 'admin' jest zawsze admin-only (poza tą mapą, niekonfigurowalna).
-			tabVisibility: { search: 'all', database: 'all', view: 'all', add: 'all', settings: 'admin', war: 'all', kreator: 'all', defense: 'admin' },
+			tabVisibility: { search: 'all', database: 'all', view: 'all', add: 'all', settings: 'admin', war: 'all', kreator: 'all', defense: 'admin', heroes: 'all' },
 			// Umiejscowienie: 'bar' = w pasku, 'more' = w menu „⋯ Więcej", 'hidden' = ukryta. Domyślnie wszystko w pasku.
 			// Przycisk „Więcej" pojawia się dopiero gdy ≥2 widoczne zakładki są w „Więcej".
-			tabPlacement: { search: 'bar', database: 'bar', view: 'bar', add: 'bar', settings: 'bar', war: 'bar', kreator: 'bar', defense: 'bar', admin: 'bar' },
+			tabPlacement: { search: 'bar', database: 'bar', view: 'bar', add: 'bar', settings: 'bar', war: 'bar', kreator: 'bar', defense: 'bar', admin: 'bar', heroes: 'bar' },
 			// Kolejność zakładek (Admin zawsze przypięty na końcu, poza tą listą). Domyślnie = obecny układ.
-			tabOrder: ['search', 'database', 'view', 'add', 'war', 'kreator', 'defense', 'settings'],
+			tabOrder: ['search', 'database', 'view', 'add', 'war', 'kreator', 'heroes', 'defense', 'settings'],
 		};
 		let appConfig = { ...DEFAULT_CONFIG };
 		let configRef = null;
@@ -119,7 +123,23 @@
             pl: {
                 'loading': 'Ładowanie danych...', 'common.loading': 'Ładowanie...', 'common.cancel': 'Anuluj', 'common.clear': 'Wyczyść', 'common.save': 'Zapisz',
                 'header.subtitle': 'Wyszukiwarka kontr-formacji', 'status.online': 'Online', 'status.offline': 'Offline', 'status.formations': 'formacji',
-                'nav.search': 'Szukaj', 'nav.database': 'Baza', 'nav.preview': 'Podgląd', 'nav.add': 'Dodaj', 'nav.import': 'Import', 'nav.war': 'Wojna', 'nav.kreator': 'Kreator', 'nav.admin': 'Admin', 'nav.more': 'Więcej',
+                'nav.search': 'Szukaj', 'nav.database': 'Baza', 'nav.preview': 'Podgląd', 'nav.add': 'Dodaj', 'nav.import': 'Import', 'nav.war': 'Wojna', 'nav.kreator': 'Kreator', 'nav.heroes': 'Bohaterowie', 'nav.admin': 'Admin', 'nav.more': 'Więcej',
+                'heroes.title': 'Bohaterowie', 'heroes.subtitle': 'Przeglądaj umiejętności bohaterów', 'heroes.searchPlaceholder': '🔍 Szukaj bohatera lub umiejętności (np. Shock, Silence)...', 'heroes.searchExamples': 'Szukaj po treści, np.:',
+                'heroes.allRaces': 'Wszystkie rasy', 'heroes.allRoles': 'Wszystkie role', 'heroes.count': '{n} bohaterów', 'heroes.none': 'Brak bohaterów spełniających filtr',
+                'heroes.noData': 'Brak danych o umiejętnościach', 'heroes.noDataHint': 'Zaimportuj skille w zakładce Import (panel admina).', 'heroes.loading': 'Ładowanie umiejętności…',
+                'heroes.back': '← Wróć do listy', 'heroes.pickHint': 'Wybierz bohatera, aby zobaczyć jego umiejętności',
+                'heroes.expandAll': 'Rozwiń wszystkie', 'heroes.collapseAll': 'Zwiń wszystkie', 'heroes.clearFilters': 'Wyczyść filtry', 'heroes.clearSearch': 'Wyczyść', 'heroes.verified': 'Zweryfikowany', 'petTab.pet': 'Pet',
+                'heroes.compareToggle': 'Porównaj', 'heroes.compareTitle': 'Porównanie', 'heroes.compareBtn': 'Porównaj', 'heroes.compareHint': 'Kliknij 2–3 bohaterów do porównania', 'heroes.compareMin': 'Wybierz min. 2 bohaterów', 'heroes.compareMax': 'Maksymalnie 3 bohaterów do porównania',
+                'skills.active': '⚡ Umiejętność aktywna', 'skills.passive': '🛡️ Umiejętności pasywne', 'skills.awaken': '🌟 Przebudzenie', 'skills.engraving': '✦ Grawerunek', 'skills.exclusive': '⚔️ Ekwipunek ekskluzywny', 'skills.noData': 'Brak danych o umiejętnościach tego bohatera.',
+                'skills.unavailable': 'Niedostępne', 'skills.edit': 'Edytuj', 'skills.saved': 'Zapisano umiejętności', 'skills.editTitle': '— edycja umiejętności', 'skills.energy': '⚡ Ładowanie energii',
+                'skills.role': 'Rola', 'skills.stat': 'Stat', 'skills.fieldName': 'Nazwa', 'skills.fieldDesc': 'Opis', 'skills.passiveLabel': 'Pasywka',
+                'role.Dealer': 'Dealer', 'role.Healer': 'Healer', 'role.Support': 'Support', 'role.Tank': 'Tank',
+                'settings.skillsTitle': 'Umiejętności bohaterów (import / eksport)', 'settings.skillsDesc': 'Wczytaj plik heroSkills.json. Brakujące zostaną dodane, istniejące pozostaną — różnice pokażemy do Twojej decyzji.', 'settings.skillsBtn': 'Importuj skille (JSON)',
+                'settings.skillsImported': 'Zaimportowano umiejętności: {n}', 'settings.skillsUnmatched': 'bez dopasowania do bazy bohaterów', 'settings.skillsBadFile': 'Nieprawidłowy plik skilli (oczekiwano mapy { Nazwa: {...} }).',
+                'settings.skillsImportTitle': 'Import umiejętności', 'settings.skillsImportDesc': 'Brakujące zostaną dodane automatycznie. Różniące się — zaznacz, by nadpisać (odznacz, by zostawić).',
+                'settings.skillsNew': 'Nowe (zostaną dodane)', 'settings.skillsChanged': 'Różnice (do decyzji)', 'settings.skillsApply': 'Zastosuj', 'settings.skillsNothing': 'Nic nie zaimportowano', 'settings.skillsUpToDate': 'Wszystko aktualne — brak zmian',
+                'settings.petSkillsTitle': 'Umiejętności petów (import / eksport)', 'settings.petSkillsDesc': 'Wczytaj plik petSkills.json. Brakujące zostaną dodane, różnice — do Twojej decyzji.', 'settings.petSkillsBtn': 'Importuj pety (JSON)',
+                'settings.skillsExportBtn': 'Eksportuj skille (JSON)', 'settings.petSkillsExportBtn': 'Eksportuj pety (JSON)', 'settings.skillsExported': 'Wyeksportowano: {n}', 'settings.skillsExportEmpty': 'Brak danych do eksportu — najpierw zaimportuj.',
                 'search.title': 'Szukaj kontr-formacji', 'search.subtitle': 'Wpisz skład przeciwnika (lub wybierz tagami)', 'search.btn': 'SZUKAJ', 'search.clear': 'Wyczyść',
                 'search.emptyState': 'Wpisz postacie przeciwnika i kliknij "Szukaj"', 'search.results': 'Wyniki', 'search.found': 'Znaleziono', 'search.noResults': 'Nie znaleziono pasujących formacji',
                 'search.enemy': 'Przeciwnik', 'search.missing': 'Brak', 'search.allSlotsFull': 'Wszystkie pola zajęte!', 'search.petSlotFull': 'Pole Pet już zajęte!',
@@ -360,7 +380,23 @@
             en: {
                 'loading': 'Loading data...', 'common.loading': 'Loading...', 'common.cancel': 'Cancel', 'common.clear': 'Clear', 'common.save': 'Save',
                 'header.subtitle': 'Counter-formation finder', 'status.online': 'Online', 'status.offline': 'Offline', 'status.formations': 'formations',
-                'nav.search': 'Search', 'nav.database': 'Database', 'nav.preview': 'Preview', 'nav.add': 'Add', 'nav.import': 'Import', 'nav.war': 'War', 'nav.kreator': 'Creator', 'nav.admin': 'Admin', 'nav.more': 'More',
+                'nav.search': 'Search', 'nav.database': 'Database', 'nav.preview': 'Preview', 'nav.add': 'Add', 'nav.import': 'Import', 'nav.war': 'War', 'nav.kreator': 'Creator', 'nav.heroes': 'Heroes', 'nav.admin': 'Admin', 'nav.more': 'More',
+                'heroes.title': 'Heroes', 'heroes.subtitle': 'Browse hero skills', 'heroes.searchPlaceholder': '🔍 Search hero or skill (e.g. Shock, Silence)...', 'heroes.searchExamples': 'Search by content, e.g.:',
+                'heroes.allRaces': 'All races', 'heroes.allRoles': 'All roles', 'heroes.count': '{n} heroes', 'heroes.none': 'No heroes match the filter',
+                'heroes.noData': 'No skill data', 'heroes.noDataHint': 'Import skills in the Import tab (admin panel).', 'heroes.loading': 'Loading skills…',
+                'heroes.back': '← Back to list', 'heroes.pickHint': 'Pick a hero to see their skills',
+                'heroes.expandAll': 'Expand all', 'heroes.collapseAll': 'Collapse all', 'heroes.clearFilters': 'Clear filters', 'heroes.clearSearch': 'Clear', 'heroes.verified': 'Verified', 'petTab.pet': 'Pet',
+                'heroes.compareToggle': 'Compare', 'heroes.compareTitle': 'Comparison', 'heroes.compareBtn': 'Compare', 'heroes.compareHint': 'Tap 2–3 heroes to compare', 'heroes.compareMin': 'Pick at least 2 heroes', 'heroes.compareMax': 'Up to 3 heroes for comparison',
+                'skills.active': '⚡ Active Skill', 'skills.passive': '🛡️ Passive Skills', 'skills.awaken': '🌟 Awakened', 'skills.engraving': '✦ Engraving', 'skills.exclusive': '⚔️ Exclusive Equipment', 'skills.noData': 'No skill data for this hero.',
+                'skills.unavailable': 'Unavailable', 'skills.edit': 'Edit', 'skills.saved': 'Skills saved', 'skills.editTitle': '— edit skills', 'skills.energy': '⚡ Energy gain',
+                'skills.role': 'Role', 'skills.stat': 'Stat', 'skills.fieldName': 'Name', 'skills.fieldDesc': 'Description', 'skills.passiveLabel': 'Passive',
+                'role.Dealer': 'Dealer', 'role.Healer': 'Healer', 'role.Support': 'Support', 'role.Tank': 'Tank',
+                'settings.skillsTitle': 'Hero skills (import / export)', 'settings.skillsDesc': 'Load heroSkills.json. Missing entries are added, existing ones kept — differences are shown for your decision.', 'settings.skillsBtn': 'Import skills (JSON)',
+                'settings.skillsImported': 'Skills imported: {n}', 'settings.skillsUnmatched': 'unmatched to hero database', 'settings.skillsBadFile': 'Invalid skills file (expected a map { Name: {...} }).',
+                'settings.skillsImportTitle': 'Skills import', 'settings.skillsImportDesc': 'Missing entries are added automatically. Differing ones — check to overwrite (uncheck to keep).',
+                'settings.skillsNew': 'New (will be added)', 'settings.skillsChanged': 'Differences (your choice)', 'settings.skillsApply': 'Apply', 'settings.skillsNothing': 'Nothing imported', 'settings.skillsUpToDate': 'Everything up to date — no changes',
+                'settings.petSkillsTitle': 'Pet skills (import / export)', 'settings.petSkillsDesc': 'Load petSkills.json. Missing entries are added, differences are your choice.', 'settings.petSkillsBtn': 'Import pets (JSON)',
+                'settings.skillsExportBtn': 'Export skills (JSON)', 'settings.petSkillsExportBtn': 'Export pets (JSON)', 'settings.skillsExported': 'Exported: {n}', 'settings.skillsExportEmpty': 'No data to export — import first.',
                 'search.title': 'Search counter-formations', 'search.subtitle': 'Enter enemy composition (or use tags)', 'search.btn': 'SEARCH', 'search.clear': 'Clear',
                 'search.emptyState': 'Enter enemy heroes and click "Search"', 'search.results': 'Results', 'search.found': 'Found', 'search.noResults': 'No matching formations found',
                 'search.enemy': 'Enemy', 'search.missing': 'Missing', 'search.allSlotsFull': 'All slots are full!', 'search.petSlotFull': 'Pet slot is full!',
@@ -731,8 +767,8 @@
         }
 
 		// Konfigurowalne zakładki (kolejność = w panelu). 'admin' zawsze admin-only (locked).
-		const TAB_ICONS = { search: '🔍', database: '📚', view: '👁️', add: '➕', settings: '⚙️', war: '⚔️', kreator: '🎯', defense: '🛡️', admin: '👑' };
-		const TAB_I18N = { search: 'nav.search', database: 'nav.database', view: 'nav.preview', add: 'nav.add', settings: 'nav.import', war: 'nav.war', kreator: 'nav.kreator', defense: 'nav.defense', admin: 'nav.admin' };
+		const TAB_ICONS = { search: '🔍', database: '📚', view: '👁️', add: '➕', settings: '⚙️', war: '⚔️', kreator: '🎯', defense: '🛡️', admin: '👑', heroes: '🧙' };
+		const TAB_I18N = { search: 'nav.search', database: 'nav.database', view: 'nav.preview', add: 'nav.add', settings: 'nav.import', war: 'nav.war', kreator: 'nav.kreator', defense: 'nav.defense', admin: 'nav.admin', heroes: 'nav.heroes' };
 		const tabLabel = tab => `${TAB_ICONS[tab]} ${t(TAB_I18N[tab])}`;
 
 		let moreTabsActive = []; // zakładki aktualnie pokazane w menu „⋯ Więcej"
@@ -1007,6 +1043,8 @@
 			// Defense: zawsze rerenduj bieżący pod-widok przy wejściu (świeże liczniki/listy)
 			if (name === 'defense') switchDefenseView(currentDefenseView);
 			if (name === 'settings') renderImportStats();
+			if (name === 'heroes') renderHeroesTab(); // lazy-load /heroSkills + render listy
+
 		}
 
 		// Formatuj datę do czytelnego formatu (z godziną jeśli != 00:00)
@@ -2776,8 +2814,8 @@
 				
 				const hero = findHero(name);
 				const rc = hero ? `race-${hero.race.toLowerCase()}` : '';
-				
-				return `<div class="battle-slot filled ${rc} ${diffClass}"><span class="hero-name">${name}</span></div>`;
+
+				return `<div class="battle-slot filled ${rc} ${diffClass} slot-clickable" onclick="event.stopPropagation();showHeroSkills('${jsStr(name)}')"><span class="hero-name">${name}</span></div>`;
 			};
 			
 			if (isEnemy) {
@@ -2868,7 +2906,7 @@
 				diffClass = 'compare-unique';
 			}
 			
-			return `<div class="battle-pet filled ${diffClass}"><span class="pet-icon">🐾</span><span>${petName}</span></div>`;
+			return `<div class="battle-pet filled ${diffClass} slot-clickable" onclick="event.stopPropagation();showPetSkills('${jsStr(petName)}')"><span class="pet-icon">🐾</span><span>${petName}</span></div>`;
 		}
 
         function openQuickSelect(targetId, label) {
@@ -3128,7 +3166,7 @@
                 if (!name) return `<div class="battle-slot empty"></div>`;
                 const hero = findHero(name);
                 const rc = hero ? `race-${hero.race.toLowerCase()}` : '';
-                return `<div class="battle-slot filled ${rc}"><span class="hero-name">${name}</span></div>`;
+                return `<div class="battle-slot filled ${rc} slot-clickable" onclick="event.stopPropagation();showHeroSkills('${jsStr(name)}')"><span class="hero-name">${name}</span></div>`;
             };
             
             return isEnemy ? `<div class="battle-grid"><div class="battle-row">${slot(5)}${slot(6)}${slot(7)}</div><div class="battle-row">${slot(3)}${slot(4)}</div><div class="battle-row">${slot(0)}${slot(1)}${slot(2)}</div></div>` :
@@ -3136,7 +3174,7 @@
         }
 
         function renderBattlePet(name) {
-            return name ? `<div class="battle-pet filled"><span class="pet-icon">🐾</span><span>${name}</span></div>` :
+            return name ? `<div class="battle-pet filled slot-clickable" onclick="event.stopPropagation();showPetSkills('${jsStr(name)}')"><span class="pet-icon">🐾</span><span>${name}</span></div>` :
                 `<div class="battle-pet empty"><span class="pet-icon">🐾</span><span>${t('preview.noPet')}</span></div>`;
         }
 
@@ -5330,8 +5368,8 @@
 				
 				// Kapitalizuj nazwę (pierwsza duża)
 				const displayName = hero ? hero.name : (name.charAt(0).toUpperCase() + name.slice(1).toLowerCase());
-				
-				return `<div class="${classes}">${displayName}</div>`;
+
+				return `<div class="${classes} slot-clickable" onclick="event.stopPropagation();showHeroSkills('${jsStr(hero ? hero.name : name)}')">${displayName}</div>`;
 			};
 			
 			return `
@@ -5361,8 +5399,8 @@
 				if (isMatched) classes += ' war-matched';
 				if (isMatched && !samePos) classes += ' war-moved';
 				if (isExtra) classes += ' war-extra';
-				
-				return `<div class="${classes}">${name}</div>`;
+
+				return `<div class="${classes} slot-clickable" onclick="event.stopPropagation();showHeroSkills('${jsStr(name)}')">${name}</div>`;
 			};
 			
 			return `
@@ -5387,8 +5425,8 @@
 				let classes = 'war-your-team-slot filled';
 				if (race) classes += ` race-${race}`;
 				if (isConflict) classes += ' conflict';
-				
-				return `<div class="${classes}">${name}</div>`;
+
+				return `<div class="${classes} slot-clickable" onclick="event.stopPropagation();showHeroSkills('${jsStr(name)}')">${name}</div>`;
 			};
 			
 			return `
@@ -5407,7 +5445,7 @@
 			}
 			const isConflict = conflictPets && conflictPets.has(normalize(petName));
 			const conflictClass = isConflict ? ' conflict' : '';
-			return `<div class="war-your-team-pet${conflictClass}">🐾 ${petName}</div>`;
+			return `<div class="war-your-team-pet${conflictClass} slot-clickable" onclick="event.stopPropagation();showPetSkills('${jsStr(petName)}')">🐾 ${petName}</div>`;
 		}
 
 		// Renderuj porównanie petów - z oryginalnymi nazwami
@@ -5433,7 +5471,7 @@
 				petClass += ' war-extra';         // pet w bazie, inny/brak u szukanego
 			}
 			
-			return `<div class="compact-pet ${petClass}">🐾 ${displayName}</div>`;
+			return `<div class="compact-pet ${petClass} slot-clickable" onclick="event.stopPropagation();showPetSkills('${jsStr(petData || petName)}')">🐾 ${displayName}</div>`;
 		}
 
 		// Kopiuj skład do schowka
@@ -5992,6 +6030,476 @@
 				}
 			}
 		}
+
+
+        // ═══════════════════════════════════════════════════════════
+        // TAB: HEROES — podgląd umiejętności bohaterów (read-only)
+        // ═══════════════════════════════════════════════════════════
+        // Dane skilli (/heroSkills) są lazy-load przy 1. wejściu (loadHeroSkills) —
+        // świadomie NIE trzymamy stałego .on('value'), żeby nie obciążać startu apki.
+
+        let heroesFilterRaces = new Set(), heroesFilterRoles = new Set(), heroesFilterStats = new Set(), heroesSearchQuery = ''; // wielokrotny wybór (pusty zbiór = wszystkie)
+        let heroCompareMode = false, heroCompareSel = []; // tryb porównywania: wybór 2–3 bohaterów
+        const ENGRAVING_TIERS = ['10', '20', '30', '40']; // poziomy grawerunku (na razie wypełniony tylko +40)
+        // Ikony klas/typów — emoji dobrane pod grę (Dealer=miecze, Tank=tarcza, Healer=serce, Support=iskra;
+        // STR=mięsień, AGI=łuk jak w grze, INT=kula). Łatwa podmiana na grafiki gdyby pojawiło się dobre źródło.
+        const ROLE_ICON = { Dealer: '🗡️', Tank: '🛡️', Healer: '➕', Support: '💠' };
+        const STAT_ICON = { STR: '🔨', AGI: '🏹', INT: '🪄' };
+        const roleLabel = r => `${ROLE_ICON[r] || ''} ${t('role.' + r)}`.trim();
+        const statLabel = s => s ? `${STAT_ICON[s] || ''} ${escSkill(s)}`.trim() : '';
+        // Znaczek „zweryfikowany" (jak niebieski ptaszek na social media) — gdy obj.verified === true.
+        const verifiedBadge = obj => obj && obj.verified ? `<span class="verified-badge" title="${escSkill(t('heroes.verified'))}">✓</span>` : '';
+        // Stan zwinięcia poziomów grawerunku w Podglądzie (per-poziom, zapamiętywany). Domyślnie tylko +40 rozwinięty.
+        let engravingExpanded = Object.assign({ '10': false, '20': false, '30': false, '40': true }, storage.getJson('souls_engraving_expanded', {}));
+
+        // Escape HTML — skille to tekst z gry, zabezpieczamy wstrzyknięcie. \n zostają (CSS pre-line je renderuje).
+        const escSkill = s => String(s == null ? '' : s).replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
+
+        // Przykłady wyszukiwania po treści skilla (pokazywane gdy pole puste).
+        const HEROES_SEARCH_EXAMPLES = ['Shock', 'Silence', 'Stun', 'Heal', 'Energy', 'Crit', 'Shield', 'Dodge', 'Bleed'];
+        // Cały tekst skilli bohatera (nazwy + opisy + rola/stat) — do wyszukiwania po treści. Oryginalna wielkość liter.
+        function heroSkillsText(s) {
+            if (!s) return '';
+            const p = [];
+            if (s.active) p.push(s.active.name, s.active.desc);
+            (s.passives || []).forEach(x => p.push(x.name, x.desc));
+            if (s.awaken) p.push(s.awaken.name, s.awaken.desc);
+            if (s.engraving) Object.values(s.engraving).forEach(v => p.push(v));
+            if (s.exclusive) p.push(s.exclusive.name, s.exclusive.desc);
+            if (s.role) p.push(s.role);
+            if (s.stat) p.push(s.stat);
+            return p.filter(Boolean).join(' · ');
+        }
+        function petSkillsText(s) {
+            if (!s) return '';
+            const p = [];
+            if (s.active) p.push(s.active.name, s.active.desc);
+            if (s.passive) p.push(s.passive.name, s.passive.desc);
+            if (s.energy) p.push(s.energy);
+            return p.filter(Boolean).join(' · ');
+        }
+        // Fragment treści wokół trafienia (do podpowiedzi na kafelku przy szukaniu po skillu).
+        function matchSnippet(text, q) {
+            const i = text.toLowerCase().indexOf(q);
+            if (i < 0) return '';
+            const start = Math.max(0, i - 18), end = Math.min(text.length, i + q.length + 34);
+            return (start > 0 ? '…' : '') + text.slice(start, end).trim() + (end < text.length ? '…' : '');
+        }
+
+        // Lookup skilli bohatera po nazwie (case-insensitive). Zwraca obiekt lub null.
+        function getHeroSkills(name) {
+            if (!name) return null;
+            if (allHeroSkills[name]) return allHeroSkills[name];
+            const n = normalize(name);
+            const key = Object.keys(allHeroSkills).find(k => normalize(k) === n);
+            return key ? allHeroSkills[key] : null;
+        }
+
+        // Lookup skilli peta po nazwie (case-insensitive). Zwraca obiekt lub null.
+        function getPetSkills(name) {
+            if (!name) return null;
+            if (allPetSkills[name]) return allPetSkills[name];
+            const n = normalize(name);
+            const key = Object.keys(allPetSkills).find(k => normalize(k) === n);
+            return key ? allPetSkills[key] : null;
+        }
+
+        // Lazy-load /heroSkills i /petSkills (raz; potem cache). force = wymuszenie (np. po imporcie).
+        async function loadHeroSkills(force) {
+            if (heroSkillsLoaded && !force) return;
+            if (!heroSkillsRef) return;
+            try {
+                const snap = await heroSkillsRef.once('value');
+                allHeroSkills = snap.val() || {};
+                heroSkillsLoaded = true;
+            } catch (e) {
+                console.error('heroSkills load error:', e);
+                allHeroSkills = {};
+            }
+        }
+        async function loadPetSkills(force) {
+            if (petSkillsLoaded && !force) return;
+            if (!petSkillsRef) return;
+            try {
+                const snap = await petSkillsRef.once('value');
+                allPetSkills = snap.val() || {};
+                petSkillsLoaded = true;
+            } catch (e) {
+                console.error('petSkills load error:', e);
+                allPetSkills = {};
+            }
+        }
+
+        // Wejście na zakładkę: dociągnij dane (raz) i wyrenderuj listę (bohaterowie + pety).
+        async function renderHeroesTab() {
+            if (!heroSkillsLoaded || !petSkillsLoaded) {
+                const grid = $('heroes-grid');
+                if (grid) grid.innerHTML = `<div class="heroes-empty">${t('heroes.loading')}</div>`;
+                await Promise.all([loadHeroSkills(), loadPetSkills()]);
+            }
+            renderHeroesFilters();
+            renderSearchExamples();
+            renderHeroesGrid();
+        }
+
+        // Chipy filtrów: rasy (z /heroes, kolejność RACE_ORDER) + klasy (z /heroSkills) — wielokrotny wybór.
+        // Rebuild za każdym razem (tanie, łapie zmianę języka i stan zaznaczeń).
+        function renderHeroesFilters() {
+            const raceWrap = $('heroes-race-chips'), roleWrap = $('heroes-role-chips');
+            if (raceWrap) {
+                const races = RACE_ORDER.filter(r => heroes.some(h => h.race === r));
+                raceWrap.innerHTML = races.map(r => `<button class="heroes-chip race-${r.toLowerCase()}${heroesFilterRaces.has(r) ? ' active' : ''}" onclick="toggleHeroesRace('${r}')">${RACE_EMOJI[r] || ''} ${escSkill(raceLabel(r))}</button>`).join('');
+            }
+            if (roleWrap) {
+                const roles = ['Tank', 'Dealer', 'Support', 'Healer'].filter(role => Object.values(allHeroSkills).some(s => s && s.role === role));
+                roleWrap.innerHTML = roles.map(r => `<button class="heroes-chip role-chip${heroesFilterRoles.has(r) ? ' active' : ''}" onclick="toggleHeroesRole('${r}')">${roleLabel(r)}</button>`).join('');
+            }
+            const statWrap = $('heroes-stat-chips');
+            if (statWrap) {
+                const stats = ['STR', 'AGI', 'INT'].filter(st => Object.values(allHeroSkills).some(s => s && s.stat === st));
+                const clear = (heroesFilterRaces.size || heroesFilterRoles.size || heroesFilterStats.size)
+                    ? `<button class="heroes-chip heroes-chip-clear" onclick="clearHeroesFilters()">✕ ${t('heroes.clearFilters')}</button>` : '';
+                statWrap.innerHTML = stats.map(st => `<button class="heroes-chip stat-chip${heroesFilterStats.has(st) ? ' active' : ''}" onclick="toggleHeroesStat('${st}')">${statLabel(st)}</button>`).join('') + clear;
+            }
+        }
+
+        function toggleHeroesRace(r) { heroesFilterRaces.has(r) ? heroesFilterRaces.delete(r) : heroesFilterRaces.add(r); renderHeroesFilters(); renderHeroesGrid(); }
+        function toggleHeroesRole(r) { heroesFilterRoles.has(r) ? heroesFilterRoles.delete(r) : heroesFilterRoles.add(r); renderHeroesFilters(); renderHeroesGrid(); }
+        function toggleHeroesStat(st) { heroesFilterStats.has(st) ? heroesFilterStats.delete(st) : heroesFilterStats.add(st); renderHeroesFilters(); renderHeroesGrid(); }
+        function clearHeroesFilters() { heroesFilterRaces.clear(); heroesFilterRoles.clear(); heroesFilterStats.clear(); renderHeroesFilters(); renderHeroesGrid(); }
+        function setHeroesSearch(v) { heroesSearchQuery = v; renderSearchExamples(); renderHeroesGrid(); }
+        function setHeroesSearchExample(term) {
+            const inp = $('heroes-search'); if (inp) inp.value = term;
+            heroesSearchQuery = term; renderSearchExamples(); renderHeroesGrid();
+        }
+        // Wiersz pod szukajką: gdy pole puste → przykłady (klik wypełnia); gdy coś wpisane → przycisk „wyczyść".
+        function renderSearchExamples() {
+            const el = $('heroes-search-examples');
+            if (!el) return;
+            el.style.display = 'flex';
+            if (heroesSearchQuery) {
+                el.innerHTML = `<button class="heroes-chip heroes-chip-clear" onclick="clearHeroesSearch()">✕ ${t('heroes.clearSearch')}</button>`;
+            } else {
+                el.innerHTML = `<span class="hse-ex-label">🔎 ${t('heroes.searchExamples')}</span>`
+                    + HEROES_SEARCH_EXAMPLES.map(x => `<button class="hse-ex-chip" onclick="setHeroesSearchExample('${x}')">${x}</button>`).join('');
+            }
+        }
+        function clearHeroesSearch() {
+            const inp = $('heroes-search'); if (inp) inp.value = '';
+            heroesSearchQuery = ''; renderSearchExamples(); renderHeroesGrid();
+        }
+
+        // Siatka kafelków pogrupowana po rasie + sekcja Pety na dole — sekcje ZWIJANE (mechanika jak w Tagach,
+        // ale własny przycisk/etykiety bez słowa „tagi"). Kolejność ras = RACE_ORDER (jak w Tagach).
+        function renderHeroesGrid() {
+            const grid = $('heroes-grid');
+            if (!grid) return;
+            const q = normalize(heroesSearchQuery);
+            let list = heroes.slice();
+            if (heroesFilterRaces.size) list = list.filter(h => heroesFilterRaces.has(h.race));
+            if (heroesFilterRoles.size) list = list.filter(h => { const s = getHeroSkills(h.name); return s && heroesFilterRoles.has(s.role); });
+            if (heroesFilterStats.size) list = list.filter(h => { const s = getHeroSkills(h.name); return s && heroesFilterStats.has(s.stat); });
+            if (q) list = list.filter(h => normalize(h.name).includes(q) || heroSkillsText(getHeroSkills(h.name)).toLowerCase().includes(q));
+            const cnt = $('heroes-count');
+            if (cnt) cnt.textContent = t('heroes.count', { n: list.length });
+            const groups = {};
+            list.forEach(h => { (groups[h.race] = groups[h.race] || []).push(h); });
+            const order = RACE_ORDER.filter(r => groups[r]).concat(Object.keys(groups).filter(r => !RACE_ORDER.includes(r)));
+            const section = (label, count, tiles) => `<div class="quick-tags-section"><div class="quick-tags-header expanded" onclick="toggleQuickTagSection(this)">`
+                + `<span class="toggle-icon">▶</span>${label} (${count})</div>`
+                + `<div class="quick-tags-content show"><div class="heroes-race-tiles">${tiles}</div></div></div>`;
+            let html = order.map(race => section(`${RACE_EMOJI[race] || '🧙'} ${escSkill(raceLabel(race))}`, groups[race].length,
+                groups[race].sort((a, b) => a.name.localeCompare(b.name)).map(h => heroTileHTML(h, q)).join(''))).join('');
+            // sekcja Pety — gdy brak filtra rasy/roli (pety ich nie mają); szukajka działa po nazwie I treści skilla
+            if (!heroesFilterRaces.size && !heroesFilterRoles.size && !heroesFilterStats.size) {
+                let petList = Array.from(new Set([...pets, ...Object.keys(allPetSkills)]));
+                if (q) petList = petList.filter(p => normalize(p).includes(q) || petSkillsText(getPetSkills(p)).toLowerCase().includes(q));
+                petList.sort((a, b) => a.localeCompare(b));
+                if (petList.length) html += section(`🐾 ${t('quickTags.pets')}`, petList.length, petList.map(p => petTileHTML(p, q)).join(''));
+            }
+            // Pasek porównania (tryb compare) — zawsze widoczny gdy tryb włączony
+            let compareBar = '';
+            if (heroCompareMode) {
+                const chips = heroCompareSel.length
+                    ? heroCompareSel.map(n => `<span class="hcb-chip" onclick="onHeroTileClick('${jsStr(n)}')">${escSkill(n)} ✕</span>`).join('')
+                    : `<span class="hcb-hint">${t('heroes.compareHint')}</span>`;
+                compareBar = `<div class="heroes-compare-bar"><span class="hcb-label">⚖️ ${heroCompareSel.length}/3</span>${chips}`
+                    + `<button class="btn btn-small" ${heroCompareSel.length < 2 ? 'disabled' : ''} onclick="showHeroCompare()">${t('heroes.compareBtn')}</button>`
+                    + (heroCompareSel.length ? `<button class="btn btn-small btn-secondary" onclick="clearHeroCompare()">${t('heroes.clearFilters')}</button>` : '') + `</div>`;
+            }
+            if (!html) { grid.innerHTML = compareBar + `<div class="heroes-empty">${t('heroes.none')}</div>`; return; }
+            // przycisk zwiń/rozwiń wszystko WEWNĄTRZ kontenera; domyślnie rozwinięte → „Zwiń wszystkie"
+            grid.innerHTML = compareBar + `<button class="expand-all-btn" onclick="toggleAllHeroGroups(this)">▲ ${t('heroes.collapseAll')}</button>` + html;
+        }
+
+        // Zwiń/rozwiń wszystkie grupy w zakładce Bohaterowie (własne etykiety, bez słowa „tagi").
+        function toggleAllHeroGroups(btn) {
+            const grid = btn.closest('.heroes-grid');
+            const sections = grid.querySelectorAll('.quick-tags-section');
+            const allExpanded = grid.querySelectorAll('.quick-tags-header.expanded').length === sections.length;
+            sections.forEach(s => {
+                s.querySelector('.quick-tags-header').classList.toggle('expanded', !allExpanded);
+                s.querySelector('.quick-tags-content').classList.toggle('show', !allExpanded);
+            });
+            btn.textContent = allExpanded ? `▼ ${t('heroes.expandAll')}` : `▲ ${t('heroes.collapseAll')}`;
+        }
+
+        // Snippet trafienia w treści skilla (gdy szukasz po treści, nie po nazwie) — podpowiedź na kafelku.
+        function tileMatchHTML(name, q, text) {
+            if (!q || normalize(name).includes(q)) return '';
+            const snip = matchSnippet(text, q);
+            return snip ? `<span class="hero-tile-match">${escSkill(snip)}</span>` : '';
+        }
+
+        function petTileHTML(name, q) {
+            const s = getPetSkills(name);
+            const sub = s ? `<span class="hero-tile-role">${t('petTab.pet')}</span>` : `<span class="hero-tile-nodata">${t('heroes.noData')}</span>`;
+            return `<button class="hero-tile race-pet${s ? '' : ' no-data'}" onclick="showPetSkills('${jsStr(name)}')">`
+                + `<span class="hero-tile-emoji">🐾</span><span class="hero-tile-name">${escSkill(name)}${verifiedBadge(s)}</span>${sub}${tileMatchHTML(name, q, petSkillsText(s))}</button>`;
+        }
+
+        function heroTileHTML(h, q) {
+            const s = getHeroSkills(h.name);
+            const rc = `race-${String(h.race || '').toLowerCase()}`;
+            const sel = heroCompareMode && heroCompareSel.includes(h.name) ? ' selected' : '';
+            const sub = s && s.role
+                ? `<span class="hero-tile-role">${roleLabel(s.role)}${s.stat ? ' · ' + statLabel(s.stat) : ''}</span>`
+                : `<span class="hero-tile-nodata">${t('heroes.noData')}</span>`;
+            return `<button class="hero-tile ${rc}${s ? '' : ' no-data'}${sel}" onclick="onHeroTileClick('${jsStr(h.name)}')">`
+                + `<span class="hero-tile-emoji">${RACE_EMOJI[h.race] || '🧙'}</span>`
+                + `<span class="hero-tile-name">${escSkill(h.name)}${verifiedBadge(s)}</span>${sub}${tileMatchHTML(h.name, q, heroSkillsText(s))}</button>`;
+        }
+
+        // Klik w kafelek: w trybie porównania zaznacza (max 3), inaczej otwiera skille.
+        function onHeroTileClick(name) {
+            if (!heroCompareMode) { showHeroSkills(name); return; }
+            const i = heroCompareSel.indexOf(name);
+            if (i >= 0) heroCompareSel.splice(i, 1);
+            else { if (heroCompareSel.length >= 3) { showToast(t('heroes.compareMax')); return; } heroCompareSel.push(name); }
+            renderHeroesGrid();
+        }
+        function toggleHeroCompareMode() {
+            heroCompareMode = !heroCompareMode;
+            if (!heroCompareMode) heroCompareSel = [];
+            $('heroes-compare-toggle')?.classList.toggle('active', heroCompareMode);
+            renderHeroesGrid();
+        }
+        function clearHeroCompare() { heroCompareSel = []; renderHeroesGrid(); }
+
+        // Modal porównania — reużywa szerokiego #hero-skills-modal; kolumny obok siebie (1 bohater = 1 kolumna).
+        function showHeroCompare() {
+            if (heroCompareSel.length < 2) { showToast(t('heroes.compareMin')); return; }
+            const modal = $('hero-skills-modal');
+            if (!modal) return;
+            $('hero-skills-title').innerHTML = `<div class="hsk-titletext"><span class="hsk-name">⚖️ ${t('heroes.compareTitle')} (${heroCompareSel.length})</span></div>`;
+            $('hero-skills-body').innerHTML = `<div class="compare-cols">${heroCompareSel.map(heroSkillColumnHTML).join('')}</div>`;
+            modal.classList.add('show');
+        }
+        // Pojedyncza kolumna bohatera (nagłówek + sekcje skilli pionowo) — używane w porównywarce.
+        function heroSkillColumnHTML(name) {
+            const hero = findHero(name), s = getHeroSkills(name);
+            const race = hero ? hero.race : '';
+            const meta = s && s.role ? `${roleLabel(s.role)}${s.stat ? ' · ' + statLabel(s.stat) : ''}` : (s && s.stat ? statLabel(s.stat) : '');
+            const raceTxt = race ? `${RACE_EMOJI[race] || ''} ${escSkill(raceLabel(race))}` : '';
+            const item = sk => `<div class="skill-item"><div class="skill-name">${escSkill(sk.name)}</div>`
+                + (sk.desc ? `<div class="skill-desc">${escSkill(sk.desc)}</div>` : '') + `</div>`;
+            const na = `<div class="skill-item skill-na">${t('skills.unavailable')}</div>`;
+            const sec = (key, inner) => `<div class="skill-section"><h4 class="skill-col-title">${t(key)}</h4>${inner}</div>`;
+            const engFilled = ENGRAVING_TIERS.filter(tr => s && s.engraving && s.engraving[tr]);
+            const engInner = engFilled.length
+                ? engFilled.map(tr => `<div class="skill-item"><div class="skill-name">+${tr}</div><div class="skill-desc">${escSkill(s.engraving[tr])}</div></div>`).join('')
+                : na;
+            return `<div class="compare-col">`
+                + `<div class="compare-col-head"><span class="hsk-name">${escSkill(name)}${verifiedBadge(s)}</span>`
+                + ((raceTxt || meta) ? `<span class="hsk-meta">${raceTxt}${raceTxt && meta ? ' · ' : ''}${meta}</span>` : '') + `</div>`
+                + sec('skills.active', s && s.active ? item(s.active) : na)
+                + sec('skills.passive', s && s.passives && s.passives.length ? s.passives.map(item).join('') : na)
+                + sec('skills.awaken', s && s.awaken ? item(s.awaken) : na)
+                + sec('skills.engraving', engInner)
+                + sec('skills.exclusive', s && s.exclusive ? item(s.exclusive) : na)
+                + `</div>`;
+        }
+
+        // Modal z kartą skilli — wywoływany z kafelka ORAZ z klikalnych nazw w formacjach.
+        function showHeroSkills(name) {
+            const modal = $('hero-skills-modal');
+            if (!modal) return;
+            if (!heroSkillsLoaded) {
+                const titleEl = $('hero-skills-title'), body = $('hero-skills-body');
+                if (titleEl) titleEl.textContent = name;
+                if (body) body.innerHTML = `<div class="heroes-empty">${t('heroes.loading')}</div>`;
+                modal.classList.add('show');
+                loadHeroSkills().then(() => renderHeroSkillsModal(name));
+                return;
+            }
+            renderHeroSkillsModal(name);
+            modal.classList.add('show');
+        }
+
+        // Render zawartości modalu (kolumny obok siebie: Active | Pasywne | Przebudzenie | Grawerunek | Exclusive).
+        // Exclusive i poziomy grawerunku są ZAWSZE pokazane — brak danych = „Niedostępne".
+        function renderHeroSkillsModal(name) {
+            const titleEl = $('hero-skills-title'), body = $('hero-skills-body');
+            const hero = findHero(name);
+            const s = getHeroSkills(name);
+            const race = hero ? hero.race : '';
+            const emoji = RACE_EMOJI[race] || '🧙';
+            const meta = s && s.role ? `${roleLabel(s.role)}${s.stat ? ' · ' + statLabel(s.stat) : ''}` : (s && s.stat ? statLabel(s.stat) : '');
+            const raceTxt = race ? `${emoji} ${escSkill(raceLabel(race))}` : '';
+            const editBtn = isAdmin ? `<button class="hsk-edit-btn" onclick="openHeroSkillsEdit('${jsStr(name)}')" title="${escSkill(t('skills.edit'))}" aria-label="${escSkill(t('skills.edit'))}">✏️</button>` : '';
+            if (titleEl) titleEl.innerHTML = `<div class="hsk-titletext"><span class="hsk-name">${escSkill(name)}${verifiedBadge(s)}</span>`
+                + ((raceTxt || meta) ? `<span class="hsk-meta">${raceTxt}${raceTxt && meta ? ' · ' : ''}${meta}</span>` : '') + `</div>${editBtn}`;
+            if (!body) return;
+            const item = sk => `<div class="skill-item"><div class="skill-name">${escSkill(sk.name)}</div>`
+                + (sk.desc ? `<div class="skill-desc">${escSkill(sk.desc)}</div>` : '') + `</div>`;
+            const na = `<div class="skill-item skill-na">${t('skills.unavailable')}</div>`;
+            const col = (key, inner) => `<div class="skill-col"><h4 class="skill-col-title">${t(key)}</h4>${inner}</div>`;
+            const engHtml = ENGRAVING_TIERS.map(tier => {
+                const v = s && s.engraving && s.engraving[tier];
+                const open = engravingExpanded[tier];
+                return `<div class="skill-item eng-tier${open ? ' open' : ''}${v ? '' : ' skill-na'}">`
+                    + `<div class="skill-name eng-tier-head" onclick="toggleEngravingTier(this,'${tier}')"><span class="toggle-icon">▶</span> +${tier}</div>`
+                    + `<div class="skill-desc eng-tier-body">${v ? escSkill(v) : t('skills.unavailable')}</div></div>`;
+            }).join('');
+            body.innerHTML = `<div class="skill-cols">`
+                + col('skills.active', s && s.active ? item(s.active) : na)
+                + col('skills.passive', s && s.passives && s.passives.length ? s.passives.map(item).join('') : na)
+                + col('skills.awaken', s && s.awaken ? item(s.awaken) : na)
+                + col('skills.engraving', engHtml)
+                + col('skills.exclusive', s && s.exclusive ? item(s.exclusive) : na)
+                + `</div>`;
+        }
+        function closeHeroSkills() { $('hero-skills-modal')?.classList.remove('show'); }
+
+        // Zwiń/rozwiń poziom grawerunku w Podglądzie + zapamiętaj wybór (per-poziom) w localStorage.
+        function toggleEngravingTier(el, tier) {
+            const open = el.closest('.eng-tier').classList.toggle('open');
+            engravingExpanded[tier] = open;
+            storage.setJson('souls_engraving_expanded', engravingExpanded);
+        }
+
+        // ── Pety: ten sam modal co bohaterowie, ale 3 kolumny (Active | Pasywne | Ładowanie energii) ──
+        function showPetSkills(name) {
+            const modal = $('hero-skills-modal');
+            if (!modal) return;
+            if (!petSkillsLoaded) {
+                const titleEl = $('hero-skills-title'), body = $('hero-skills-body');
+                if (titleEl) titleEl.textContent = name;
+                if (body) body.innerHTML = `<div class="heroes-empty">${t('heroes.loading')}</div>`;
+                modal.classList.add('show');
+                loadPetSkills().then(() => renderPetSkillsModal(name));
+                return;
+            }
+            renderPetSkillsModal(name);
+            modal.classList.add('show');
+        }
+        function renderPetSkillsModal(name) {
+            const titleEl = $('hero-skills-title'), body = $('hero-skills-body');
+            const s = getPetSkills(name);
+            const editBtn = isAdmin ? `<button class="hsk-edit-btn" onclick="openPetSkillsEdit('${jsStr(name)}')" title="${escSkill(t('skills.edit'))}" aria-label="${escSkill(t('skills.edit'))}">✏️</button>` : '';
+            if (titleEl) titleEl.innerHTML = `<div class="hsk-titletext"><span class="hsk-name">🐾 ${escSkill(name)}${verifiedBadge(s)}</span><span class="hsk-meta">${t('petTab.pet')}</span></div>${editBtn}`;
+            if (!body) return;
+            const item = sk => `<div class="skill-item"><div class="skill-name">${escSkill(sk.name)}</div>`
+                + (sk.desc ? `<div class="skill-desc">${escSkill(sk.desc)}</div>` : '') + `</div>`;
+            const na = `<div class="skill-item skill-na">${t('skills.unavailable')}</div>`;
+            const col = (key, inner) => `<div class="skill-col"><h4 class="skill-col-title">${t(key)}</h4>${inner}</div>`;
+            const energy = s && s.energy ? `<div class="skill-item"><div class="skill-desc">${escSkill(s.energy)}</div></div>` : na;
+            body.innerHTML = `<div class="skill-cols">`
+                + col('skills.active', s && s.active ? item(s.active) : na)
+                + col('skills.passive', s && s.passive ? item(s.passive) : na)
+                + col('skills.energy', energy)
+                + `</div>`;
+        }
+
+        // Auto-wysokość textarea = pełna treść (do limitu). scrollHeight działa dopiero gdy element jest widoczny.
+        function autoSizeTextarea(el) { if (!el) return; el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight + 2, 420) + 'px'; }
+
+        // ── Edycja umiejętności (tylko admin) ──
+        let editingSkillHero = null;
+        function openHeroSkillsEdit(name) {
+            if (!isAdmin) return;
+            editingSkillHero = name;
+            const s = getHeroSkills(name) || {};
+            const set = (id, val) => { const el = $(id); if (el) el.value = val || ''; };
+            set('hse-role', s.role); set('hse-stat', s.stat);
+            set('hse-active-name', s.active && s.active.name); set('hse-active-desc', s.active && s.active.desc);
+            for (let i = 0; i < 3; i++) { const p = (s.passives || [])[i] || {}; set(`hse-pass${i}-name`, p.name); set(`hse-pass${i}-desc`, p.desc); }
+            set('hse-awaken-name', s.awaken && s.awaken.name); set('hse-awaken-desc', s.awaken && s.awaken.desc);
+            ENGRAVING_TIERS.forEach(tier => set(`hse-eng${tier}`, s.engraving && s.engraving[tier]));
+            set('hse-excl-name', s.exclusive && s.exclusive.name); set('hse-excl-desc', s.exclusive && s.exclusive.desc);
+            const vcb = $('hse-verified'); if (vcb) vcb.checked = !!s.verified;
+            $('hero-skills-edit-title').textContent = name;
+            $('hero-skills-edit-modal').classList.add('show');
+            // auto-rozwinięcie pól: pokaż całość długich opisów od razu (scrollHeight liczy się dopiero po wyświetleniu)
+            document.querySelectorAll('#hero-skills-edit-modal .hse-textarea').forEach(autoSizeTextarea);
+        }
+        function closeHeroSkillsEdit() { $('hero-skills-edit-modal')?.classList.remove('show'); editingSkillHero = null; }
+        async function saveHeroSkillsEdit() {
+            if (!editingSkillHero || !isAdmin) return;
+            if (!isOnline) { showToast(t('common.noConnection'), true); return; }
+            const name = editingSkillHero;
+            const gv = id => ($(id)?.value || '').trim();
+            const sk = (n, d) => (n || d) ? { name: n, desc: d } : null;
+            const obj = {};
+            const role = gv('hse-role'), stat = gv('hse-stat');
+            if (role) obj.role = role;
+            if (stat) obj.stat = stat;
+            const active = sk(gv('hse-active-name'), gv('hse-active-desc')); if (active) obj.active = active;
+            const passives = [];
+            for (let i = 0; i < 3; i++) { const p = sk(gv(`hse-pass${i}-name`), gv(`hse-pass${i}-desc`)); if (p) passives.push(p); }
+            if (passives.length) obj.passives = passives;
+            const awaken = sk(gv('hse-awaken-name'), gv('hse-awaken-desc')); if (awaken) obj.awaken = awaken;
+            const eng = {};
+            ENGRAVING_TIERS.forEach(tier => { const d = gv(`hse-eng${tier}`); if (d) eng[tier] = d; });
+            if (Object.keys(eng).length) obj.engraving = eng;
+            const excl = sk(gv('hse-excl-name'), gv('hse-excl-desc')); if (excl) obj.exclusive = excl;
+            if ($('hse-verified')?.checked) obj.verified = true;
+            try {
+                await heroSkillsRef.child(name).set(Object.keys(obj).length ? obj : null);
+                if (Object.keys(obj).length) allHeroSkills[name] = obj; else delete allHeroSkills[name];
+                closeHeroSkillsEdit();
+                renderHeroSkillsModal(name);
+                if ($('tab-heroes')?.classList.contains('active')) renderHeroesGrid();
+                showToast(`✅ ${t('skills.saved')}`);
+            } catch (e) { showToast(`${t('common.error')}: ${e.message}`, true); }
+        }
+
+        // ── Edycja peta (tylko admin) ──
+        let editingPetSkill = null;
+        function openPetSkillsEdit(name) {
+            if (!isAdmin) return;
+            editingPetSkill = name;
+            const s = getPetSkills(name) || {};
+            const set = (id, val) => { const el = $(id); if (el) el.value = val || ''; };
+            set('pse-active-name', s.active && s.active.name); set('pse-active-desc', s.active && s.active.desc);
+            set('pse-passive-name', s.passive && s.passive.name); set('pse-passive-desc', s.passive && s.passive.desc);
+            set('pse-energy', s.energy);
+            const vcb = $('pse-verified'); if (vcb) vcb.checked = !!s.verified;
+            $('pet-skills-edit-title').textContent = name;
+            $('pet-skills-edit-modal').classList.add('show');
+            document.querySelectorAll('#pet-skills-edit-modal .hse-textarea').forEach(autoSizeTextarea);
+        }
+        function closePetSkillsEdit() { $('pet-skills-edit-modal')?.classList.remove('show'); editingPetSkill = null; }
+        async function savePetSkillsEdit() {
+            if (!editingPetSkill || !isAdmin) return;
+            if (!isOnline) { showToast(t('common.noConnection'), true); return; }
+            const name = editingPetSkill;
+            const gv = id => ($(id)?.value || '').trim();
+            const sk = (n, d) => (n || d) ? { name: n, desc: d } : null;
+            const obj = {};
+            const active = sk(gv('pse-active-name'), gv('pse-active-desc')); if (active) obj.active = active;
+            const passive = sk(gv('pse-passive-name'), gv('pse-passive-desc')); if (passive) obj.passive = passive;
+            const energy = gv('pse-energy'); if (energy) obj.energy = energy;
+            if ($('pse-verified')?.checked) obj.verified = true;
+            try {
+                await petSkillsRef.child(name).set(Object.keys(obj).length ? obj : null);
+                if (Object.keys(obj).length) allPetSkills[name] = obj; else delete allPetSkills[name];
+                closePetSkillsEdit();
+                renderPetSkillsModal(name);
+                if ($('tab-heroes')?.classList.contains('active')) renderHeroesGrid();
+                showToast(`✅ ${t('skills.saved')}`);
+            } catch (e) { showToast(`${t('common.error')}: ${e.message}`, true); }
+        }
 
 
         // ═══════════════════════════════════════════════════════════
@@ -6896,10 +7404,10 @@
                 if (!name) return `<div class="defense-mini-slot empty"></div>`;
                 const hero = findHero(name);
                 const rc = hero ? `race-${hero.race.toLowerCase()}` : '';
-                return `<div class="defense-mini-slot"><span class="${rc}">${escapeHtml(name)}</span></div>`;
+                return `<div class="defense-mini-slot slot-clickable" onclick="event.stopPropagation();showHeroSkills('${jsStr(name)}')"><span class="${rc}">${escapeHtml(name)}</span></div>`;
             };
             const petHtml = pet
-                ? `<div class="defense-mini-pet">🐾 ${escapeHtml(pet)}</div>`
+                ? `<div class="defense-mini-pet slot-clickable" onclick="event.stopPropagation();showPetSkills('${jsStr(pet)}')">🐾 ${escapeHtml(pet)}</div>`
                 : `<div class="defense-mini-pet empty">🐾 —</div>`;
             return `
                 <div class="defense-mini-grid">
@@ -7041,6 +7549,112 @@
             };
             reader.readAsText(file);
             event.target.value = '';
+        }
+
+        // Import umiejętności → /heroSkills lub /petSkills (kind: 'hero'|'pet'). Osobny nod — NIE rusza /heroes/pets/formacji.
+        // MERGE: brakujące dodaje automatycznie; istniejące identyczne zostawia; różniące się → diff do decyzji usera.
+        let pendingSkillsImport = null;
+        async function importSkillsFile(event, kind) {
+            const file = event.target.files[0];
+            if (!file) return;
+            if (!isOnline) { showToast(t('common.noConnection'), true); return; }
+            const isPet = kind === 'pet';
+            const reader = new FileReader();
+            reader.onload = async e => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    if (!data || typeof data !== 'object' || Array.isArray(data)) { showToast(t('settings.skillsBadFile'), true); return; }
+                    if (isPet) await loadPetSkills(); else await loadHeroSkills(); // aktualny stan bazy do porównania
+                    const cache = isPet ? allPetSkills : allHeroSkills;
+                    const matcher = isPet ? (n => pets.some(p => normalize(p) === normalize(n))) : (n => !!findHero(n));
+                    const validKey = k => k && !/[.#$\[\]\/]/.test(String(k)); // klucze Firebase nie mogą mieć . # $ [ ] /
+                    const entries = Object.entries(data).filter(([k, v]) => validKey(k) && v && typeof v === 'object');
+                    if (!entries.length) { showToast(t('settings.skillsBadFile'), true); return; }
+                    const isNew = [], changed = [];
+                    entries.forEach(([k, v]) => {
+                        const cur = cache[k];
+                        if (cur === undefined) isNew.push([k, v]);
+                        else if (JSON.stringify(cur) !== JSON.stringify(v)) changed.push([k, v]);
+                    });
+                    const unmatched = entries.filter(([k]) => !matcher(k)).map(([k]) => k); // klucze bez bohatera/peta w żywej bazie
+                    if (!isNew.length && !changed.length) { showToast(t('settings.skillsUpToDate')); return; }
+                    pendingSkillsImport = { isNew, changed, unmatched, kind };
+                    showSkillsImportDiff();
+                } catch (err) {
+                    console.error('Import skilli error:', err);
+                    showToast(`${t('common.error')}: ${err.message}`, true);
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        }
+        function importHeroSkillsJSON(event) { return importSkillsFile(event, 'hero'); }
+        function importPetSkillsJSON(event) { return importSkillsFile(event, 'pet'); }
+
+        // Eksport /heroSkills i /petSkills do JSON (ten sam format co import — symetrycznie). Read-only.
+        function downloadJSONFile(obj, filename) {
+            const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json;charset=utf-8;' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = filename;
+            a.click();
+        }
+        async function exportHeroSkillsJSON() {
+            if (!isOnline) { showToast(t('common.noConnection'), true); return; }
+            await loadHeroSkills();
+            const n = Object.keys(allHeroSkills).length;
+            if (!n) { showToast(t('settings.skillsExportEmpty'), true); return; }
+            downloadJSONFile(allHeroSkills, 'heroSkills.json');
+            showToast(`💾 ${t('settings.skillsExported', { n })}`);
+        }
+        async function exportPetSkillsJSON() {
+            if (!isOnline) { showToast(t('common.noConnection'), true); return; }
+            await loadPetSkills();
+            const n = Object.keys(allPetSkills).length;
+            if (!n) { showToast(t('settings.skillsExportEmpty'), true); return; }
+            downloadJSONFile(allPetSkills, 'petSkills.json');
+            showToast(`💾 ${t('settings.skillsExported', { n })}`);
+        }
+
+        // Podgląd importu skilli: nowe (auto-dodane) + różnice (checkboxy do nadpisania) + ostrzeżenie o niedopasowanych.
+        function showSkillsImportDiff() {
+            const p = pendingSkillsImport;
+            if (!p) return;
+            const none = `<div class="hsk-diff-none">${t('settings.diffNone')}</div>`;
+            const newList = p.isNew.length ? p.isNew.map(([k]) => `<div>➕ ${escSkill(k)}</div>`).join('') : none;
+            const changedList = p.changed.length
+                ? p.changed.map(([k], i) => `<label class="hsk-diff-row"><input type="checkbox" class="hsk-diff-chk" data-i="${i}" checked> ⚠️ ${escSkill(k)}</label>`).join('')
+                : none;
+            const warn = p.unmatched.length ? `<div class="hsk-diff-warn">⚠️ ${p.unmatched.length} ${t('settings.skillsUnmatched')}: ${escSkill(p.unmatched.join(', '))}</div>` : '';
+            $('skills-import-body').innerHTML =
+                `<div class="hsk-diff-sec"><h4>➕ ${t('settings.skillsNew')} (${p.isNew.length})</h4>${newList}</div>`
+                + `<div class="hsk-diff-sec"><h4>⚠️ ${t('settings.skillsChanged')} (${p.changed.length})</h4>${changedList}</div>`
+                + warn;
+            if ($('skills-import-confirm')) $('skills-import-confirm').textContent = `✓ ${t('settings.skillsApply')}`;
+            $('skills-import-modal').classList.add('show');
+        }
+        function closeSkillsImport() { $('skills-import-modal')?.classList.remove('show'); pendingSkillsImport = null; }
+        async function confirmSkillsImport() {
+            const p = pendingSkillsImport;
+            if (!p) return;
+            const chosen = [];
+            document.querySelectorAll('#skills-import-body .hsk-diff-chk').forEach(chk => { if (chk.checked) chosen.push(p.changed[+chk.dataset.i]); });
+            const toWrite = p.isNew.concat(chosen); // nowe zawsze + zaznaczone różnice
+            const kind = p.kind;
+            $('skills-import-modal').classList.remove('show');
+            pendingSkillsImport = null;
+            if (!toWrite.length) { showToast(t('settings.skillsNothing')); return; }
+            const ref = kind === 'pet' ? petSkillsRef : heroSkillsRef;
+            try {
+                const writes = toWrite.map(([k, v]) => () => ref.child(k).set(v));
+                for (let i = 0; i < writes.length; i += 200) await Promise.all(writes.slice(i, i + 200).map(fn => fn()));
+                if (kind === 'pet') await loadPetSkills(true); else await loadHeroSkills(true); // odśwież cache
+                if ($('tab-heroes')?.classList.contains('active')) renderHeroesGrid();
+                showToast(`✅ ${t('settings.skillsImported', { n: toWrite.length })}`);
+            } catch (err) {
+                console.error('Import skilli error:', err);
+                showToast(`${t('common.error')}: ${err.message}`, true);
+            }
         }
 
         // ── Zakładka Import: statystyki, podgląd diff restore, Obrona CSV ──
@@ -7798,6 +8412,8 @@
             formationsRef = db.ref('formations');
             heroesRef = db.ref('heroes');
             petsRef = db.ref('pets');
+            heroSkillsRef = db.ref('heroSkills');
+            petSkillsRef = db.ref('petSkills');
             
             formationsRef.on('value', snap => {
                 allFormations = snap.val() ? Object.values(snap.val()).sort((a, b) => a.id - b.id) : [];
@@ -7810,6 +8426,8 @@
                 if (snap.val()) {
                     heroes = Object.values(snap.val()).sort((a, b) => a.name.localeCompare(b.name));
                     if (isAdmin) renderHeroesList();
+                    // Nowy/zmieniony bohater pojawia się od razu w zakładce Bohaterowie (z „brak danych" dopóki admin nie uzupełni skilli)
+                    if ($('tab-heroes')?.classList.contains('active')) renderHeroesGrid();
                     // Regeneruj tagi po załadowaniu bohaterów z bazy
                     generateWarTags();
                     generateKreatorTags();
@@ -7821,6 +8439,7 @@
                 if (snap.val()) {
                     pets = Object.values(snap.val()).map(getPetName).sort();
                     if (isAdmin) renderPetsList();
+                    if ($('tab-heroes')?.classList.contains('active')) renderHeroesGrid(); // nowy pet pojawia się od razu w sekcji Pety
                     // Regeneruj tagi po załadowaniu petów z bazy
                     generateWarTags();
                     generateKreatorTags();

@@ -752,6 +752,26 @@
     </div>
     
     <!-- ═══════════════════════════════════════════════════════
+         TAB: HEROES — podgląd umiejętności bohaterów
+         ═══════════════════════════════════════════════════════ -->
+    <div id="tab-heroes" class="tab-content">
+        <div class="section">
+            <h2>🧙 <span data-i18n="heroes.title">Bohaterowie</span></h2>
+            <p class="section-subtitle" data-i18n="heroes.subtitle">Przeglądaj umiejętności bohaterów</p>
+            <div class="heroes-toolbar">
+                <input type="text" id="heroes-search" class="heroes-search" data-i18n-placeholder="heroes.searchPlaceholder" placeholder="🔍 Szukaj bohatera..." oninput="setHeroesSearch(this.value)">
+                <button id="heroes-compare-toggle" class="heroes-compare-btn" onclick="toggleHeroCompareMode()">⚖️ <span data-i18n="heroes.compareToggle">Porównaj</span></button>
+            </div>
+            <div class="heroes-search-examples" id="heroes-search-examples"></div>
+            <div class="heroes-chips" id="heroes-race-chips"></div>
+            <div class="heroes-chips" id="heroes-role-chips"></div>
+            <div class="heroes-chips" id="heroes-stat-chips"></div>
+            <div class="heroes-count" id="heroes-count"></div>
+            <div class="heroes-grid" id="heroes-grid"></div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════
          TAB: SETTINGS (Admin) — Import/eksport CSV, odświeżanie
          ═══════════════════════════════════════════════════════ -->
     <div id="tab-settings" class="tab-content">
@@ -813,6 +833,32 @@
                     </div>
                     <div class="import-lastbak" id="last-backup-label"></div>
                     <input type="file" id="json-input" accept=".json,application/json" style="display:none" onchange="restoreBackupJSON(event)">
+                </div>
+            </div>
+
+            <!-- Import umiejętności bohaterów (JSON) -->
+            <div class="admin-card">
+                <h3 class="admin-card-title clickable" onclick="toggleAdminSection('imp-skills')"><span class="admin-toggle-icon" id="imp-skills-toggle">▶</span> 🧙 <span data-i18n="settings.skillsTitle">Import umiejętności bohaterów</span></h3>
+                <div id="imp-skills-body" style="display:none">
+                    <p class="import-desc" data-i18n="settings.skillsDesc">Wczytaj plik heroSkills.json — zapisze umiejętności do bazy (/heroSkills). Re-import nadpisuje istniejące.</p>
+                    <div class="import-pair">
+                        <button class="btn btn-success" onclick="document.getElementById('skills-input').click()">🧙 <span data-i18n="settings.skillsBtn">Importuj skille (JSON)</span></button>
+                        <button class="btn btn-secondary" onclick="exportHeroSkillsJSON()">💾 <span data-i18n="settings.skillsExportBtn">Eksportuj skille (JSON)</span></button>
+                    </div>
+                    <input type="file" id="skills-input" accept=".json,application/json" style="display:none" onchange="importHeroSkillsJSON(event)">
+                </div>
+            </div>
+
+            <!-- Import umiejętności petów (JSON) -->
+            <div class="admin-card">
+                <h3 class="admin-card-title clickable" onclick="toggleAdminSection('imp-petskills')"><span class="admin-toggle-icon" id="imp-petskills-toggle">▶</span> 🐾 <span data-i18n="settings.petSkillsTitle">Import umiejętności petów</span></h3>
+                <div id="imp-petskills-body" style="display:none">
+                    <p class="import-desc" data-i18n="settings.petSkillsDesc">Wczytaj plik petSkills.json. Brakujące zostaną dodane, różnice — do Twojej decyzji.</p>
+                    <div class="import-pair">
+                        <button class="btn btn-success" onclick="document.getElementById('petskills-input').click()">🐾 <span data-i18n="settings.petSkillsBtn">Importuj pety (JSON)</span></button>
+                        <button class="btn btn-secondary" onclick="exportPetSkillsJSON()">💾 <span data-i18n="settings.petSkillsExportBtn">Eksportuj pety (JSON)</span></button>
+                    </div>
+                    <input type="file" id="petskills-input" accept=".json,application/json" style="display:none" onchange="importPetSkillsJSON(event)">
                 </div>
             </div>
 
@@ -1130,6 +1176,100 @@
         </div>
     </div>
 
+    <!-- Modal: karta umiejętności bohatera (zakładka Bohaterowie + klik w nazwę w formacji) -->
+    <div class="hsk-modal-bg" id="hero-skills-modal" onclick="if(event.target===this) closeHeroSkills()">
+        <div class="hsk-modal hsk-modal-wide">
+            <button class="hsk-close" onclick="closeHeroSkills()" aria-label="close">×</button>
+            <h3 class="hsk-title" id="hero-skills-title"></h3>
+            <div class="hsk-body" id="hero-skills-body"></div>
+        </div>
+    </div>
+
+    <!-- Modal: edycja umiejętności (tylko admin) -->
+    <div class="hsk-modal-bg" id="hero-skills-edit-modal" onclick="if(event.target===this) closeHeroSkillsEdit()">
+        <div class="hsk-modal">
+            <button class="hsk-close" onclick="closeHeroSkillsEdit()" aria-label="close">×</button>
+            <h3 class="hsk-title"><span class="hsk-name" id="hero-skills-edit-title"></span> <span class="hsk-meta" data-i18n="skills.editTitle">— edycja umiejętności</span></h3>
+            <div class="hse-form">
+                <div class="hse-row2">
+                    <label class="hse-field"><span data-i18n="skills.role">Rola</span><input id="hse-role" class="hse-input"></label>
+                    <label class="hse-field"><span data-i18n="skills.stat">Stat</span><input id="hse-stat" class="hse-input"></label>
+                </div>
+                <label class="hse-verified-row"><input type="checkbox" id="hse-verified"> <span class="verified-badge">✓</span> <span data-i18n="heroes.verified">Zweryfikowany</span></label>
+                <fieldset class="hse-group"><legend data-i18n="skills.active">⚡ Aktywna</legend>
+                    <input id="hse-active-name" class="hse-input" data-i18n-placeholder="skills.fieldName" placeholder="Nazwa">
+                    <textarea id="hse-active-desc" class="hse-textarea" oninput="autoSizeTextarea(this)" data-i18n-placeholder="skills.fieldDesc" placeholder="Opis"></textarea>
+                </fieldset>
+                <fieldset class="hse-group"><legend data-i18n="skills.passive">🛡️ Pasywne</legend>
+                    <input id="hse-pass0-name" class="hse-input" data-i18n-placeholder="skills.fieldName" placeholder="Nazwa">
+                    <textarea id="hse-pass0-desc" class="hse-textarea" oninput="autoSizeTextarea(this)" data-i18n-placeholder="skills.fieldDesc" placeholder="Opis"></textarea>
+                    <input id="hse-pass1-name" class="hse-input" data-i18n-placeholder="skills.fieldName" placeholder="Nazwa">
+                    <textarea id="hse-pass1-desc" class="hse-textarea" oninput="autoSizeTextarea(this)" data-i18n-placeholder="skills.fieldDesc" placeholder="Opis"></textarea>
+                    <input id="hse-pass2-name" class="hse-input" data-i18n-placeholder="skills.fieldName" placeholder="Nazwa">
+                    <textarea id="hse-pass2-desc" class="hse-textarea" oninput="autoSizeTextarea(this)" data-i18n-placeholder="skills.fieldDesc" placeholder="Opis"></textarea>
+                </fieldset>
+                <fieldset class="hse-group"><legend data-i18n="skills.awaken">🌟 Przebudzenie</legend>
+                    <input id="hse-awaken-name" class="hse-input" data-i18n-placeholder="skills.fieldName" placeholder="Nazwa">
+                    <textarea id="hse-awaken-desc" class="hse-textarea" oninput="autoSizeTextarea(this)" data-i18n-placeholder="skills.fieldDesc" placeholder="Opis"></textarea>
+                </fieldset>
+                <fieldset class="hse-group"><legend data-i18n="skills.engraving">✦ Grawerunek</legend>
+                    <label class="hse-tier"><span>+10</span><textarea id="hse-eng10" class="hse-textarea" oninput="autoSizeTextarea(this)"></textarea></label>
+                    <label class="hse-tier"><span>+20</span><textarea id="hse-eng20" class="hse-textarea" oninput="autoSizeTextarea(this)"></textarea></label>
+                    <label class="hse-tier"><span>+30</span><textarea id="hse-eng30" class="hse-textarea" oninput="autoSizeTextarea(this)"></textarea></label>
+                    <label class="hse-tier"><span>+40</span><textarea id="hse-eng40" class="hse-textarea" oninput="autoSizeTextarea(this)"></textarea></label>
+                </fieldset>
+                <fieldset class="hse-group"><legend data-i18n="skills.exclusive">⚔️ Exclusive</legend>
+                    <input id="hse-excl-name" class="hse-input" data-i18n-placeholder="skills.fieldName" placeholder="Nazwa">
+                    <textarea id="hse-excl-desc" class="hse-textarea" oninput="autoSizeTextarea(this)" data-i18n-placeholder="skills.fieldDesc" placeholder="Opis"></textarea>
+                </fieldset>
+            </div>
+            <div class="hse-actions">
+                <button class="btn btn-secondary" onclick="closeHeroSkillsEdit()" data-i18n="common.cancel">Anuluj</button>
+                <button class="btn btn-success" onclick="saveHeroSkillsEdit()" data-i18n="common.save">Zapisz</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: edycja umiejętności peta (tylko admin) -->
+    <div class="hsk-modal-bg" id="pet-skills-edit-modal" onclick="if(event.target===this) closePetSkillsEdit()">
+        <div class="hsk-modal">
+            <button class="hsk-close" onclick="closePetSkillsEdit()" aria-label="close">×</button>
+            <h3 class="hsk-title"><span class="hsk-name">🐾 <span id="pet-skills-edit-title"></span></span> <span class="hsk-meta" data-i18n="skills.editTitle">— edycja umiejętności</span></h3>
+            <div class="hse-form">
+                <label class="hse-verified-row"><input type="checkbox" id="pse-verified"> <span class="verified-badge">✓</span> <span data-i18n="heroes.verified">Zweryfikowany</span></label>
+                <fieldset class="hse-group"><legend data-i18n="skills.active">⚡ Aktywna</legend>
+                    <input id="pse-active-name" class="hse-input" data-i18n-placeholder="skills.fieldName" placeholder="Nazwa">
+                    <textarea id="pse-active-desc" class="hse-textarea" oninput="autoSizeTextarea(this)" data-i18n-placeholder="skills.fieldDesc" placeholder="Opis"></textarea>
+                </fieldset>
+                <fieldset class="hse-group"><legend data-i18n="skills.passive">🛡️ Pasywna</legend>
+                    <input id="pse-passive-name" class="hse-input" data-i18n-placeholder="skills.fieldName" placeholder="Nazwa">
+                    <textarea id="pse-passive-desc" class="hse-textarea" oninput="autoSizeTextarea(this)" data-i18n-placeholder="skills.fieldDesc" placeholder="Opis"></textarea>
+                </fieldset>
+                <fieldset class="hse-group"><legend data-i18n="skills.energy">⚡ Ładowanie energii</legend>
+                    <textarea id="pse-energy" class="hse-textarea" oninput="autoSizeTextarea(this)" data-i18n-placeholder="skills.fieldDesc" placeholder="Opis"></textarea>
+                </fieldset>
+            </div>
+            <div class="hse-actions">
+                <button class="btn btn-secondary" onclick="closePetSkillsEdit()" data-i18n="common.cancel">Anuluj</button>
+                <button class="btn btn-success" onclick="savePetSkillsEdit()" data-i18n="common.save">Zapisz</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: podgląd importu skilli (nowe + różnice) -->
+    <div class="hsk-modal-bg" id="skills-import-modal" onclick="if(event.target===this) closeSkillsImport()">
+        <div class="hsk-modal">
+            <button class="hsk-close" onclick="closeSkillsImport()" aria-label="close">×</button>
+            <h3 class="hsk-title"><span class="hsk-name" data-i18n="settings.skillsImportTitle">Import umiejętności</span></h3>
+            <p class="import-desc" data-i18n="settings.skillsImportDesc">Brakujące zostaną dodane automatycznie. Różniące się — zaznacz, by nadpisać.</p>
+            <div id="skills-import-body"></div>
+            <div class="hse-actions">
+                <button class="btn btn-secondary" onclick="closeSkillsImport()" data-i18n="common.cancel">Anuluj</button>
+                <button class="btn btn-success" id="skills-import-confirm" onclick="confirmSkillsImport()">✓ <span data-i18n="settings.skillsApply">Zastosuj</span></button>
+            </div>
+        </div>
+    </div>
+
     <nav class="bottom-nav nav-initializing">
         <button class="nav-btn active" id="nav-search" onclick="switchTab('search')"><span class="icon">🔍</span><span data-i18n="nav.search">Szukaj</span></button>
         <button class="nav-btn" id="nav-database" onclick="switchTab('database')"><span class="icon">📚</span><span data-i18n="nav.database">Baza</span></button>
@@ -1137,6 +1277,7 @@
         <button class="nav-btn" id="nav-add" onclick="switchTab('add')"><span class="icon">➕</span><span data-i18n="nav.add">Dodaj</span></button>
         <button class="nav-btn" id="nav-war" onclick="switchTab('war')"><span class="icon">⚔️</span><span data-i18n="nav.war">Wojna</span></button>
         <button class="nav-btn" id="nav-kreator" onclick="switchTab('kreator')"><span class="icon">🎯</span><span data-i18n="nav.kreator">Kreator</span></button>
+        <button class="nav-btn" id="nav-heroes" onclick="switchTab('heroes')"><span class="icon">🧙</span><span data-i18n="nav.heroes">Bohaterowie</span></button>
         <button class="nav-btn admin-only" id="nav-defense" onclick="switchTab('defense')"><span class="icon">🛡️</span><span data-i18n="nav.defense">Obrona</span></button>
         <button class="nav-btn admin-only" id="nav-settings" onclick="switchTab('settings')"><span class="icon">⚙️</span><span data-i18n="nav.import">Import</span></button>
         <button class="nav-btn admin-only" id="nav-admin" onclick="switchTab('admin')"><span class="icon">👑</span><span data-i18n="nav.admin">Admin</span></button>
