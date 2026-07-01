@@ -3004,7 +3004,7 @@
 		/* kolumny skilli obok siebie */
 		.skill-cols { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-start; }
 		.skill-col { flex: 1 1 190px; min-width: 180px; border-left: 3px solid var(--accent-gold); padding-left: 12px; }
-		.skill-col-title { font-size: 0.8rem; color: var(--accent-gold); margin: 0 0 8px; letter-spacing: 0.3px; }
+		.skill-col-title { font-size: 0.92rem; color: var(--text-light); margin: 0 0 8px; letter-spacing: 0.3px; }
 		.skill-item { background: var(--bg-input); border-radius: 8px; padding: 9px 11px; margin-bottom: 7px; }
 		.skill-item:last-child { margin-bottom: 0; }
 		.skill-name { font-weight: 700; font-size: 0.83rem; color: var(--accent-gold); margin-bottom: 3px; }
@@ -3036,7 +3036,7 @@
 		.compare-col { flex: 1 1 0; min-width: 220px; display: flex; flex-direction: column; gap: 12px; }
 		.compare-col-head { display: flex; flex-direction: column; gap: 2px; padding-bottom: 8px; border-bottom: 2px solid var(--accent-gold); }
 		.compare-col .skill-section { border-left: 3px solid var(--accent-gold); padding-left: 10px; }
-		.compare-col .skill-col-title { font-size: 0.78rem; color: var(--accent-gold); margin: 0 0 6px; }
+		.compare-col .skill-col-title { font-size: 0.86rem; color: var(--text-light); margin: 0 0 6px; }
 
 		/* formularz edycji skilli (admin) */
 		.hse-form { display: flex; flex-direction: column; gap: 12px; }
