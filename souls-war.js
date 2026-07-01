@@ -6063,6 +6063,7 @@
         let heroCompareMode = false, heroCompareSel = []; // tryb porównywania: wybór 2–3 bohaterów
         let heroesFuzzy = storage.getBool('souls_heroes_fuzzy', false); // tolerancja literówek w wyszukiwarce (przełącznik)
         const ENGRAVING_TIERS = ['10', '20', '30', '40']; // poziomy grawerunku (na razie wypełniony tylko +40)
+        const EXCLUSIVE_TIERS = ['1', '2', '3', '4']; // poziomy ekwipunku ekskluzywnego (1lvl..4lvl)
         // Ikony klas/typów — emoji dobrane pod grę (Dealer=miecze, Tank=tarcza, Healer=serce, Support=iskra;
         // STR=mięsień, AGI=łuk jak w grze, INT=kula). Łatwa podmiana na grafiki gdyby pojawiło się dobre źródło.
         const ROLE_ICON = { Dealer: '🗡️', Tank: '🛡️', Healer: '➕', Support: '💠' };
@@ -6073,6 +6074,16 @@
         const verifiedBadge = obj => obj && obj.verified ? `<span class="verified-badge" title="${escSkill(t('heroes.verified'))}">✓</span>` : '';
         // Stan zwinięcia poziomów grawerunku w Podglądzie (per-poziom, zapamiętywany). Domyślnie tylko +40 rozwinięty.
         let engravingExpanded = Object.assign({ '10': false, '20': false, '30': false, '40': true }, storage.getJson('souls_engraving_expanded', {}));
+        // Stan zwinięcia poziomów ekwipunku ekskluzywnego (per-poziom). Domyślnie tylko 4lvl rozwinięty.
+        let exclusiveExpanded = Object.assign({ '1': false, '2': false, '3': false, '4': true }, storage.getJson('souls_exclusive_expanded', {}));
+        // Normalizuje pole exclusive do mapy poziomów { '1':..,'4':.. }. Wstecznie zgodne ze starym kształtem
+        // { name, desc } (żywe Firebase do czasu re-importu) — legacy `desc` traktujemy jak 4lvl (domyślnie otwarty).
+        function exclusiveLevels(excl) {
+            if (!excl) return {};
+            if (excl.levels) return excl.levels;
+            if (excl.desc) return { '4': excl.desc };
+            return {};
+        }
 
         // Escape HTML — skille to tekst z gry, zabezpieczamy wstrzyknięcie. \n zostają (CSS pre-line je renderuje).
         const escSkill = s => String(s == null ? '' : s).replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
@@ -6099,7 +6110,7 @@
                 (s.passives || []).forEach(x => b.push({ field: 'passive', text: `${x.name || ''} ${x.desc || ''}` }));
                 if (s.awaken) b.push({ field: 'awaken', text: `${s.awaken.name || ''} ${s.awaken.desc || ''}` });
                 if (s.engraving) Object.values(s.engraving).forEach(v => v && b.push({ field: 'engraving', text: String(v) }));
-                if (s.exclusive) b.push({ field: 'exclusive', text: `${s.exclusive.name || ''} ${s.exclusive.desc || ''}` });
+                if (s.exclusive) b.push({ field: 'exclusive', text: `${s.exclusive.name || ''} ${Object.values(exclusiveLevels(s.exclusive)).filter(Boolean).join(' ')}` });
                 const meta = [s.role, s.stat].filter(Boolean).join(' ');
                 if (meta) b.push({ field: 'meta', text: meta });
             }
@@ -6653,6 +6664,13 @@
             const engInner = engFilled.length
                 ? engFilled.map(tr => `<div class="skill-item"><div class="skill-name">+${tr}</div><div class="skill-desc">${escSkill(s.engraving[tr])}</div></div>`).join('')
                 : na;
+            const exclLv = s && s.exclusive ? exclusiveLevels(s.exclusive) : {};
+            const exclName = s && s.exclusive && s.exclusive.name;
+            const exclFilled = EXCLUSIVE_TIERS.filter(tr => exclLv[tr]);
+            const exclInner = (exclName || exclFilled.length)
+                ? (exclName ? `<div class="skill-item"><div class="skill-name">${escSkill(exclName)}</div></div>` : '')
+                    + exclFilled.map(tr => `<div class="skill-item"><div class="skill-name">${tr}lvl</div><div class="skill-desc">${escSkill(exclLv[tr])}</div></div>`).join('')
+                : na;
             return `<div class="compare-col">`
                 + `<div class="compare-col-head"><span class="hsk-name">${escSkill(name)}${verifiedBadge(s)}</span>`
                 + ((raceTxt || meta) ? `<span class="hsk-meta">${raceTxt}${raceTxt && meta ? ' · ' : ''}${meta}</span>` : '') + `</div>`
@@ -6660,7 +6678,7 @@
                 + sec('skills.passive', s && s.passives && s.passives.length ? s.passives.map(item).join('') : na)
                 + sec('skills.awaken', s && s.awaken ? item(s.awaken) : na)
                 + sec('skills.engraving', engInner)
-                + sec('skills.exclusive', s && s.exclusive ? item(s.exclusive) : na)
+                + sec('skills.exclusive', exclInner)
                 + `</div>`;
         }
 
@@ -6709,12 +6727,24 @@
                     + `<div class="skill-name eng-tier-head" onclick="toggleEngravingTier(this,'${tier}')"><span class="toggle-icon">▶</span> +${tier}</div>`
                     + `<div class="skill-desc eng-tier-body">${v ? hlx(v, hl) : t('skills.unavailable')}</div></div>`;
             }).join('');
+            const exclLv = s && s.exclusive ? exclusiveLevels(s.exclusive) : {};
+            const exclName = s && s.exclusive && s.exclusive.name;
+            const exclTiers = EXCLUSIVE_TIERS.map(tier => {
+                const v = exclLv[tier];
+                const open = exclusiveExpanded[tier];
+                return `<div class="skill-item eng-tier${open ? ' open' : ''}${v ? '' : ' skill-na'}">`
+                    + `<div class="skill-name eng-tier-head" onclick="toggleExclusiveTier(this,'${tier}')"><span class="toggle-icon">▶</span> ${tier}lvl</div>`
+                    + `<div class="skill-desc eng-tier-body">${v ? hlx(v, hl) : t('skills.unavailable')}</div></div>`;
+            }).join('');
+            const exclHtml = (exclName || Object.keys(exclLv).length)
+                ? (exclName ? `<div class="skill-item excl-name"><div class="skill-name">${hlx(exclName, hl)}</div></div>` : '') + exclTiers
+                : na;
             body.innerHTML = `<div class="skill-cols">`
                 + col('skills.active', s && s.active ? item(s.active) : na)
                 + col('skills.passive', s && s.passives && s.passives.length ? s.passives.map(item).join('') : na)
                 + col('skills.awaken', s && s.awaken ? item(s.awaken) : na)
                 + col('skills.engraving', engHtml)
-                + col('skills.exclusive', s && s.exclusive ? item(s.exclusive) : na)
+                + col('skills.exclusive', exclHtml)
                 + `</div>`;
         }
         function closeHeroSkills() { $('hero-skills-modal')?.classList.remove('show'); }
@@ -6724,6 +6754,12 @@
             const open = el.closest('.eng-tier').classList.toggle('open');
             engravingExpanded[tier] = open;
             storage.setJson('souls_engraving_expanded', engravingExpanded);
+        }
+        // Zwiń/rozwiń poziom ekwipunku ekskluzywnego w Podglądzie + zapamiętaj wybór (per-poziom).
+        function toggleExclusiveTier(el, tier) {
+            const open = el.closest('.eng-tier').classList.toggle('open');
+            exclusiveExpanded[tier] = open;
+            storage.setJson('souls_exclusive_expanded', exclusiveExpanded);
         }
 
         // ── Pety: ten sam modal co bohaterowie, ale 3 kolumny (Active | Pasywne | Ładowanie energii) ──
@@ -6774,7 +6810,9 @@
             for (let i = 0; i < 3; i++) { const p = (s.passives || [])[i] || {}; set(`hse-pass${i}-name`, p.name); set(`hse-pass${i}-desc`, p.desc); }
             set('hse-awaken-name', s.awaken && s.awaken.name); set('hse-awaken-desc', s.awaken && s.awaken.desc);
             ENGRAVING_TIERS.forEach(tier => set(`hse-eng${tier}`, s.engraving && s.engraving[tier]));
-            set('hse-excl-name', s.exclusive && s.exclusive.name); set('hse-excl-desc', s.exclusive && s.exclusive.desc);
+            set('hse-excl-name', s.exclusive && s.exclusive.name);
+            const exclLv = exclusiveLevels(s.exclusive);
+            EXCLUSIVE_TIERS.forEach(tier => set(`hse-excl${tier}`, exclLv[tier]));
             const vcb = $('hse-verified'); if (vcb) vcb.checked = !!s.verified;
             $('hero-skills-edit-title').textContent = name;
             $('hero-skills-edit-modal').classList.add('show');
@@ -6800,7 +6838,14 @@
             const eng = {};
             ENGRAVING_TIERS.forEach(tier => { const d = gv(`hse-eng${tier}`); if (d) eng[tier] = d; });
             if (Object.keys(eng).length) obj.engraving = eng;
-            const excl = sk(gv('hse-excl-name'), gv('hse-excl-desc')); if (excl) obj.exclusive = excl;
+            const exclName = gv('hse-excl-name');
+            const exclLevels = {};
+            EXCLUSIVE_TIERS.forEach(tier => { const d = gv(`hse-excl${tier}`); if (d) exclLevels[tier] = d; });
+            if (exclName || Object.keys(exclLevels).length) {
+                obj.exclusive = {};
+                if (exclName) obj.exclusive.name = exclName;
+                if (Object.keys(exclLevels).length) obj.exclusive.levels = exclLevels;
+            }
             if ($('hse-verified')?.checked) obj.verified = true;
             try {
                 await heroSkillsRef.child(name).set(Object.keys(obj).length ? obj : null);

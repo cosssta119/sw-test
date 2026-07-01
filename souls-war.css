@@ -3017,6 +3017,9 @@
 		.eng-tier.open .eng-tier-head .toggle-icon { transform: rotate(90deg); }
 		.eng-tier-body { display: none; margin-top: 4px; }
 		.eng-tier.open .eng-tier-body { display: block; }
+		/* nazwa ekwipunku ekskluzywnego jako nagłówek nad poziomami 1lvl..4lvl */
+		.skill-item.excl-name { padding-bottom: 4px; margin-bottom: 4px; border-bottom: 1px solid var(--border); }
+		.skill-item.excl-name .skill-name { font-weight: 600; color: var(--accent-gold); }
 
 		/* porównywarka bohaterów */
 		.heroes-compare-btn { flex: 0 0 auto; padding: 9px 12px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; color: var(--text-light); font-size: 0.82rem; font-family: inherit; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
