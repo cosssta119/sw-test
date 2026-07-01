@@ -6655,7 +6655,7 @@
             const hero = findHero(name), s = getHeroSkills(name);
             const race = hero ? hero.race : '';
             const meta = s && s.role ? `${roleLabel(s.role)}${s.stat ? ' · ' + statLabel(s.stat) : ''}` : (s && s.stat ? statLabel(s.stat) : '');
-            const raceTxt = race ? `${RACE_EMOJI[race] || ''} ${escSkill(raceLabel(race))}` : '';
+            const raceTxt = race ? `${RACE_EMOJI[race] || ''} <span class="hsk-race" style="color:var(--race-${race.toLowerCase()})">${escSkill(raceLabel(race))}</span>` : '';
             const item = sk => `<div class="skill-item"><div class="skill-name">${escSkill(sk.name)}</div>`
                 + (sk.desc ? `<div class="skill-desc">${escSkill(sk.desc)}</div>` : '') + `</div>`;
             const na = `<div class="skill-item skill-na">${t('skills.unavailable')}</div>`;
@@ -6711,7 +6711,7 @@
             const race = hero ? hero.race : '';
             const emoji = RACE_EMOJI[race] || '🧙';
             const meta = s && s.role ? `${roleLabel(s.role)}${s.stat ? ' · ' + statLabel(s.stat) : ''}` : (s && s.stat ? statLabel(s.stat) : '');
-            const raceTxt = race ? `${emoji} ${escSkill(raceLabel(race))}` : '';
+            const raceTxt = race ? `${emoji} <span class="hsk-race" style="color:var(--race-${race.toLowerCase()})">${escSkill(raceLabel(race))}</span>` : '';
             const editBtn = isAdmin ? `<button class="hsk-edit-btn" onclick="openHeroSkillsEdit('${jsStr(name)}')" title="${escSkill(t('skills.edit'))}" aria-label="${escSkill(t('skills.edit'))}">✏️</button>` : '';
             if (titleEl) titleEl.innerHTML = `<div class="hsk-titletext"><span class="hsk-name">${escSkill(name)}${verifiedBadge(s)}</span>`
                 + ((raceTxt || meta) ? `<span class="hsk-meta">${raceTxt}${raceTxt && meta ? ' · ' : ''}${meta}</span>` : '') + `</div>${editBtn}`;
@@ -8283,7 +8283,7 @@
         let editingHeroName = null; // bohater aktualnie w trybie inline-edycji (po nazwie)
 
         function renderHeroesList() {
-            $('heroes-count').textContent = heroes.length;
+            $('admin-heroes-count').textContent = heroes.length;
             // Jednolita szerokość kafelka = najdłuższa nazwa (+ miejsce na ✏️🗑️ i padding)
             const maxLen = heroes.reduce((m, h) => Math.max(m, h.name.length), 4);
             $('heroes-list').style.setProperty('--tile-w', (maxLen + 9) + 'ch');
