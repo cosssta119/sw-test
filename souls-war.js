@@ -110,12 +110,12 @@
             Dark:   "Dmitri Roze Nebula Zeke Benzel Lilith Bahzam Zagrako",
             Light:  "Lumen Akmon Leovalt Lena Ulion Nuel Solina Taros",
             Undead: "Muerte Melantha Nox Ripper Fleta Ash Dextor Carmen Zenon Amanda Void Harfa",
-            Elf:    "Serena Oneiric Elara CoCo Babu Sander Tania Galan Aolmond LuLu Fiona Abala",
+            Elf:    "Serena Oneiric Elara CoCo Babu Sander Tania Galan Aolmond LuLu Fiona Abala Chiron",
             Fire:   "Bella Lupico Paopao Jack Dolucos Aruru Kaion Paru Naru Telfer Lagou",
             Human:  "Morra Scarlet Kyle Adora Rakan Olga Idina Ken Calix Odelia Milia Richelle Liandra"
         }).flatMap(([race, names]) => names.split(' ').map(name => ({ name, race })));
         
-        let pets = ["Gladis","Nasrune","Romanelle","Tianum","Hamm","Spooky","Mystet","Bloombell","Silbren","Vailo","Estelle","Banavi","Moko"];
+        let pets = ["Gladis","Nasrune","Romanelle","Tianum","Hamm","Spooky","Mystet","Bloombell","Silbren","Vailo","Estelle","Banavi","Moko","Katatsu"];
         
         // =====================================================
         // TŁUMACZENIA
@@ -6060,6 +6060,7 @@
         // świadomie NIE trzymamy stałego .on('value'), żeby nie obciążać startu apki.
 
         let heroesFilterRaces = new Set(), heroesFilterRoles = new Set(), heroesFilterStats = new Set(), heroesSearchQuery = ''; // wielokrotny wybór (pusty zbiór = wszystkie)
+        let heroesFilterExclusive = false; // filtr: pokaż tylko bohaterów z uzupełnionym Exclusive Equipment
         let heroCompareMode = false, heroCompareSel = []; // tryb porównywania: wybór 2–3 bohaterów
         let heroesFuzzy = storage.getBool('souls_heroes_fuzzy', false); // tolerancja literówek w wyszukiwarce (przełącznik)
         const ENGRAVING_TIERS = ['10', '20', '30', '40']; // poziomy grawerunku (na razie wypełniony tylko +40)
@@ -6399,16 +6400,21 @@
             const statWrap = $('heroes-stat-chips');
             if (statWrap) {
                 const stats = ['STR', 'AGI', 'INT'].filter(st => Object.values(allHeroSkills).some(s => s && s.stat === st));
-                const clear = (heroesFilterRaces.size || heroesFilterRoles.size || heroesFilterStats.size)
+                statWrap.innerHTML = stats.map(st => `<button class="heroes-chip stat-chip${heroesFilterStats.has(st) ? ' active' : ''}" onclick="toggleHeroesStat('${st}')">${statLabel(st)}</button>`).join('');
+            }
+            const exclWrap = $('heroes-exclusive-chips');
+            if (exclWrap) {
+                const clear = (heroesFilterRaces.size || heroesFilterRoles.size || heroesFilterStats.size || heroesFilterExclusive)
                     ? `<button class="heroes-chip heroes-chip-clear" onclick="clearHeroesFilters()">✕ ${t('heroes.clearFilters')}</button>` : '';
-                statWrap.innerHTML = stats.map(st => `<button class="heroes-chip stat-chip${heroesFilterStats.has(st) ? ' active' : ''}" onclick="toggleHeroesStat('${st}')">${statLabel(st)}</button>`).join('') + clear;
+                exclWrap.innerHTML = `<button class="heroes-chip excl-chip${heroesFilterExclusive ? ' active' : ''}" onclick="toggleHeroesExclusive()">${t('skills.exclusive')}</button>` + clear;
             }
         }
 
         function toggleHeroesRace(r) { heroesFilterRaces.has(r) ? heroesFilterRaces.delete(r) : heroesFilterRaces.add(r); renderHeroesFilters(); renderHeroesGrid(); }
         function toggleHeroesRole(r) { heroesFilterRoles.has(r) ? heroesFilterRoles.delete(r) : heroesFilterRoles.add(r); renderHeroesFilters(); renderHeroesGrid(); }
         function toggleHeroesStat(st) { heroesFilterStats.has(st) ? heroesFilterStats.delete(st) : heroesFilterStats.add(st); renderHeroesFilters(); renderHeroesGrid(); }
-        function clearHeroesFilters() { heroesFilterRaces.clear(); heroesFilterRoles.clear(); heroesFilterStats.clear(); renderHeroesFilters(); renderHeroesGrid(); }
+        function toggleHeroesExclusive() { heroesFilterExclusive = !heroesFilterExclusive; renderHeroesFilters(); renderHeroesGrid(); }
+        function clearHeroesFilters() { heroesFilterRaces.clear(); heroesFilterRoles.clear(); heroesFilterStats.clear(); heroesFilterExclusive = false; renderHeroesFilters(); renderHeroesGrid(); }
         function setHeroesSearch(v) { heroesSearchQuery = v; renderSearchExamples(); renderHeroesGrid(); }
         function setHeroesSearchExample(term) {
             const inp = $('heroes-search'); if (inp) inp.value = term;
@@ -6539,6 +6545,7 @@
             if (heroesFilterRaces.size) list = list.filter(h => heroesFilterRaces.has(h.race));
             if (heroesFilterRoles.size) list = list.filter(h => { const s = getHeroSkills(h.name); return s && heroesFilterRoles.has(s.role); });
             if (heroesFilterStats.size) list = list.filter(h => { const s = getHeroSkills(h.name); return s && heroesFilterStats.has(s.stat); });
+            if (heroesFilterExclusive) list = list.filter(h => { const s = getHeroSkills(h.name); return s && s.exclusive && Object.values(exclusiveLevels(s.exclusive)).some(Boolean); });
             if (!parsed.empty) list = list.filter(h => matchBlocks(heroSkillBlocks(h.name, getHeroSkills(h.name)), parsed).ok);
             const cnt = $('heroes-count');
             if (cnt) cnt.textContent = t('heroes.count', { n: list.length });
@@ -6550,8 +6557,8 @@
                 + `<div class="quick-tags-content show"><div class="heroes-race-tiles">${tiles}</div></div></div>`;
             let html = order.map(race => section(`${RACE_EMOJI[race] || '🧙'} ${escSkill(raceLabel(race))}`, groups[race].length,
                 groups[race].sort((a, b) => a.name.localeCompare(b.name)).map(h => heroTileHTML(h, parsed)).join(''))).join('');
-            // sekcja Pety — gdy brak filtra rasy/roli (pety ich nie mają); szukajka działa po nazwie I treści skilla
-            if (!heroesFilterRaces.size && !heroesFilterRoles.size && !heroesFilterStats.size) {
+            // sekcja Pety — gdy brak filtra rasy/roli/exclusive (pety ich nie mają); szukajka działa po nazwie I treści skilla
+            if (!heroesFilterRaces.size && !heroesFilterRoles.size && !heroesFilterStats.size && !heroesFilterExclusive) {
                 let petList = Array.from(new Set([...pets, ...Object.keys(allPetSkills)]));
                 if (!parsed.empty) petList = petList.filter(p => matchBlocks(petSkillBlocks(p, getPetSkills(p)), parsed).ok);
                 petList.sort((a, b) => a.localeCompare(b));
