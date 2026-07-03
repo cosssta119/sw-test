@@ -2911,6 +2911,14 @@
 		.hse-ex-label { font-size: 0.74rem; color: var(--text-muted); }
 		.hse-ex-chip { padding: 3px 10px; background: transparent; border: 1px dashed var(--border); border-radius: 14px; color: var(--text-muted); font-size: 0.74rem; font-family: inherit; cursor: pointer; transition: all 0.15s; }
 		.hse-ex-chip:hover { border-color: var(--accent-gold); color: var(--accent-gold); border-style: solid; }
+		/* Admin: dodawanie / tryb edycji przykładów szukajki */
+		.hse-ex-add { font-weight: 700; }
+		.hse-ex-toggle.active { border-style: solid; border-color: var(--accent-gold); color: var(--accent-gold); background: rgba(212,175,55,0.12); }
+		.hse-ex-editing { display: inline-flex; align-items: center; gap: 4px; padding: 3px 6px 3px 10px; border: 1px solid var(--accent-gold); border-radius: 14px; font-size: 0.74rem; }
+		.hse-ex-text { color: var(--text-light); cursor: pointer; }
+		.hse-ex-text:hover { color: var(--accent-gold); text-decoration: underline; }
+		.hse-ex-del { border: none; background: transparent; color: var(--text-muted); cursor: pointer; font-size: 0.95rem; line-height: 1; padding: 0 2px; }
+		.hse-ex-del:hover { color: var(--accent-red); }
 		/* przycisk „?" (zaawansowane szukanie) + rozwijana legenda składni */
 		.heroes-help-toggle { flex: 0 0 auto; width: 38px; padding: 0; background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; color: var(--text-muted); font-size: 1rem; cursor: pointer; transition: all 0.15s; }
 		.heroes-help-toggle:hover, .heroes-help-toggle.active { border-color: var(--accent-gold); color: var(--accent-gold); }

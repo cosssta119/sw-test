@@ -136,7 +136,7 @@
                 'loading': 'Ładowanie danych...', 'common.loading': 'Ładowanie...', 'common.cancel': 'Anuluj', 'common.clear': 'Wyczyść', 'common.save': 'Zapisz',
                 'header.subtitle': 'Wyszukiwarka kontr-formacji', 'status.online': 'Online', 'status.offline': 'Offline', 'status.formations': 'formacji',
                 'nav.search': 'Szukaj', 'nav.database': 'Baza', 'nav.preview': 'Podgląd', 'nav.add': 'Dodaj', 'nav.import': 'Import', 'nav.war': 'Wojna', 'nav.kreator': 'Kreator', 'nav.heroes': 'Bohaterowie', 'nav.admin': 'Admin', 'nav.more': 'Więcej',
-                'heroes.title': 'Bohaterowie', 'heroes.subtitle': 'Przeglądaj umiejętności bohaterów', 'heroes.searchPlaceholder': '🔍 Szukaj: crit increase, "fraza", stun|silence, active:stun…', 'heroes.searchExamples': 'Szukaj po treści, np.:',
+                'heroes.title': 'Bohaterowie', 'heroes.subtitle': 'Przeglądaj umiejętności bohaterów', 'heroes.searchPlaceholder': '🔍 Szukaj: crit increase, "fraza", stun|silence, active:stun…', 'heroes.searchExamples': 'Szukaj po treści, np.:', 'heroes.exampleAdd': 'Dodaj przykład', 'heroes.exampleAddPrompt': 'Nowy przykład wyszukiwania:', 'heroes.exampleRename': 'Kliknij, aby zmienić', 'heroes.exampleRenamePrompt': 'Zmień przykład:', 'heroes.exampleDelete': 'Usuń przykład', 'heroes.exampleEditMode': 'Tryb edycji przykładów (admin)', 'heroes.exampleExists': 'Taki przykład już jest.',
                 'heroes.helpTitle': '🔍 Zaawansowane wyszukiwanie', 'heroes.helpAnd': 'oba słowa muszą być w tym samym skillu', 'heroes.helpPhrase': 'dokładna fraza (słowa obok siebie)', 'heroes.helpOr': 'którekolwiek ze słów', 'heroes.helpNot': 'ma „crit", ale bez „heal"', 'heroes.helpField': 'szukaj tylko w wybranym skillu', 'heroes.helpFields': 'Pola do „pole:słowo": active, passive, awaken, engraving, exclusive, name (pet: active, passive, energy). Reguły można łączyć.',
                 'heroes.fuzzyToggle': 'Literówki', 'heroes.fuzzyHint': 'Tolerancja literówek — dopasowuje mimo drobnej pomyłki (np. „incrase" → „increase")',
                 'heroes.synTitle': 'Słownik synonimów', 'heroes.synNote': 'Wpisz skrót, a szukajka znajdzie pełną formę (np. „cc" → „crowd control"). Klik = szukaj.',
@@ -422,7 +422,7 @@
                 'loading': 'Loading data...', 'common.loading': 'Loading...', 'common.cancel': 'Cancel', 'common.clear': 'Clear', 'common.save': 'Save',
                 'header.subtitle': 'Counter-formation finder', 'status.online': 'Online', 'status.offline': 'Offline', 'status.formations': 'formations',
                 'nav.search': 'Search', 'nav.database': 'Database', 'nav.preview': 'Preview', 'nav.add': 'Add', 'nav.import': 'Import', 'nav.war': 'War', 'nav.kreator': 'Creator', 'nav.heroes': 'Heroes', 'nav.admin': 'Admin', 'nav.more': 'More',
-                'heroes.title': 'Heroes', 'heroes.subtitle': 'Browse hero skills', 'heroes.searchPlaceholder': '🔍 Search: crit increase, "phrase", stun|silence, active:stun…', 'heroes.searchExamples': 'Search by content, e.g.:',
+                'heroes.title': 'Heroes', 'heroes.subtitle': 'Browse hero skills', 'heroes.searchPlaceholder': '🔍 Search: crit increase, "phrase", stun|silence, active:stun…', 'heroes.searchExamples': 'Search by content, e.g.:', 'heroes.exampleAdd': 'Add example', 'heroes.exampleAddPrompt': 'New search example:', 'heroes.exampleRename': 'Click to rename', 'heroes.exampleRenamePrompt': 'Rename example:', 'heroes.exampleDelete': 'Delete example', 'heroes.exampleEditMode': 'Examples edit mode (admin)', 'heroes.exampleExists': 'That example already exists.',
                 'heroes.helpTitle': '🔍 Advanced search', 'heroes.helpAnd': 'both words must be in the same skill', 'heroes.helpPhrase': 'exact phrase (words adjacent)', 'heroes.helpOr': 'either word', 'heroes.helpNot': 'has "crit" but no "heal"', 'heroes.helpField': 'search only in the chosen skill', 'heroes.helpFields': 'Fields for "field:word": active, passive, awaken, engraving, exclusive, name (pet: active, passive, energy). Rules can be combined.',
                 'heroes.fuzzyToggle': 'Typos', 'heroes.fuzzyHint': 'Typo tolerance — matches despite a small mistake (e.g. "incrase" → "increase")',
                 'heroes.synTitle': 'Synonyms', 'heroes.synNote': 'Type a shorthand and search finds the full form (e.g. "cc" → "crowd control"). Click to search.',
@@ -986,11 +986,12 @@
 			styleRaceSelect($('new-hero-race'));
 			filterDatabase();
 			// jeśli admin odblokował będąc na zakładce Bohaterowie — pokaż od razu edycję słownika
-			if ($('tab-heroes')?.classList.contains('active')) renderHeroesSynonyms();
+			if ($('tab-heroes')?.classList.contains('active')) { renderHeroesSynonyms(); renderSearchExamples(); }
 		}
 
 		function adminLogout() {
 			isAdmin = false;
+			heroesExamplesEditMode = false; // wyjdź z trybu edycji przykładów
 			localStorage.removeItem('souls_admin');
 			$('admin-badge').style.display = 'none';
 			applyTabVisibility();
@@ -6144,6 +6145,9 @@
 
         // Przykłady wyszukiwania po treści skilla (pokazywane gdy pole puste).
         const HEROES_SEARCH_EXAMPLES = ['Shock', 'Silence', 'Stun', 'Heal', 'Energy', 'Crit', 'Shield', 'Dodge', 'Bleed'];
+        let heroesExamplesEditMode = false; // admin: tryb edycji przykładów szukajki (× usuń / klik = zmień nazwę)
+        // Lista przykładów: z /config/settings (edytowalna przez admina) albo domyślna, gdy nigdy nie ustawiono.
+        function heroExamples() { return appConfig.heroSearchExamples != null ? appConfig.heroSearchExamples : HEROES_SEARCH_EXAMPLES; }
         // ── Zaawansowane wyszukiwanie skilli: bloki + parser mini-języka zapytań + dopasowanie per-skill ──
         // Aliasy pól do scopingu (active:, passive: …) → kanoniczne pole bloku. Pusty scope = szukaj wszędzie.
         const HERO_FIELD_ALIAS = {
@@ -6477,13 +6481,58 @@
         function renderSearchExamples() {
             const el = $('heroes-search-examples');
             if (!el) return;
-            el.style.display = 'flex';
             if (heroesSearchQuery) {
+                el.style.display = 'flex';
                 el.innerHTML = `<button class="heroes-chip heroes-chip-clear" onclick="clearHeroesSearch()">✕ ${t('heroes.clearSearch')}</button>`;
-            } else {
-                el.innerHTML = `<span class="hse-ex-label">🔎 ${t('heroes.searchExamples')}</span>`
-                    + HEROES_SEARCH_EXAMPLES.map(x => `<button class="hse-ex-chip" onclick="setHeroesSearchExample('${x}')">${x}</button>`).join('');
+                return;
             }
+            const examples = heroExamples();
+            if (!examples.length && !isAdmin) { el.style.display = 'none'; return; } // brak przykładów i nie admin → chowamy
+            el.style.display = 'flex';
+            const edit = isAdmin && heroesExamplesEditMode;
+            let html = `<span class="hse-ex-label">🔎 ${t('heroes.searchExamples')}</span>`;
+            html += examples.map((x, i) => edit
+                ? `<span class="hse-ex-chip hse-ex-editing"><span class="hse-ex-text" onclick="renameHeroExample(${i})" title="${t('heroes.exampleRename')}">${escapeHtml(x)}</span><button class="hse-ex-del" onclick="deleteHeroExample(${i})" title="${t('heroes.exampleDelete')}">×</button></span>`
+                : `<button class="hse-ex-chip" onclick="setHeroesSearchExample('${jsStr(x)}')">${escapeHtml(x)}</button>`
+            ).join('');
+            if (isAdmin) {
+                html += `<button class="hse-ex-chip hse-ex-add" onclick="addHeroExample()" title="${t('heroes.exampleAdd')}">+</button>`;
+                html += `<button class="hse-ex-chip hse-ex-toggle${heroesExamplesEditMode ? ' active' : ''}" onclick="toggleHeroesExamplesEdit()" title="${t('heroes.exampleEditMode')}">${heroesExamplesEditMode ? '✓' : '✏️'}</button>`;
+            }
+            el.innerHTML = html;
+        }
+        function toggleHeroesExamplesEdit() { heroesExamplesEditMode = !heroesExamplesEditMode; renderSearchExamples(); }
+        async function saveHeroExamples(arr) {
+            if (!isAdmin || !configRef) return;
+            if (!isOnline) { showToast(t('common.noConnection'), true); return; }
+            try { await configRef.child('heroSearchExamples').set(arr); } // /config/settings ma reguły write — bez nowej reguły Firebase
+            catch (e) { showToast(t('common.error') + ': ' + e.message, true); }
+        }
+        async function addHeroExample() {
+            if (!isAdmin) return;
+            const v = (prompt(t('heroes.exampleAddPrompt')) || '').trim();
+            if (!v) return;
+            const list = [...heroExamples()];
+            if (list.some(x => x.toLowerCase() === v.toLowerCase())) { showToast('⚠️ ' + t('heroes.exampleExists'), true); return; }
+            list.push(v);
+            await saveHeroExamples(list);
+        }
+        async function renameHeroExample(i) {
+            if (!isAdmin) return;
+            const list = [...heroExamples()];
+            if (i < 0 || i >= list.length) return;
+            const v = (prompt(t('heroes.exampleRenamePrompt'), list[i]) || '').trim();
+            if (!v || v === list[i]) return;
+            if (list.some((x, j) => j !== i && x.toLowerCase() === v.toLowerCase())) { showToast('⚠️ ' + t('heroes.exampleExists'), true); return; }
+            list[i] = v;
+            await saveHeroExamples(list);
+        }
+        async function deleteHeroExample(i) {
+            if (!isAdmin) return;
+            const list = [...heroExamples()];
+            if (i < 0 || i >= list.length) return;
+            list.splice(i, 1);
+            await saveHeroExamples(list);
         }
         function clearHeroesSearch() {
             const inp = $('heroes-search'); if (inp) inp.value = '';
@@ -9506,6 +9555,9 @@
                 appConfig.defaultPackageWindow = ['all', '30', '90'].includes(String(c.defaultPackageWindow))
                     ? String(c.defaultPackageWindow) : DEFAULT_CONFIG.defaultPackageWindow;
                 appConfig.screensCompress = (c.screensCompress === false) ? false : true; // domyślnie TAK
+                // Przykłady szukajki Bohaterów: array (edytowalny) albo null = domyślne (HEROES_SEARCH_EXAMPLES)
+                appConfig.heroSearchExamples = Array.isArray(c.heroSearchExamples) ? c.heroSearchExamples.filter(x => typeof x === 'string') : null;
+                if ($('tab-heroes')?.classList.contains('active')) renderSearchExamples(); // live przy zmianie przez innego admina
                 const tv = c.tabVisibility || {};
                 appConfig.tabVisibility = {};
                 Object.keys(DEFAULT_CONFIG.tabVisibility).forEach(k => {
