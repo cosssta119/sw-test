@@ -3066,6 +3066,157 @@
 			.hsk-title { flex-direction: column; }
 		}
 
+		/* ═══ 21c. SCREENS TAB (Galeria) ═══ */
+		.screens-breadcrumb {
+			display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
+			margin: 8px 0 14px; font-size: 0.95rem;
+		}
+		.screens-crumb {
+			background: var(--bg-input); color: var(--text-light);
+			border: 1px solid var(--border); border-radius: 6px;
+			padding: 4px 10px; cursor: pointer; font-family: inherit; font-size: 0.9rem;
+		}
+		.screens-crumb:hover { border-color: var(--accent-gold); color: var(--accent-gold); }
+		.screens-crumb-sep { color: var(--text-muted); }
+
+		.screens-admin-bar {
+			display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+			margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px solid var(--border);
+		}
+		.screens-upload-status { color: var(--accent-gold); font-size: 0.9rem; }
+
+		.screens-search {
+			width: 100%; padding: 10px 12px; margin-bottom: 14px;
+			background: var(--bg-input); color: var(--text-light);
+			border: 1px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 0.95rem;
+		}
+		.screens-search:focus { outline: none; border-color: var(--accent-gold); }
+		.screens-searchbar { display: flex; gap: 8px; margin-bottom: 14px; }
+		.screens-searchbar .screens-search { flex: 1; margin-bottom: 0; }
+		.screens-help-toggle {
+			flex: 0 0 auto; width: 44px; background: var(--bg-input); color: var(--text-light);
+			border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-size: 1.1rem;
+		}
+		.screens-help-toggle:hover, .screens-help-toggle.active { border-color: var(--accent-gold); color: var(--accent-gold); }
+		.screens-help {
+			background: var(--bg-card); border: 1px solid var(--border); border-left: 3px solid var(--accent-gold);
+			border-radius: 8px; padding: 14px 16px; margin-bottom: 14px; font-size: 0.9rem; line-height: 1.5;
+		}
+		.screens-help h4 { color: var(--accent-gold); margin-bottom: 8px; }
+		.screens-help p { margin: 8px 0 4px; }
+		.screens-help ul { margin: 0 0 4px; padding-left: 20px; }
+		.screens-help li { margin: 3px 0; }
+		.screen-thumb-loc { padding: 0 8px 6px; font-size: 0.72rem; color: var(--text-muted); word-break: break-word; }
+
+		/* Tagi */
+		.screens-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+		.screen-tag-chip {
+			background: var(--bg-input); border: 1px solid var(--border); color: var(--text-light);
+			border-radius: 14px; padding: 4px 10px; font-size: 0.8rem; cursor: pointer; font-family: inherit;
+		}
+		.screen-tag-chip:hover { border-color: var(--accent-gold); }
+		.screen-tag-chip.active { background: var(--accent-gold); color: #000; border-color: var(--accent-gold); }
+		.screen-tag { display: inline-block; background: var(--bg-input); border: 1px solid var(--border); border-radius: 10px; padding: 1px 8px; font-size: 0.72rem; color: var(--text-muted); }
+		.screen-thumb-tags { display: flex; flex-wrap: wrap; gap: 3px; padding: 0 8px 6px; }
+		.lb-tags-row { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; align-items: center; margin-top: 6px; }
+
+		/* Zoom lightboxa */
+		#screens-lightbox-img { cursor: zoom-in; touch-action: none; transition: transform .08s ease-out; }
+		#screens-lightbox-img.zoomed { cursor: grab; }
+
+		.screens-grid {
+			display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+			gap: 12px;
+		}
+		.screens-empty { grid-column: 1/-1; text-align: center; color: var(--text-muted); padding: 40px 0; }
+
+		.screen-folder-card, .screen-thumb-card {
+			background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px;
+			overflow: hidden; position: relative; cursor: pointer;
+			transition: border-color .15s, transform .15s;
+		}
+		.screen-folder-card:hover, .screen-thumb-card:hover { border-color: var(--accent-gold); transform: translateY(-2px); }
+
+		.screen-folder-card { padding: 18px 12px; text-align: center; }
+		.screen-folder-icon { font-size: 2.4rem; line-height: 1; }
+		.screen-folder-name { margin-top: 8px; font-weight: 700; word-break: break-word; }
+		.screen-folder-count { color: var(--text-muted); font-size: 0.8rem; margin-top: 2px; }
+
+		.screen-thumb-img {
+			width: 100%; aspect-ratio: 1/1; object-fit: cover; display: block; background: var(--bg-input);
+		}
+		.screen-thumb-name {
+			padding: 6px 8px; font-size: 0.82rem; word-break: break-word;
+			border-top: 1px solid var(--border);
+		}
+
+		.screen-card-actions {
+			position: absolute; top: 4px; right: 4px; display: flex; gap: 3px;
+			opacity: 0; transition: opacity .15s;
+		}
+		.screen-folder-card:hover .screen-card-actions, .screen-thumb-card:hover .screen-card-actions { opacity: 1; }
+		.screen-card-actions button {
+			background: rgba(0,0,0,.7); color: #fff; border: none; border-radius: 5px;
+			width: 26px; height: 26px; cursor: pointer; font-size: 0.85rem; line-height: 1;
+		}
+		.screen-card-actions button:hover { background: var(--accent-red); }
+		/* Dotyk (telefon/tablet) nie ma hovera → przyciski akcji zawsze widoczne i większe do dotknięcia. */
+		@media (hover: none) {
+			.screen-card-actions { opacity: 1; }
+			.screen-card-actions button { width: 32px; height: 32px; font-size: 1rem; }
+		}
+
+		/* Lightbox pełnego obrazu */
+		.screens-lightbox {
+			position: fixed; inset: 0; z-index: 3000; background: rgba(0,0,0,.9);
+			display: flex; align-items: center; justify-content: center; padding: 20px;
+		}
+		.screens-lightbox.hidden { display: none; }
+		.screens-lightbox-inner { position: relative; max-width: 96vw; max-height: 92vh; display: flex; flex-direction: column; align-items: center; }
+		/* Obraz dopasowuje się do wolnego miejsca (flex), meta i „Pobierz" są zawsze widoczne pod nim. */
+		.screens-lightbox-inner img { max-width: 96vw; flex: 1 1 auto; min-height: 0; object-fit: contain; border-radius: 8px; }
+		.screens-lightbox-meta, .screens-lightbox-download { flex: 0 0 auto; }
+		.screens-lightbox-meta { max-height: 26vh; overflow-y: auto; }
+		.screens-lightbox-close {
+			position: absolute; top: -12px; right: -12px; z-index: 3002; width: 34px; height: 34px; border-radius: 50%;
+			background: var(--accent-red); color: #fff; border: 2px solid #fff; cursor: pointer; font-size: 1rem;
+		}
+		.screens-lightbox-meta { margin-top: 12px; color: var(--text-light); text-align: center; max-width: 600px; }
+		.screens-lightbox-meta .lb-title { font-weight: 700; color: var(--accent-gold); }
+		.screens-lightbox-meta .lb-comment { color: var(--text-muted); font-size: 0.9rem; margin-top: 4px; }
+		.screens-lightbox-download { margin-top: 14px; }
+		.lb-title-row, .lb-comment-row { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; }
+		.lb-edit-mini { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.9rem; line-height: 1; padding: 2px 4px; border-radius: 4px; }
+		.lb-edit-mini:hover { color: var(--accent-gold); }
+		.lb-comment-empty { font-style: italic; opacity: 0.7; }
+		.screens-lightbox-nav {
+			position: absolute; top: 50%; transform: translateY(-50%); z-index: 3001;
+			width: 46px; height: 46px; border-radius: 50%; border: none;
+			background: rgba(0,0,0,.55); color: #fff; font-size: 1.8rem; line-height: 1; cursor: pointer;
+		}
+		.screens-lightbox-nav:hover { background: var(--accent-gold); color: #000; }
+		.screens-lightbox-nav.prev { left: 14px; }
+		.screens-lightbox-nav.next { right: 14px; }
+
+		.screens-grid.drag-over { outline: 2px dashed var(--accent-gold); outline-offset: 6px; border-radius: 10px; }
+
+		/* Modal przenoszenia */
+		.screens-move-list { display: flex; flex-direction: column; gap: 6px; max-height: 50vh; overflow-y: auto; margin-top: 12px; }
+		.screens-move-item {
+			background: var(--bg-input); color: var(--text-light); border: 1px solid var(--border);
+			border-radius: 6px; padding: 8px 12px; cursor: pointer; text-align: left; font-family: inherit;
+		}
+		.screens-move-item:hover:not(:disabled) { border-color: var(--accent-gold); color: var(--accent-gold); }
+		.screens-move-item:disabled { opacity: .4; cursor: default; }
+		#screens-move-modal .modal-content { position: relative; }
+		.screens-move-close {
+			position: absolute; top: 10px; right: 12px;
+			background: none; border: none; color: var(--text-muted);
+			font-size: 1.9rem; line-height: 1; cursor: pointer; padding: 0; width: 34px; height: 34px;
+		}
+		.screens-move-close:hover { color: var(--accent-gold); }
+		.screens-back { border-color: var(--accent-gold); color: var(--accent-gold); font-weight: 700; }
+
 		/* ===== SCROLLBAR ===== */
 		::-webkit-scrollbar { width: 6px; }
 		::-webkit-scrollbar-track { background: var(--bg-dark); }

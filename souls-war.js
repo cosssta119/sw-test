@@ -43,6 +43,15 @@
         let heroSkillsLoaded = false;    // czy już pobrano (kolejne wejścia nie odpytują Firebase)
         let allPetSkills = {};           // cache /petSkills (analogicznie do heroSkills)
         let petSkillsLoaded = false;
+        // Galeria screenów (zakładka Screeny): drzewo folderów + pliki w Firebase Storage
+        let allScreenFolders = [], allScreenshots = [];
+        let screensCurrentFolder = null; // null = korzeń galerii
+        let screensLightboxId = null;    // aktualnie otwarty screen w lightboxie (do pobierania)
+        let screensSearch = '';          // filtr szukajki galerii (po nazwie/opisie, globalnie)
+        let screensHelpOpen = storage.getBool('souls_screens_help_open', false); // panel „❔ jak to działa"
+        let screensViewShots = [];       // lista screenów aktualnie wyświetlanych (folder lub wynik szukajki) — kontekst nawigacji ‹ ›
+        let screenFoldersRef = null, screenshotsRef = null, screensStorageRef = null;
+        let screenMoveCtx = null;        // { kind:'folder'|'shot', id } — kontekst modala „Przenieś"
         let isOnline = false, isAdmin = false;
         let headerClickCount = 0, headerClickTimer = null;
         let favorites = storage.getJson('souls_favorites', []);
@@ -59,14 +68,15 @@
 			defaultDbFilter: 'all',     // domyślny filtr bazy na starcie
 			defaultPackageMinSupport: 5,// domyślne „min. wystąpień" w pakietach
 			defaultPackageWindow: 'all',// domyślne okno czasowe pakietów
+			screensCompress: true,      // Galeria: kompresja screenów przy wgrywaniu (oszczędza miejsce/transfer Storage)
 			// Widoczność zakładek: 'all' = wszyscy (też admin), 'admin' = tylko admin. Domyślne = obecny stan apki.
 			// Zakładka 'admin' jest zawsze admin-only (poza tą mapą, niekonfigurowalna).
-			tabVisibility: { search: 'all', database: 'all', view: 'all', add: 'all', settings: 'admin', war: 'all', kreator: 'all', defense: 'admin', heroes: 'all' },
+			tabVisibility: { search: 'all', database: 'all', view: 'all', add: 'all', settings: 'admin', war: 'all', kreator: 'all', defense: 'admin', heroes: 'all', screens: 'admin' },
 			// Umiejscowienie: 'bar' = w pasku, 'more' = w menu „⋯ Więcej", 'hidden' = ukryta. Domyślnie wszystko w pasku.
 			// Przycisk „Więcej" pojawia się dopiero gdy ≥2 widoczne zakładki są w „Więcej".
-			tabPlacement: { search: 'bar', database: 'bar', view: 'bar', add: 'bar', settings: 'bar', war: 'bar', kreator: 'bar', defense: 'bar', admin: 'bar', heroes: 'bar' },
+			tabPlacement: { search: 'bar', database: 'bar', view: 'bar', add: 'bar', settings: 'bar', war: 'bar', kreator: 'bar', defense: 'bar', admin: 'bar', heroes: 'bar', screens: 'bar' },
 			// Kolejność zakładek (Admin zawsze przypięty na końcu, poza tą listą). Domyślnie = obecny układ.
-			tabOrder: ['search', 'database', 'view', 'add', 'war', 'kreator', 'heroes', 'defense', 'settings'],
+			tabOrder: ['search', 'database', 'view', 'add', 'war', 'kreator', 'heroes', 'defense', 'screens', 'settings'],
 		};
 		let appConfig = { ...DEFAULT_CONFIG };
 		let configRef = null;
@@ -184,7 +194,7 @@
                 'admin.renamePetConfirm': 'Zmiana nazwy zaktualizuje też wszystkie formacje i składy obrony używające tego peta. Kontynuować?',
                 'admin.config': 'Konfiguracja (globalna)', 'admin.configNewDays': 'Próg „NOWE" (dni)',
                 'admin.configMinMatch': 'Domyślny próg trafności', 'admin.configWarResult': 'Wyników w Planerze Wojny (5–100)', 'admin.configSort': 'Domyślne sortowanie wyników',
-                'admin.configDbFilter': 'Domyślny filtr bazy', 'admin.configPkgSupport': 'Pakiety: domyślne min. wystąpień', 'admin.configPkgWindow': 'Pakiety: domyślne okno',
+                'admin.configDbFilter': 'Domyślny filtr bazy', 'admin.configPkgSupport': 'Pakiety: domyślne min. wystąpień', 'admin.configPkgWindow': 'Pakiety: domyślne okno', 'admin.configScreensCompress': 'Galeria: kompresuj screeny przy wgrywaniu',
                 'admin.tabVisibility': 'Widoczność zakładek', 'admin.visAll': 'Wszyscy', 'admin.visAdmin': 'Tylko admin',
                 'admin.placeBar': 'W pasku', 'admin.placeMore': 'W „Więcej"', 'admin.placeHidden': 'Ukryj',
                 'admin.tabLocked': 'Zawsze dostępna (tylko admin)', 'admin.tabLockedHint': 'Tej zakładki nie można ukryć ani przenieść — to wejście do panelu admina.',
@@ -311,6 +321,27 @@
                 'search.belowThresholdHint': 'Ukryte: trafność poniżej progu',
                 'search.allBelowThreshold': 'Wszystkie dopasowania mają trafność poniżej {n}. Zmniejsz próg.',
 				'nav.defense': 'Obrona',
+				'nav.screens': 'Galeria',
+				'screens.title': 'Galeria screenów', 'screens.subtitle': 'Foldery i screeny gildii — kliknij kafelek, by otworzyć',
+				'screens.root': 'Galeria', 'screens.newFolder': 'Nowy folder', 'screens.upload': 'Wgraj screeny', 'screens.download': 'Pobierz',
+				'screens.empty': 'Ten folder jest pusty.', 'screens.emptyAdmin': 'Pusto. Dodaj folder lub wgraj screeny.',
+				'screens.folderNamePrompt': 'Nazwa folderu:', 'screens.renameFolderPrompt': 'Nowa nazwa folderu:',
+				'screens.renameShotPrompt': 'Nowa nazwa screena:', 'screens.moveTitle': 'Przenieś do…',
+				'screens.moveRoot': '🖼️ Galeria (korzeń)', 'screens.moved': 'Przeniesiono',
+				'screens.deleteFolderConfirm': 'Usunąć folder „{name}" wraz z całą zawartością ({n} screenów)? Tego nie można cofnąć.',
+				'screens.deleteShotConfirm': 'Usunąć ten screen? Tego nie można cofnąć.',
+				'screens.folderCount': '{n} elem.', 'screens.uploading': 'Wgrywanie {i}/{n}…',
+				'screens.uploaded': 'Wgrano {n} screenów', 'screens.uploadErr': 'Błąd wgrywania: {msg}',
+				'screens.notImage': 'Pominięto (nie obraz): {name}', 'screens.tooBig': 'Pominięto (za duży, >10 MB): {name}',
+				'screens.folderExists': 'Folder o tej nazwie już istnieje tutaj.', 'screens.deleted': 'Usunięto',
+				'screens.searchPlaceholder': '🔍 Szukaj screena (nazwa, opis lub tag)…', 'screens.searchNoResults': 'Brak wyników dla tej frazy.',
+				'screens.editComment': 'Edytuj opis', 'screens.commentPrompt': 'Opis / komentarz do screena:', 'screens.back': 'Wstecz', 'screens.noComment': 'brak opisu',
+				'screens.tagsPrompt': 'Tagi (po przecinku):', 'screens.noTags': 'brak tagów',
+				'screens.titleTooLong': 'Nazwa za długa (max {n} znaków).', 'screens.commentTooLong': 'Opis za długi (max {n} znaków).',
+				'screens.tooManyTags': 'Za dużo tagów (max {n}).', 'screens.tagTooLong': 'Tag za długi (max {n} znaków).',
+				'screens.helpBtn': 'Jak to działa',
+				'screens.helpView': '<h4>🖼️ Galeria — jak to działa</h4><p><strong>Przeglądanie</strong></p><ul><li>Kliknij <b>folder 📁</b>, żeby wejść do środka. U góry ścieżka (okruszki) — klik cofa do dowolnego poziomu; jest też <b>← Wstecz</b>.</li><li>Kliknij <b>miniaturę</b>, żeby otworzyć screen na pełnym ekranie.</li><li>W podglądzie: <b>scroll / dwuklik</b> = powiększ (telefon: <b>pinch</b>), <b>przeciąganie</b> = przesuwanie powiększonego, <b>‹ ›</b> lub <b>←/→</b> (telefon: <b>swipe</b>) = następny/poprzedni, <b>Esc / ✕</b> = zamknij (telefon: <b>swipe w dół</b>).</li><li><b>⬇️ Pobierz</b> zapisuje obraz na dysk.</li></ul><p><strong>Szukanie</strong></p><ul><li>Pole u góry szuka po <b>nazwie, opisie i tagach</b> w całej galerii.</li><li>Pod nim <b>klikalne tagi</b> — klik filtruje, ponowny klik wyłącza. Tagi pojawiają się dopiero, gdy jakiś screen ma dodany tag.</li></ul>',
+				'screens.helpAdmin': '<p><strong>Wgrywanie (admin)</strong> — zawsze do aktualnie otwartego folderu:</p><ul><li>Przycisk <b>⬆️ Wgraj screeny</b> — na komputerze wybierasz pliki; <b>na telefonie</b> otwiera się Galeria/Aparat, wybierz zrzut(y) z galerii (można kilka naraz),</li><li><b>(komputer) Przeciągnij</b> pliki z pulpitu na siatkę,</li><li><b>(komputer) Ctrl+V</b> — wklej zrzut ze schowka (np. po Win+Shift+S).</li></ul><p>Obrazy są automatycznie zmniejszane (kompresja — do wyłączenia w Konfiguracji). Tylko obrazy, do 10 MB.</p><p><strong>Porządkowanie (admin)</strong> — przyciski na kafelku (komputer: po najechaniu, telefon: zawsze widoczne):</p><ul><li><b>📁➕ Nowy folder</b> w bieżącym miejscu (foldery można zagnieżdżać),</li><li><b>✏️</b> zmień nazwę · <b>📁</b> przenieś · <b>🗑️</b> usuń (folder kasuje też zawartość),</li><li>W podglądzie <b>✏️</b> przy nazwie / opisie / tagach edytuje te pola.</li></ul><p><b>Limity:</b> nazwa 60 znaków, opis 300, tag 32, maks. 8 tagów.</p>',
 				'defense.title': 'Obrona gildii',
 				'defense.viewPlayers': 'Gracze', 'defense.viewFormations': 'Składy', 'defense.viewAdd': 'Dodaj skład',
 				'defense.newPlayerPlaceholder': 'Nazwa gracza...', 'defense.addPlayer': 'Dodaj gracza',
@@ -450,7 +481,7 @@
                 'admin.renamePetConfirm': 'Renaming will also update all formations and defense setups using this pet. Continue?',
                 'admin.config': 'Configuration (global)', 'admin.configNewDays': '"NEW" threshold (days)',
                 'admin.configMinMatch': 'Default match threshold', 'admin.configWarResult': 'War Planner results (5–100)', 'admin.configSort': 'Default results sorting',
-                'admin.configDbFilter': 'Default database filter', 'admin.configPkgSupport': 'Packages: default min. occurrences', 'admin.configPkgWindow': 'Packages: default window',
+                'admin.configDbFilter': 'Default database filter', 'admin.configPkgSupport': 'Packages: default min. occurrences', 'admin.configPkgWindow': 'Packages: default window', 'admin.configScreensCompress': 'Gallery: compress screenshots on upload',
                 'admin.tabVisibility': 'Tab visibility', 'admin.visAll': 'Everyone', 'admin.visAdmin': 'Admin only',
                 'admin.placeBar': 'In bar', 'admin.placeMore': 'In „More"', 'admin.placeHidden': 'Hidden',
                 'admin.tabLocked': 'Always available (admin only)', 'admin.tabLockedHint': 'This tab cannot be hidden or moved — it is the entry to the admin panel.',
@@ -578,6 +609,27 @@
                 'search.belowThresholdHint': 'Hidden: match below threshold',
                 'search.allBelowThreshold': 'All matches are below {n}. Lower the threshold.',
 				'nav.defense': 'Defense',
+				'nav.screens': 'Gallery',
+				'screens.title': 'Screenshot gallery', 'screens.subtitle': 'Guild folders and screenshots — click a tile to open',
+				'screens.root': 'Gallery', 'screens.newFolder': 'New folder', 'screens.upload': 'Upload screens', 'screens.download': 'Download',
+				'screens.empty': 'This folder is empty.', 'screens.emptyAdmin': 'Empty. Add a folder or upload screens.',
+				'screens.folderNamePrompt': 'Folder name:', 'screens.renameFolderPrompt': 'New folder name:',
+				'screens.renameShotPrompt': 'New screenshot name:', 'screens.moveTitle': 'Move to…',
+				'screens.moveRoot': '🖼️ Gallery (root)', 'screens.moved': 'Moved',
+				'screens.deleteFolderConfirm': 'Delete folder “{name}” with all its contents ({n} screenshots)? This cannot be undone.',
+				'screens.deleteShotConfirm': 'Delete this screenshot? This cannot be undone.',
+				'screens.folderCount': '{n} items', 'screens.uploading': 'Uploading {i}/{n}…',
+				'screens.uploaded': 'Uploaded {n} screenshots', 'screens.uploadErr': 'Upload error: {msg}',
+				'screens.notImage': 'Skipped (not an image): {name}', 'screens.tooBig': 'Skipped (too big, >10 MB): {name}',
+				'screens.folderExists': 'A folder with this name already exists here.', 'screens.deleted': 'Deleted',
+				'screens.searchPlaceholder': '🔍 Search screenshot (name, description or tag)…', 'screens.searchNoResults': 'No results for this query.',
+				'screens.editComment': 'Edit description', 'screens.commentPrompt': 'Screenshot description / comment:', 'screens.back': 'Back', 'screens.noComment': 'no description',
+				'screens.tagsPrompt': 'Tags (comma-separated):', 'screens.noTags': 'no tags',
+				'screens.titleTooLong': 'Name too long (max {n} chars).', 'screens.commentTooLong': 'Description too long (max {n} chars).',
+				'screens.tooManyTags': 'Too many tags (max {n}).', 'screens.tagTooLong': 'Tag too long (max {n} chars).',
+				'screens.helpBtn': 'How it works',
+				'screens.helpView': '<h4>🖼️ Gallery — how it works</h4><p><strong>Browsing</strong></p><ul><li>Click a <b>folder 📁</b> to open it. The path (breadcrumbs) is on top — click jumps to any level; there is also <b>← Back</b>.</li><li>Click a <b>thumbnail</b> to open the screenshot full-screen.</li><li>In the viewer: <b>scroll / double-click</b> = zoom (mobile: <b>pinch</b>), <b>drag</b> = pan, <b>‹ ›</b> or <b>←/→</b> (mobile: <b>swipe</b>) = next/previous, <b>Esc / ✕</b> = close (mobile: <b>swipe down</b>).</li><li><b>⬇️ Download</b> saves the image to disk.</li></ul><p><strong>Search</strong></p><ul><li>The field on top searches by <b>name, description and tags</b> across the whole gallery.</li><li>Below it are <b>clickable tags</b> — click filters, click again clears. Tags appear only once some screenshot has a tag.</li></ul>',
+				'screens.helpAdmin': '<p><strong>Uploading (admin)</strong> — always into the currently open folder:</p><ul><li>The <b>⬆️ Upload screens</b> button — on desktop you pick files; <b>on phone</b> it opens the Gallery/Camera, pick the screenshot(s) from the gallery (multiple at once),</li><li><b>(desktop) Drag</b> files onto the grid,</li><li><b>(desktop) Ctrl+V</b> — paste a screenshot from the clipboard (e.g. after Win+Shift+S).</li></ul><p>Images are auto-shrunk (compression — can be turned off in Config). Images only, up to 10 MB.</p><p><strong>Organizing (admin)</strong> — tile buttons (desktop: on hover, phone: always visible):</p><ul><li><b>📁➕ New folder</b> in the current place (folders can nest),</li><li><b>✏️</b> rename · <b>📁</b> move · <b>🗑️</b> delete (a folder also deletes its contents),</li><li>In the viewer <b>✏️</b> next to name / description / tags edits those fields.</li></ul><p><b>Limits:</b> name 60 chars, description 300, tag 32, max 8 tags.</p>',
 				'defense.title': 'Guild defense',
 				'defense.viewPlayers': 'Players', 'defense.viewFormations': 'Formations', 'defense.viewAdd': 'Add formation',
 				'defense.newPlayerPlaceholder': 'Player name...', 'defense.addPlayer': 'Add player',
@@ -785,8 +837,8 @@
         }
 
 		// Konfigurowalne zakładki (kolejność = w panelu). 'admin' zawsze admin-only (locked).
-		const TAB_ICONS = { search: '🔍', database: '📚', view: '👁️', add: '➕', settings: '⚙️', war: '⚔️', kreator: '🎯', defense: '🛡️', admin: '👑', heroes: '🧙' };
-		const TAB_I18N = { search: 'nav.search', database: 'nav.database', view: 'nav.preview', add: 'nav.add', settings: 'nav.import', war: 'nav.war', kreator: 'nav.kreator', defense: 'nav.defense', admin: 'nav.admin', heroes: 'nav.heroes' };
+		const TAB_ICONS = { search: '🔍', database: '📚', view: '👁️', add: '➕', settings: '⚙️', war: '⚔️', kreator: '🎯', defense: '🛡️', admin: '👑', heroes: '🧙', screens: '🖼️' };
+		const TAB_I18N = { search: 'nav.search', database: 'nav.database', view: 'nav.preview', add: 'nav.add', settings: 'nav.import', war: 'nav.war', kreator: 'nav.kreator', defense: 'nav.defense', admin: 'nav.admin', heroes: 'nav.heroes', screens: 'nav.screens' };
 		const tabLabel = tab => `${TAB_ICONS[tab]} ${t(TAB_I18N[tab])}`;
 
 		let moreTabsActive = []; // zakładki aktualnie pokazane w menu „⋯ Więcej"
@@ -1065,6 +1117,7 @@
 			if (name === 'defense') switchDefenseView(currentDefenseView);
 			if (name === 'settings') renderImportStats();
 			if (name === 'heroes') renderHeroesTab(); // lazy-load /heroSkills + render listy
+			if (name === 'screens') renderScreensTab();
 
 		}
 
@@ -8494,6 +8547,7 @@
             if ($('config-db-filter')) $('config-db-filter').value = appConfig.defaultDbFilter;
             if ($('config-pkg-support')) $('config-pkg-support').value = appConfig.defaultPackageMinSupport;
             if ($('config-pkg-window')) $('config-pkg-window').value = appConfig.defaultPackageWindow;
+            if ($('config-screens-compress')) $('config-screens-compress').checked = appConfig.screensCompress !== false;
 
             // Robocze kopie (edytowane w formularzu do czasu Zapisz; reorder ich nie gubi).
             // Nie nadpisuj edycji w toku: przy odświeżeniu z listenera Firebase pomiń przeseedowanie,
@@ -8546,7 +8600,8 @@
                     tabVisibility,
                     tabPlacement,
                     tabOrder,
-                    warResultLimit: warResult
+                    warResultLimit: warResult,
+                    screensCompress: $('config-screens-compress') ? $('config-screens-compress').checked : true
                 });
                 configTabDirty = false; // zapisano → pozwól listenerowi przeseedować robocze kopie ze świeżego configu
                 showToast(`✅ ${t('admin.configSaved')}`);
@@ -8802,6 +8857,544 @@
 
 
         // ═══════════════════════════════════════════════════════════
+        // TAB: SCREENS — galeria screenów w folderach (Firebase Storage)
+        // ═══════════════════════════════════════════════════════════
+        // Model: /screenFolders/{id} = {id,name,parentId,createdAt} — drzewo po parentId (null=korzeń).
+        //        /screenshots/{id}   = {id,folderId,url,storagePath,title,comment,uploadedAt}.
+        // Pliki (obrazy) siedzą w Firebase Storage pod screenshots/{id}; RTDB trzyma tylko metadane + URL.
+        const SCREENS_MAX_DIM = 1600, SCREENS_JPEG_Q = 0.85, SCREENS_MAX_BYTES = 10 * 1024 * 1024;
+        const SCREENS_THUMB_DIM = 320, SCREENS_THUMB_Q = 0.7; // miniatura do siatki
+        const SCREENS_TITLE_MAX = 60, SCREENS_COMMENT_MAX = 300, SCREENS_TAG_MAX = 32, SCREENS_TAGS_MAX = 8; // limity tekstu
+        let lbScale = 1, lbTx = 0, lbTy = 0; // stan zoom/pan lightboxa
+
+        // ── odczyty drzewa z cache (allScreenFolders/allScreenshots) ──
+        function screenFolderChildren(parentId) {
+            return allScreenFolders.filter(f => (f.parentId || null) === (parentId || null))
+                .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        }
+        function screenshotsInFolder(folderId) {
+            return allScreenshots.filter(s => (s.folderId || null) === (folderId || null))
+                .sort((a, b) => String(b.uploadedAt || '').localeCompare(String(a.uploadedAt || '')));
+        }
+        function findScreenFolder(id) { return allScreenFolders.find(f => f.id === id) || null; }
+        function findScreenshot(id) { return allScreenshots.find(s => s.id === id) || null; }
+
+        // Ścieżka korzeń→folder (lista folderów) do breadcrumbów. Guard chroni przed pętlą parentId.
+        function screenFolderPath(folderId) {
+            const path = [], guard = new Set();
+            let cur = folderId ? findScreenFolder(folderId) : null;
+            while (cur && !guard.has(cur.id)) { guard.add(cur.id); path.unshift(cur); cur = cur.parentId ? findScreenFolder(cur.parentId) : null; }
+            return path;
+        }
+        // ID folderu + wszystkich jego podfolderów (rekurencyjnie).
+        function screenFolderSubtree(folderId) {
+            const stack = [folderId], out = [folderId];
+            while (stack.length) {
+                const p = stack.pop();
+                allScreenFolders.filter(f => (f.parentId || null) === p).forEach(f => { stack.push(f.id); out.push(f.id); });
+            }
+            return out;
+        }
+
+        function screensGoTo(folderId) {
+            screensCurrentFolder = folderId || null;
+            screensSearch = '';
+            const si = $('screens-search'); if (si) si.value = '';
+            renderScreensTab();
+        }
+
+        function renderScreensTab() {
+            const bar = $('screens-admin-bar');
+            if (bar) bar.style.display = isAdmin ? 'flex' : 'none';
+            renderScreensBreadcrumb();
+            renderScreensHelp();
+            renderScreensTagBar();
+            renderScreensGrid();
+        }
+
+        // Panel „❔ jak to działa" — sekcje admina tylko dla admina.
+        function toggleScreensHelp() {
+            screensHelpOpen = !screensHelpOpen;
+            storage.setBool('souls_screens_help_open', screensHelpOpen);
+            renderScreensHelp();
+        }
+        function renderScreensHelp() {
+            const el = $('screens-help');
+            if (!el) return;
+            $('screens-help-toggle')?.classList.toggle('active', screensHelpOpen);
+            if (!screensHelpOpen) { el.style.display = 'none'; el.innerHTML = ''; return; }
+            el.style.display = 'block';
+            el.innerHTML = t('screens.helpView') + (isAdmin ? t('screens.helpAdmin') : '');
+        }
+
+        // Pasek klikalnych tagów (unikalne ze wszystkich screenów) — klik filtruje przez szukajkę.
+        function renderScreensTagBar() {
+            const el = $('screens-tags');
+            if (!el) return;
+            const tags = [...new Set(allScreenshots.flatMap(s => s.tags || []))].sort((a, b) => a.localeCompare(b));
+            el.innerHTML = tags.map(tg =>
+                `<button class="screen-tag-chip${tg.toLowerCase() === screensSearch ? ' active' : ''}" onclick="toggleScreenTagFilter('${jsStr(tg)}')">🏷️ ${escapeHtml(tg)}</button>`
+            ).join('');
+        }
+        function toggleScreenTagFilter(tag) {
+            const v = (screensSearch === tag.toLowerCase()) ? '' : tag;
+            const si = $('screens-search');
+            if (si) si.value = v;
+            setScreensSearch(v);
+        }
+
+        function renderScreensBreadcrumb() {
+            const el = $('screens-breadcrumb');
+            if (!el) return;
+            let html = screensCurrentFolder ? `<button class="screens-crumb screens-back" onclick="screensGoBack()">← ${t('screens.back')}</button>` : '';
+            html += `<button class="screens-crumb" onclick="screensGoTo(null)">🖼️ ${t('screens.root')}</button>`;
+            screenFolderPath(screensCurrentFolder).forEach(f => {
+                html += `<span class="screens-crumb-sep">›</span><button class="screens-crumb" onclick="screensGoTo('${jsStr(f.id)}')">${escapeHtml(f.name)}</button>`;
+            });
+            el.innerHTML = html;
+        }
+        // Wstecz = do folderu-rodzica bieżącego (albo do korzenia).
+        function screensGoBack() {
+            const cur = findScreenFolder(screensCurrentFolder);
+            screensGoTo(cur ? (cur.parentId || null) : null);
+        }
+
+        // Etykieta lokalizacji folderu (ścieżka „A / B") — do wyników szukajki. Korzeń → nazwa galerii.
+        function screenFolderLabel(folderId) {
+            if (!folderId) return t('screens.root');
+            const path = screenFolderPath(folderId);
+            return path.length ? path.map(f => escapeHtml(f.name)).join(' / ') : t('screens.root');
+        }
+
+        function setScreensSearch(v) { screensSearch = (v || '').trim().toLowerCase(); renderScreensTagBar(); renderScreensGrid(); }
+
+        function renderScreensGrid() {
+            const grid = $('screens-grid');
+            if (!grid) return;
+            const actions = (kind, id) => !isAdmin ? '' : `<div class="screen-card-actions">
+                    <button title="✏️" onclick="event.stopPropagation(); ${kind === 'folder' ? 'renameScreenFolder' : 'renameScreenshot'}('${jsStr(id)}')">✏️</button>
+                    <button title="📁" onclick="event.stopPropagation(); openScreenMove('${kind}','${jsStr(id)}')">📁</button>
+                    <button title="🗑️" onclick="event.stopPropagation(); ${kind === 'folder' ? 'deleteScreenFolder' : 'deleteScreenshot'}('${jsStr(id)}')">🗑️</button>
+                </div>`;
+            const folderCard = (f, subLabel) => `<div class="screen-folder-card" onclick="screensGoTo('${jsStr(f.id)}')">
+                    ${actions('folder', f.id)}
+                    <div class="screen-folder-icon">📁</div>
+                    <div class="screen-folder-name">${escapeHtml(f.name)}</div>
+                    <div class="screen-folder-count">${subLabel}</div>
+                </div>`;
+            const shotCard = (s, locLabel) => `<div class="screen-thumb-card" onclick="openScreenLightbox('${jsStr(s.id)}')">
+                    ${actions('shot', s.id)}
+                    <img class="screen-thumb-img" loading="lazy" src="${escapeHtml(s.thumbUrl || s.url)}" alt="${escapeHtml(s.title || '')}">
+                    <div class="screen-thumb-name">${escapeHtml(s.title || '') || '—'}</div>
+                    ${(s.tags && s.tags.length) ? `<div class="screen-thumb-tags">${s.tags.slice(0, 3).map(tg => `<span class="screen-tag">${escapeHtml(tg)}</span>`).join('')}</div>` : ''}
+                    ${locLabel ? `<div class="screen-thumb-loc">📁 ${locLabel}</div>` : ''}
+                </div>`;
+
+            // ── Tryb szukajki: płaskie wyniki z CAŁEJ galerii (nazwa + opis + tagi) ──
+            if (screensSearch) {
+                const q = screensSearch;
+                const folders = allScreenFolders.filter(f => (f.name || '').toLowerCase().includes(q))
+                    .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+                const shots = allScreenshots.filter(s => (s.title || '').toLowerCase().includes(q) || (s.comment || '').toLowerCase().includes(q) || (s.tags || []).some(tg => tg.toLowerCase().includes(q)))
+                    .sort((a, b) => String(b.uploadedAt || '').localeCompare(String(a.uploadedAt || '')));
+                screensViewShots = shots;
+                if (!folders.length && !shots.length) {
+                    grid.innerHTML = `<div class="screens-empty">${t('screens.searchNoResults')}</div>`;
+                    return;
+                }
+                grid.innerHTML = folders.map(f => folderCard(f, screenFolderLabel(f.id))).join('')
+                    + shots.map(s => shotCard(s, screenFolderLabel(s.folderId))).join('');
+                return;
+            }
+
+            // ── Normalny widok bieżącego folderu ──
+            const folders = screenFolderChildren(screensCurrentFolder);
+            const shots = screenshotsInFolder(screensCurrentFolder);
+            screensViewShots = shots;
+            if (!folders.length && !shots.length) {
+                grid.innerHTML = `<div class="screens-empty">${t(isAdmin ? 'screens.emptyAdmin' : 'screens.empty')}</div>`;
+                return;
+            }
+            grid.innerHTML = folders.map(f => {
+                const count = screenshotsInFolder(f.id).length + screenFolderChildren(f.id).length;
+                return folderCard(f, t('screens.folderCount', { n: count }));
+            }).join('') + shots.map(s => shotCard(s)).join('');
+        }
+
+        // ── Lightbox ──
+        function openScreenLightbox(id) {
+            const s = findScreenshot(id);
+            if (!s) return;
+            screensLightboxId = id;
+            resetLbZoom();
+            $('screens-lightbox-img').src = s.url; // lightbox = pełny obraz (nie miniatura)
+            const meta = [];
+            const penTitle = isAdmin ? `<button class="lb-edit-mini" title="${t('screens.renameShotPrompt')}" onclick="renameScreenshot('${jsStr(id)}')">✏️</button>` : '';
+            meta.push(`<div class="lb-title-row"><span class="lb-title">${escapeHtml(s.title || '—')}</span>${penTitle}</div>`);
+            if (s.comment || isAdmin) {
+                const penCmt = isAdmin ? `<button class="lb-edit-mini" title="${t('screens.commentPrompt')}" onclick="editScreenshotComment('${jsStr(id)}')">✏️</button>` : '';
+                const cmt = s.comment
+                    ? `<span class="lb-comment">${escapeHtml(s.comment)}</span>`
+                    : `<span class="lb-comment lb-comment-empty">${t('screens.noComment')}</span>`;
+                meta.push(`<div class="lb-comment-row">${cmt}${penCmt}</div>`);
+            }
+            if ((s.tags && s.tags.length) || isAdmin) {
+                const penTags = isAdmin ? `<button class="lb-edit-mini" title="${t('screens.tagsPrompt')}" onclick="editScreenshotTags('${jsStr(id)}')">🏷️✏️</button>` : '';
+                const chips = (s.tags && s.tags.length)
+                    ? s.tags.map(tg => `<span class="screen-tag">${escapeHtml(tg)}</span>`).join('')
+                    : `<span class="lb-comment-empty">${t('screens.noTags')}</span>`;
+                meta.push(`<div class="lb-tags-row">${chips}${penTags}</div>`);
+            }
+            $('screens-lightbox-meta').innerHTML = meta.join('');
+            const multi = screensViewShots.length > 1;
+            document.querySelectorAll('.screens-lightbox-nav').forEach(b => b.style.display = multi ? 'block' : 'none');
+            $('screens-lightbox').classList.remove('hidden');
+        }
+        function closeScreenLightbox() {
+            $('screens-lightbox')?.classList.add('hidden');
+            const img = $('screens-lightbox-img');
+            if (img) img.src = '';
+            screensLightboxId = null;
+            resetLbZoom();
+        }
+        // ── Zoom/pan lightboxa (scroll, dblclick, drag; touch: pinch/pan/swipe w setupScreensInteractions) ──
+        function applyLbTransform() {
+            const img = $('screens-lightbox-img');
+            if (!img) return;
+            img.style.transform = `translate(${lbTx}px, ${lbTy}px) scale(${lbScale})`;
+            img.classList.toggle('zoomed', lbScale > 1);
+        }
+        function resetLbZoom() { lbScale = 1; lbTx = 0; lbTy = 0; applyLbTransform(); }
+        // Pobranie: próba fetch→blob (prawdziwe „zapisz"), fallback do otwarcia w nowej karcie (np. gdy CORS bucketu blokuje fetch).
+        async function downloadScreenshot(id) {
+            const s = findScreenshot(id || screensLightboxId);
+            if (!s) return;
+            const fname = (s.title || 'screen').replace(/[\\/:*?"<>|]+/g, '_') + '.jpg';
+            try {
+                const resp = await fetch(s.url);
+                if (!resp.ok) throw new Error('fetch ' + resp.status);
+                const blob = await resp.blob();
+                const objUrl = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = objUrl; a.download = fname;
+                document.body.appendChild(a); a.click(); a.remove();
+                setTimeout(() => URL.revokeObjectURL(objUrl), 2000);
+            } catch (e) {
+                window.open(s.url, '_blank'); // fallback — użytkownik zapisuje ręcznie
+            }
+        }
+        // Nawigacja ‹ › po screenach bieżącego folderu (zawija się na końcach).
+        function lightboxNav(dir) {
+            const shots = screensViewShots;
+            if (!shots || shots.length < 2) return;
+            const idx = shots.findIndex(s => s.id === screensLightboxId);
+            if (idx < 0) return;
+            const next = shots[(idx + dir + shots.length) % shots.length];
+            if (next) openScreenLightbox(next.id);
+        }
+        // Edycja opisu screena (admin) — prompt; optymistycznie odświeża lightbox.
+        async function editScreenshotComment(id) {
+            if (!isAdmin) return;
+            const s = findScreenshot(id);
+            if (!s) return;
+            const comment = prompt(t('screens.commentPrompt'), s.comment || '');
+            if (comment === null) return; // anulowano
+            if (comment.trim().length > SCREENS_COMMENT_MAX) { showToast('⚠️ ' + t('screens.commentTooLong', { n: SCREENS_COMMENT_MAX }), true); return; }
+            try {
+                await screenshotsRef.child(id).update({ comment: comment.trim() });
+                s.comment = comment.trim();
+                if (screensLightboxId === id) openScreenLightbox(id);
+            } catch (e) { showToast(t('common.error') + ': ' + e.message, true); }
+        }
+        // Edycja tagów (admin) — lista po przecinku; unikalne, bez pustych.
+        async function editScreenshotTags(id) {
+            if (!isAdmin) return;
+            const s = findScreenshot(id);
+            if (!s) return;
+            const raw = prompt(t('screens.tagsPrompt'), (s.tags || []).join(', '));
+            if (raw === null) return; // anulowano
+            const tags = [...new Set(raw.split(',').map(x => x.trim()).filter(Boolean))];
+            if (tags.length > SCREENS_TAGS_MAX) { showToast('⚠️ ' + t('screens.tooManyTags', { n: SCREENS_TAGS_MAX }), true); return; }
+            if (tags.some(tg => tg.length > SCREENS_TAG_MAX)) { showToast('⚠️ ' + t('screens.tagTooLong', { n: SCREENS_TAG_MAX }), true); return; }
+            try {
+                await screenshotsRef.child(id).update({ tags });
+                s.tags = tags;
+                renderScreensTagBar();
+                if (screensLightboxId === id) openScreenLightbox(id);
+            } catch (e) { showToast(t('common.error') + ': ' + e.message, true); }
+        }
+
+        // Globalne interakcje Galerii: wklej ze schowka (Ctrl+V), drag&drop plików, klawisze lightboxa.
+        function setupScreensInteractions() {
+            document.addEventListener('paste', e => {
+                if (!isAdmin || !$('tab-screens')?.classList.contains('active')) return;
+                const files = [];
+                for (const it of (e.clipboardData?.items || [])) {
+                    if (it.kind === 'file' && (it.type || '').startsWith('image/')) { const f = it.getAsFile(); if (f) files.push(f); }
+                }
+                if (files.length) { e.preventDefault(); handleScreenUpload(files); }
+            });
+            document.addEventListener('keydown', e => {
+                const lb = $('screens-lightbox');
+                if (!lb || lb.classList.contains('hidden')) return;
+                if (e.key === 'ArrowLeft') lightboxNav(-1);
+                else if (e.key === 'ArrowRight') lightboxNav(1);
+                else if (e.key === 'Escape') closeScreenLightbox();
+            });
+            const grid = $('screens-grid');
+            if (grid) {
+                grid.addEventListener('dragover', e => { if (isAdmin) { e.preventDefault(); grid.classList.add('drag-over'); } });
+                grid.addEventListener('dragleave', e => { if (e.target === grid) grid.classList.remove('drag-over'); });
+                grid.addEventListener('drop', e => {
+                    grid.classList.remove('drag-over');
+                    if (!isAdmin) return;
+                    const files = Array.from(e.dataTransfer?.files || []).filter(f => (f.type || '').startsWith('image/'));
+                    if (files.length) { e.preventDefault(); handleScreenUpload(files); }
+                });
+            }
+
+            // ── Zoom/pan/swipe na obrazie lightboxa ──
+            const lbImg = $('screens-lightbox-img');
+            if (lbImg) {
+                const touchDist = ts => Math.hypot(ts[0].clientX - ts[1].clientX, ts[0].clientY - ts[1].clientY);
+                // Desktop: scroll = zoom, dblclick = toggle, drag = pan (gdy powiększone)
+                lbImg.addEventListener('wheel', e => {
+                    e.preventDefault();
+                    const ns = Math.min(5, Math.max(1, lbScale * (e.deltaY < 0 ? 1.2 : 1 / 1.2)));
+                    if (ns === 1) resetLbZoom(); else { lbScale = ns; applyLbTransform(); }
+                }, { passive: false });
+                lbImg.addEventListener('dblclick', e => {
+                    e.preventDefault();
+                    if (lbScale > 1) resetLbZoom(); else { lbScale = 2.5; applyLbTransform(); }
+                });
+                let dragging = false, sx = 0, sy = 0, ox = 0, oy = 0;
+                lbImg.addEventListener('mousedown', e => {
+                    if (lbScale <= 1) return;
+                    dragging = true; sx = e.clientX; sy = e.clientY; ox = lbTx; oy = lbTy; e.preventDefault();
+                });
+                window.addEventListener('mousemove', e => {
+                    if (!dragging) return;
+                    lbTx = ox + (e.clientX - sx); lbTy = oy + (e.clientY - sy); applyLbTransform();
+                });
+                window.addEventListener('mouseup', () => { dragging = false; });
+                // Touch: pinch = zoom, drag = pan (gdy powiększone), swipe = nawigacja (gdy 1×)
+                let tsx = 0, tsy = 0, sd = 0, ss = 1, pox = 0, poy = 0, panning = false, swiping = false;
+                lbImg.addEventListener('touchstart', e => {
+                    if (e.touches.length === 2) { sd = touchDist(e.touches); ss = lbScale; panning = false; swiping = false; }
+                    else if (e.touches.length === 1) {
+                        tsx = e.touches[0].clientX; tsy = e.touches[0].clientY; pox = lbTx; poy = lbTy;
+                        panning = lbScale > 1; swiping = lbScale <= 1;
+                    }
+                }, { passive: false });
+                lbImg.addEventListener('touchmove', e => {
+                    if (e.touches.length === 2 && sd > 0) {
+                        e.preventDefault();
+                        lbScale = Math.min(5, Math.max(1, ss * touchDist(e.touches) / sd)); applyLbTransform();
+                    } else if (e.touches.length === 1 && panning) {
+                        e.preventDefault();
+                        lbTx = pox + (e.touches[0].clientX - tsx); lbTy = poy + (e.touches[0].clientY - tsy); applyLbTransform();
+                    }
+                }, { passive: false });
+                lbImg.addEventListener('touchend', e => {
+                    if (swiping && e.changedTouches.length) {
+                        const dx = e.changedTouches[0].clientX - tsx, dy = e.changedTouches[0].clientY - tsy;
+                        if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy)) lightboxNav(dx < 0 ? 1 : -1);
+                        else if (dy > 80 && Math.abs(dy) > Math.abs(dx)) closeScreenLightbox(); // swipe w dół = zamknij
+                    }
+                    if (lbScale <= 1) resetLbZoom();
+                    swiping = false; panning = false;
+                });
+            }
+        }
+
+        // ── Foldery: dodaj / zmień nazwę / usuń (admin) ──
+        async function createScreenFolder() {
+            if (!isAdmin || !screenFoldersRef) return;
+            const name = (prompt(t('screens.folderNamePrompt')) || '').trim();
+            if (!name) return;
+            if (name.length > SCREENS_TITLE_MAX) { showToast('⚠️ ' + t('screens.titleTooLong', { n: SCREENS_TITLE_MAX }), true); return; }
+            const parent = screensCurrentFolder || null;
+            if (screenFolderChildren(parent).some(f => (f.name || '').toLowerCase() === name.toLowerCase())) {
+                showToast('⚠️ ' + t('screens.folderExists'), true); return;
+            }
+            try {
+                const ref = screenFoldersRef.push();
+                await ref.set({ id: ref.key, name, parentId: parent, createdAt: new Date().toISOString() });
+            } catch (e) { showToast(t('common.error') + ': ' + e.message, true); }
+        }
+        async function renameScreenFolder(id) {
+            if (!isAdmin) return;
+            const f = findScreenFolder(id);
+            if (!f) return;
+            const name = (prompt(t('screens.renameFolderPrompt'), f.name) || '').trim();
+            if (!name || name === f.name) return;
+            if (name.length > SCREENS_TITLE_MAX) { showToast('⚠️ ' + t('screens.titleTooLong', { n: SCREENS_TITLE_MAX }), true); return; }
+            if (screenFolderChildren(f.parentId || null).some(o => o.id !== id && (o.name || '').toLowerCase() === name.toLowerCase())) {
+                showToast('⚠️ ' + t('screens.folderExists'), true); return;
+            }
+            try { await screenFoldersRef.child(id).update({ name }); }
+            catch (e) { showToast(t('common.error') + ': ' + e.message, true); }
+        }
+        async function renameScreenshot(id) {
+            if (!isAdmin) return;
+            const s = findScreenshot(id);
+            if (!s) return;
+            const title = (prompt(t('screens.renameShotPrompt'), s.title || '') || '').trim();
+            if (title === (s.title || '')) return;
+            if (title.length > SCREENS_TITLE_MAX) { showToast('⚠️ ' + t('screens.titleTooLong', { n: SCREENS_TITLE_MAX }), true); return; }
+            try {
+                await screenshotsRef.child(id).update({ title });
+                s.title = title;
+                if (screensLightboxId === id) openScreenLightbox(id);
+            } catch (e) { showToast(t('common.error') + ': ' + e.message, true); }
+        }
+        // Kasuje pliki screena ze Storage: pełny + miniatura (oba opcjonalne, błędy ignorowane).
+        async function deleteScreenStorageFiles(s) {
+            if (!screensStorageRef) return;
+            for (const p of [s.storagePath, s.thumbPath]) {
+                if (p) { try { await screensStorageRef.child(p).delete(); } catch (e) {} }
+            }
+        }
+        async function deleteScreenshot(id) {
+            if (!isAdmin) return;
+            const s = findScreenshot(id);
+            if (!s) return;
+            if (!confirm(t('screens.deleteShotConfirm'))) return;
+            try {
+                await deleteScreenStorageFiles(s);
+                await screenshotsRef.child(id).remove();
+                showToast('🗑️ ' + t('screens.deleted'));
+            } catch (e) { showToast(t('common.error') + ': ' + e.message, true); }
+        }
+        async function deleteScreenFolder(id) {
+            if (!isAdmin) return;
+            const f = findScreenFolder(id);
+            if (!f) return;
+            const subtree = screenFolderSubtree(id);                 // folder + podfoldery (ID)
+            const shots = allScreenshots.filter(s => subtree.includes(s.folderId));
+            if (!confirm(t('screens.deleteFolderConfirm', { name: f.name, n: shots.length }))) return;
+            try {
+                await Promise.all(shots.map(async s => {
+                    await deleteScreenStorageFiles(s);
+                    await screenshotsRef.child(s.id).remove();
+                }));
+                await Promise.all(subtree.map(fid => screenFoldersRef.child(fid).remove()));
+                if (subtree.includes(screensCurrentFolder)) screensGoTo(f.parentId || null);
+                showToast('🗑️ ' + t('screens.deleted'));
+            } catch (e) { showToast(t('common.error') + ': ' + e.message, true); }
+        }
+
+        // ── Przenoszenie (modal z drzewem folderów) ──
+        function openScreenMove(kind, id) {
+            if (!isAdmin) return;
+            screenMoveCtx = { kind, id };
+            renderScreenMoveList();
+            $('screens-move-modal')?.classList.remove('hidden');
+        }
+        function closeScreenMove() { $('screens-move-modal')?.classList.add('hidden'); screenMoveCtx = null; }
+        function renderScreenMoveList() {
+            const list = $('screens-move-list');
+            if (!list || !screenMoveCtx) return;
+            const { kind, id } = screenMoveCtx;
+            const blocked = kind === 'folder' ? new Set(screenFolderSubtree(id)) : new Set(); // folder nie może trafić do siebie/poddrzewa
+            const cur = kind === 'folder' ? (findScreenFolder(id)?.parentId || null) : (findScreenshot(id)?.folderId || null);
+            const rows = [moveRow(null, '🖼️ ' + t('screens.moveRoot'), 0, cur === null, false)];
+            const walk = (parentId, depth) => {
+                screenFolderChildren(parentId).forEach(f => {
+                    rows.push(moveRow(f.id, '📁 ' + escapeHtml(f.name), depth, cur === f.id, blocked.has(f.id)));
+                    walk(f.id, depth + 1);
+                });
+            };
+            walk(null, 1);
+            list.innerHTML = rows.join('');
+            function moveRow(targetId, label, depth, isCurrent, isBlocked) {
+                const disabled = isCurrent || isBlocked;
+                const target = targetId === null ? 'null' : `'${jsStr(targetId)}'`;
+                return `<button class="screens-move-item" style="padding-left:${8 + depth * 16}px"${disabled ? ' disabled' : ''} onclick="doScreenMove(${target})">${label}${isCurrent ? ' ✓' : ''}</button>`;
+            }
+        }
+        async function doScreenMove(targetFolderId) {
+            if (!isAdmin || !screenMoveCtx) return;
+            const { kind, id } = screenMoveCtx;
+            try {
+                if (kind === 'folder') {
+                    if (screenFolderSubtree(id).includes(targetFolderId)) { closeScreenMove(); return; } // nigdy do własnego poddrzewa
+                    const f = findScreenFolder(id);
+                    if (f && screenFolderChildren(targetFolderId).some(o => o.id !== id && (o.name || '').toLowerCase() === (f.name || '').toLowerCase())) {
+                        showToast('⚠️ ' + t('screens.folderExists'), true); return;
+                    }
+                    await screenFoldersRef.child(id).update({ parentId: targetFolderId });
+                } else {
+                    await screenshotsRef.child(id).update({ folderId: targetFolderId });
+                }
+                closeScreenMove();
+                showToast('✅ ' + t('screens.moved'));
+            } catch (e) { showToast(t('common.error') + ': ' + e.message, true); }
+        }
+
+        // ── Upload z opcjonalną kompresją (canvas) ──
+        function compressImage(file, maxDim = SCREENS_MAX_DIM, quality = SCREENS_JPEG_Q) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                const url = URL.createObjectURL(file);
+                img.onload = () => {
+                    URL.revokeObjectURL(url);
+                    let { width, height } = img;
+                    if (width > maxDim || height > maxDim) {
+                        if (width >= height) { height = Math.round(height * maxDim / width); width = maxDim; }
+                        else { width = Math.round(width * maxDim / height); height = maxDim; }
+                    }
+                    const canvas = document.createElement('canvas');
+                    canvas.width = width; canvas.height = height;
+                    canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+                    canvas.toBlob(b => b ? resolve(b) : reject(new Error('toBlob failed')), 'image/jpeg', quality);
+                };
+                img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('image load failed')); };
+                img.src = url;
+            });
+        }
+        async function handleScreenUpload(fileList) {
+            if (!isAdmin || !screensStorageRef || !screenshotsRef) return;
+            const files = Array.from(fileList || []).filter(Boolean);
+            if (!files.length) return;
+            const status = $('screens-upload-status');
+            const compress = appConfig.screensCompress !== false;
+            const targetFolder = screensCurrentFolder || null;
+            let done = 0; const skipped = [];
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                if (status) status.textContent = t('screens.uploading', { i: i + 1, n: files.length });
+                if (!/^image\//.test(file.type || '')) { skipped.push(t('screens.notImage', { name: file.name })); continue; }
+                try {
+                    let blob = file;
+                    if (compress) { try { blob = await compressImage(file); } catch (e) { blob = file; } }
+                    if (blob.size > SCREENS_MAX_BYTES) { skipped.push(t('screens.tooBig', { name: file.name })); continue; }
+                    const ref = screenshotsRef.push();
+                    const id = ref.key;
+                    const path = `screenshots/${id}`;
+                    // Cache-Control: przeglądarka trzyma obraz tydzień → powtórne wejścia bez transferu.
+                    const CACHE = 'public, max-age=604800';
+                    const snap = await screensStorageRef.child(path).put(blob, { contentType: blob.type || 'image/jpeg', cacheControl: CACHE });
+                    const url = await snap.ref.getDownloadURL();
+                    // Miniatura (~320px) do siatki — mocno tnie transfer przy dużych galeriach. Opcjonalna.
+                    let thumbUrl = null, thumbPath = null;
+                    try {
+                        const thumbBlob = await compressImage(file, SCREENS_THUMB_DIM, SCREENS_THUMB_Q);
+                        thumbPath = `screenshots/${id}_thumb`;
+                        const tSnap = await screensStorageRef.child(thumbPath).put(thumbBlob, { contentType: 'image/jpeg', cacheControl: CACHE });
+                        thumbUrl = await tSnap.ref.getDownloadURL();
+                    } catch (e) { thumbUrl = null; thumbPath = null; }
+                    await ref.set({ id, folderId: targetFolder, url, storagePath: path, thumbUrl, thumbPath, title: file.name.replace(/\.[^.]+$/, '').slice(0, SCREENS_TITLE_MAX), comment: '', tags: [], uploadedAt: new Date().toISOString() });
+                    done++;
+                } catch (e) { showToast('⚠️ ' + t('screens.uploadErr', { msg: e.message || String(e) }), true); }
+            }
+            if (status) status.textContent = '';
+            if (done) showToast('✅ ' + t('screens.uploaded', { n: done }));
+            skipped.forEach(m => showToast('⚠️ ' + m, true));
+        }
+
+
+        // ═══════════════════════════════════════════════════════════
         // FIREBASE INIT — realtime listenery formacji/heroes/pets
         // ═══════════════════════════════════════════════════════════
 
@@ -8874,6 +9467,24 @@
                 if (isAdmin) rerenderDefenseCurrent();
             });
 
+            // ─── Galeria screenów (Firebase Storage + RTDB /screenFolders + /screenshots) ───
+            screenFoldersRef = db.ref('screenFolders');
+            screenshotsRef = db.ref('screenshots');
+            try { if (firebase.storage) screensStorageRef = firebase.storage().ref(); }
+            catch (e) { console.error('Storage init error:', e); }
+
+            // id ZAWSZE z klucza Firebase (nie z pola) — odporne na rozjazd zapisanego 'id' vs klucza.
+            screenFoldersRef.on('value', snap => {
+                const v = snap.val() || {};
+                allScreenFolders = Object.entries(v).map(([id, f]) => ({ ...f, id }));
+                if ($('tab-screens')?.classList.contains('active')) renderScreensTab();
+            });
+            screenshotsRef.on('value', snap => {
+                const v = snap.val() || {};
+                allScreenshots = Object.entries(v).map(([id, s]) => ({ ...s, id }));
+                if ($('tab-screens')?.classList.contains('active')) renderScreensTab();
+            });
+
             // ─── Globalna konfiguracja gildii ───
             // Pod-węzeł 'config/settings' (a nie całe /config), bo reguły Firebase trzymają
             // /config zamknięte, a /config/adminPassword osobno — settings ma własną regułę read/write.
@@ -8894,6 +9505,7 @@
                 appConfig.defaultPackageMinSupport = pkgSup > 0 ? pkgSup : DEFAULT_CONFIG.defaultPackageMinSupport;
                 appConfig.defaultPackageWindow = ['all', '30', '90'].includes(String(c.defaultPackageWindow))
                     ? String(c.defaultPackageWindow) : DEFAULT_CONFIG.defaultPackageWindow;
+                appConfig.screensCompress = (c.screensCompress === false) ? false : true; // domyślnie TAK
                 const tv = c.tabVisibility || {};
                 appConfig.tabVisibility = {};
                 Object.keys(DEFAULT_CONFIG.tabVisibility).forEach(k => {
@@ -8965,6 +9577,8 @@
             document.querySelector(`.lang-btn[onclick="setLanguage('${currentLang}')"]`)?.classList.add('active');
             
             $('admin-password').addEventListener('keydown', e => { if (e.key === 'Enter') tryAdminLogin(); });
+
+            setupScreensInteractions(); // Galeria: Ctrl+V, drag&drop, klawisze lightboxa
             
 			document.querySelectorAll('#tab-search input[data-type]').forEach(input => {
 				input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); searchFormations(); } });
