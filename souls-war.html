@@ -1286,24 +1286,53 @@
          TAB: SCREENS (Galeria) — screeny w folderach (Firebase Storage)
          ═══════════════════════════════════════════════════════ -->
     <div id="tab-screens" class="tab-content">
-        <div class="section">
-            <h2>🖼️ <span data-i18n="screens.title">Galeria screenów</span></h2>
-            <p class="section-subtitle" data-i18n="screens.subtitle">Baza screenshotów w folderach</p>
-
-            <div class="screens-breadcrumb" id="screens-breadcrumb"></div>
-
-            <div class="screens-searchbar">
-                <input type="text" id="screens-search" class="screens-search" data-i18n-placeholder="screens.searchPlaceholder" placeholder="🔍 Szukaj screena (nazwa, opis lub tag)…" oninput="setScreensSearch(this.value)">
-                <button id="screens-help-toggle" class="screens-help-toggle" onclick="toggleScreensHelp()" data-i18n-title="screens.helpBtn" title="Jak to działa">❔</button>
+        <div class="section screens-section">
+            <!-- Przyciski akcji na górze -->
+            <div class="screens-upload-row" id="screens-upload-row" style="display:none;">
+                <button class="btn screens-upload-btn" onclick="$('screens-file-input').click()">⬆️ <span data-i18n="screens.upload">Wgraj screeny</span></button>
+                <input type="file" id="screens-file-input" accept="image/*" multiple style="display:none;" onchange="handleScreenUpload(this.files); this.value='';">
+                <span class="screens-upload-status" id="screens-upload-status"></span>
             </div>
-            <div class="screens-help" id="screens-help" style="display:none;"></div>
-            <div class="screens-tags" id="screens-tags"></div>
 
             <div class="screens-admin-bar" id="screens-admin-bar" style="display:none;">
                 <button class="btn btn-secondary" onclick="createScreenFolder()">📁➕ <span data-i18n="screens.newFolder">Nowy folder</span></button>
-                <button class="btn" onclick="$('screens-file-input').click()">⬆️ <span data-i18n="screens.upload">Wgraj screeny</span></button>
-                <input type="file" id="screens-file-input" accept="image/*" multiple style="display:none;" onchange="handleScreenUpload(this.files); this.value='';">
-                <span class="screens-upload-status" id="screens-upload-status"></span>
+                <button class="btn btn-secondary" id="screens-select-toggle" onclick="toggleScreensSelect()">☑️ <span data-i18n="screens.selectMode">Zaznacz</span></button>
+            </div>
+
+            <!-- Szukajka + licznik zajętości pod przyciskami (rząd 50/50) -->
+            <div class="screens-topbar">
+                <div class="screens-searchbar">
+                    <input type="text" id="screens-search" class="screens-search" data-i18n-placeholder="screens.searchPlaceholder" placeholder="🔍 Szukaj screena (nazwa, opis lub tag)…" oninput="setScreensSearch(this.value)">
+                    <button id="screens-help-toggle" class="screens-help-toggle" onclick="toggleScreensHelp()" data-i18n-title="screens.helpBtn" title="Jak to działa">❔</button>
+                </div>
+                <div class="screens-storage" id="screens-storage" style="display:none;"></div>
+            </div>
+
+            <div class="screens-help" id="screens-help" style="display:none;"></div>
+            <div class="screens-tags" id="screens-tags"></div>
+
+            <div class="screens-bulk-bar" id="screens-bulk-bar" style="display:none;"></div>
+
+            <!-- Wstecz + okruszki tuż nad sterowaniem widokiem i siatką -->
+            <div class="screens-breadcrumb" id="screens-breadcrumb"></div>
+
+            <!-- Sterowanie widokiem tuż nad siatką screenów -->
+            <div class="screens-toolbar">
+                <div class="screens-tile-btns" role="group">
+                    <button class="screens-tile-btn" id="screens-tile-large" onclick="setScreensTile('large')" data-i18n-title="screens.tileLarge" title="Duże kafelki">▦</button>
+                    <button class="screens-tile-btn" id="screens-tile-normal" onclick="setScreensTile('normal')" data-i18n-title="screens.tileNormal" title="Średnie kafelki">▤</button>
+                    <button class="screens-tile-btn" id="screens-tile-small" onclick="setScreensTile('small')" data-i18n-title="screens.tileSmall" title="Małe kafelki">⊞</button>
+                    <button class="screens-tile-btn" id="screens-tile-list" onclick="setScreensTile('list')" data-i18n-title="screens.tileList" title="Lista (szczegóły)">☰</button>
+                </div>
+                <select class="screens-sort" id="screens-sort" onchange="setScreensSort(this.value)">
+                    <option value="date-desc" data-i18n="screens.sortDateDesc">Najnowsze</option>
+                    <option value="date-asc" data-i18n="screens.sortDateAsc">Najstarsze</option>
+                    <option value="name-asc" data-i18n="screens.sortNameAsc">Nazwa A→Z</option>
+                    <option value="name-desc" data-i18n="screens.sortNameDesc">Nazwa Z→A</option>
+                </select>
+                <button class="screens-tile-btn" id="screens-fav-toggle" onclick="toggleScreensFavView()" data-i18n-title="screens.favView" title="Tylko ulubione">⭐</button>
+                <button class="screens-tile-btn" id="screens-recursive-toggle" onclick="toggleScreensRecursive()" data-i18n-title="screens.recursive" title="Pokaż z podfolderów">⤵️</button>
+                <span class="screens-count" id="screens-count"></span>
             </div>
 
             <div class="screens-grid" id="screens-grid"></div>
@@ -1460,6 +1489,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
     
+    <script src="souls-war-i18n.js"></script>
     <script src="souls-war.js"></script>
 </body>
 </html>

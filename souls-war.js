@@ -51,7 +51,16 @@
         let screensHelpOpen = storage.getBool('souls_screens_help_open', false); // panel „❔ jak to działa"
         let screensViewShots = [];       // lista screenów aktualnie wyświetlanych (folder lub wynik szukajki) — kontekst nawigacji ‹ ›
         let screenFoldersRef = null, screenshotsRef = null, screensStorageRef = null;
-        let screenMoveCtx = null;        // { kind:'folder'|'shot', id } — kontekst modala „Przenieś"
+        let screenMoveCtx = null;        // { kind:'folder'|'shot', id } lub { kind:'bulk', ids:[...] } — kontekst modala „Przenieś"
+        let screensSort = storage.getJson('souls_screens_sort', 'date-desc');    // sortowanie siatki: date-desc|date-asc|name-asc|name-desc
+        let screensTile = storage.getJson('souls_screens_tile', 'normal');       // rozmiar kafelków: large|normal|list
+        let screensSelectMode = false;   // tryb zaznaczania wielu screenów (akcje masowe)
+        let screensSelected = new Set(); // zaznaczone ID screenów (tylko screeny, nie foldery)
+        let screenDrag = null;           // { kind, id } — element aktualnie przeciągany (drag&drop do folderu)
+        let screensFavOnly = false;      // filtr „⭐ tylko ulubione" (widok globalny)
+        let screensRecursive = false;    // pokaż screeny z podfolderów bieżącego folderu
+        let screensTagFilter = new Set();// wybrane tagi (AND) — filtr wielotagowy
+        let screenFavorites = storage.getJson('souls_screen_favorites', []); // per-user ulubione screeny (ids)
         let isOnline = false, isAdmin = false;
         let headerClickCount = 0, headerClickTimer = null;
         let favorites = storage.getJson('souls_favorites', []);
@@ -131,583 +140,8 @@
         // TŁUMACZENIA
         // =====================================================
         
-        const translations = {
-            pl: {
-                'loading': 'Ładowanie danych...', 'common.loading': 'Ładowanie...', 'common.cancel': 'Anuluj', 'common.clear': 'Wyczyść', 'common.save': 'Zapisz',
-                'header.subtitle': 'Wyszukiwarka kontr-formacji', 'status.online': 'Online', 'status.offline': 'Offline', 'status.formations': 'formacji',
-                'nav.search': 'Szukaj', 'nav.database': 'Baza', 'nav.preview': 'Podgląd', 'nav.add': 'Dodaj', 'nav.import': 'Import', 'nav.war': 'Wojna', 'nav.kreator': 'Kreator', 'nav.heroes': 'Bohaterowie', 'nav.admin': 'Admin', 'nav.more': 'Więcej',
-                'heroes.title': 'Bohaterowie', 'heroes.subtitle': 'Przeglądaj umiejętności bohaterów', 'heroes.searchPlaceholder': '🔍 Szukaj: crit increase, "fraza", stun|silence, active:stun…', 'heroes.searchExamples': 'Szukaj po treści, np.:', 'heroes.exampleAdd': 'Dodaj przykład', 'heroes.exampleAddPrompt': 'Nowy przykład wyszukiwania:', 'heroes.exampleRename': 'Kliknij, aby zmienić', 'heroes.exampleRenamePrompt': 'Zmień przykład:', 'heroes.exampleDelete': 'Usuń przykład', 'heroes.exampleEditMode': 'Tryb edycji przykładów (admin)', 'heroes.exampleExists': 'Taki przykład już jest.',
-                'heroes.helpTitle': '🔍 Zaawansowane wyszukiwanie', 'heroes.helpAnd': 'oba słowa muszą być w tym samym skillu', 'heroes.helpPhrase': 'dokładna fraza (słowa obok siebie)', 'heroes.helpOr': 'którekolwiek ze słów', 'heroes.helpNot': 'ma „crit", ale bez „heal"', 'heroes.helpField': 'szukaj tylko w wybranym skillu', 'heroes.helpFields': 'Pola do „pole:słowo": active, passive, awaken, engraving, exclusive, name (pet: active, passive, energy). Reguły można łączyć.',
-                'heroes.fuzzyToggle': 'Literówki', 'heroes.fuzzyHint': 'Tolerancja literówek — dopasowuje mimo drobnej pomyłki (np. „incrase" → „increase")',
-                'heroes.synTitle': 'Słownik synonimów', 'heroes.synNote': 'Wpisz skrót, a szukajka znajdzie pełną formę (np. „cc" → „crowd control"). Klik = szukaj.',
-                'syn.delete': 'Usuń', 'syn.add': 'Dodaj', 'syn.update': '💾 Zapisz zmiany', 'syn.cancel': 'Anuluj', 'syn.seed': 'Zapisz domyślne do bazy',
-                'syn.seeded': 'Zapisano domyślny słownik do bazy', 'syn.saved': 'Zapisano wiersz słownika', 'syn.needForms': 'Podaj przynajmniej jedną formę', 'syn.writeFail': 'Zapis nieudany (sprawdź reguły Firebase /synonyms)',
-                'syn.confirmDel': 'Usunąć ten wiersz słownika?', 'syn.confirmSeed': 'Zapisać domyślny słownik synonimów do bazy? (staną się edytowalne)',
-                'syn.formsPh': 'Formy równoważne, po przecinku (np. acc, accuracy)', 'syn.expandPh': 'Rozszerzenie — opcjonalne, po przecinku (np. stun, silence)',
-                'syn.formatNote': 'Formy = szukane w obie strony. Rozszerzenie = szukane tylko po wpisaniu formy (asymetria). Skróty ≤3 znaki dopasowują się całym słowem.', 'syn.fallbackNote': 'Słownik jest teraz domyślny (z kodu). Zapisz do bazy, aby móc edytować i dodawać wiersze.',
-                'heroes.allRaces': 'Wszystkie rasy', 'heroes.allRoles': 'Wszystkie role', 'heroes.count': '{n} bohaterów', 'heroes.none': 'Brak bohaterów spełniających filtr',
-                'heroes.noData': 'Brak danych o umiejętnościach', 'heroes.noDataHint': 'Zaimportuj skille w zakładce Import (panel admina).', 'heroes.loading': 'Ładowanie umiejętności…',
-                'heroes.back': '← Wróć do listy', 'heroes.pickHint': 'Wybierz bohatera, aby zobaczyć jego umiejętności',
-                'heroes.expandAll': 'Rozwiń wszystkie', 'heroes.collapseAll': 'Zwiń wszystkie', 'heroes.clearFilters': 'Wyczyść filtry', 'heroes.clearSearch': 'Wyczyść', 'heroes.verified': 'Zweryfikowany', 'petTab.pet': 'Pet',
-                'heroes.compareToggle': 'Porównaj', 'heroes.compareTitle': 'Porównanie', 'heroes.compareBtn': 'Porównaj', 'heroes.compareHint': 'Kliknij 2–3 bohaterów do porównania', 'heroes.compareMin': 'Wybierz min. 2 bohaterów', 'heroes.compareMax': 'Maksymalnie 3 bohaterów do porównania',
-                'skills.active': '⚡ Active Skill', 'skills.passive': '🛡️ Passive Skill', 'skills.awaken': '🌟 Awaken Skill', 'skills.engraving': '✦ Engraving', 'skills.exclusive': '⚔️ Exclusive Equipment', 'skills.noData': 'Brak danych o umiejętnościach tego bohatera.',
-                'skills.unavailable': 'Niedostępne', 'skills.edit': 'Edytuj', 'skills.saved': 'Zapisano umiejętności', 'skills.editTitle': '— edycja umiejętności', 'skills.energy': '⚡ Ładowanie energii',
-                'skills.role': 'Rola', 'skills.stat': 'Stat', 'skills.fieldName': 'Nazwa', 'skills.fieldDesc': 'Opis', 'skills.passiveLabel': 'Pasywka',
-                'role.Dealer': 'Dealer', 'role.Healer': 'Healer', 'role.Support': 'Support', 'role.Tank': 'Tank',
-                'settings.skillsTitle': 'Umiejętności bohaterów (import / eksport)', 'settings.skillsDesc': 'Wczytaj plik heroSkills.json. Brakujące zostaną dodane, istniejące pozostaną — różnice pokażemy do Twojej decyzji.', 'settings.skillsBtn': 'Importuj skille (JSON)',
-                'settings.skillsImported': 'Zaimportowano umiejętności: {n}', 'settings.skillsUnmatched': 'bez dopasowania do bazy bohaterów', 'settings.skillsBadFile': 'Nieprawidłowy plik skilli (oczekiwano mapy { Nazwa: {...} }).',
-                'settings.skillsImportTitle': 'Import umiejętności', 'settings.skillsImportDesc': 'Brakujące zostaną dodane automatycznie. Różniące się — zaznacz, by nadpisać (odznacz, by zostawić).',
-                'settings.skillsNew': 'Nowe (zostaną dodane)', 'settings.skillsChanged': 'Różnice (do decyzji)', 'settings.skillsApply': 'Zastosuj', 'settings.skillsNothing': 'Nic nie zaimportowano', 'settings.skillsUpToDate': 'Wszystko aktualne — brak zmian',
-                'settings.petSkillsTitle': 'Umiejętności petów (import / eksport)', 'settings.petSkillsDesc': 'Wczytaj plik petSkills.json. Brakujące zostaną dodane, różnice — do Twojej decyzji.', 'settings.petSkillsBtn': 'Importuj pety (JSON)',
-                'settings.skillsExportBtn': 'Eksportuj skille (JSON)', 'settings.petSkillsExportBtn': 'Eksportuj pety (JSON)', 'settings.skillsExported': 'Wyeksportowano: {n}', 'settings.skillsExportEmpty': 'Brak danych do eksportu — najpierw zaimportuj.',
-                'search.title': 'Szukaj kontr-formacji', 'search.subtitle': 'Wpisz skład przeciwnika (lub wybierz tagami)', 'search.btn': 'SZUKAJ', 'search.clear': 'Wyczyść',
-                'search.emptyState': 'Wpisz postacie przeciwnika i kliknij "Szukaj"', 'search.results': 'Wyniki', 'search.found': 'Znaleziono', 'search.noResults': 'Nie znaleziono pasujących formacji',
-                'search.enemy': 'Przeciwnik', 'search.missing': 'Brak', 'search.allSlotsFull': 'Wszystkie pola zajęte!', 'search.petSlotFull': 'Pole Pet już zajęte!',
-                'search.enterAtLeastOne': 'Wpisz przynajmniej jedną postać!', 'search.selected': 'Wybrano', 'search.maxHeroes': 'wróg ma maks. 5 bohaterów',
-                'search.dataLoading': '⏳ Czekam na dane z bazy…',
-                'database.title': 'Pełna baza formacji', 'database.statsAll': 'Wszystkich', 'database.statsBase': 'Bazowych', 'database.statsUser': 'Dodanych',
-                'database.filterAll': 'Wszystkie', 'database.filterBase': 'Bazowe', 'database.filterUser': 'Dodane', 'database.filterFavorites': 'Ulubione',
-                'database.searchPlaceholder': '🔍 Szukaj (nazwa, bohater, komentarz)...', 'database.noFormations': 'Brak formacji',
-                'preview.title': 'Podgląd formacji',
-                'preview.emptyState': 'Wpisz ID aby zobaczyć układ formacji', 'preview.notFound': 'Nie znaleziono formacji',
-                'preview.enemy': 'PRZECIWNIK', 'preview.yourTeam': 'TWÓJ SKŁAD', 'preview.noPet': 'Brak peta', 'preview.invalidId': 'Wpisz prawidłowy numer ID!',
-                'preview.recentlyViewed': 'Ostatnio przeglądane', 'preview.noRecent': 'Brak historii',                'add.title': 'Dodaj nową formację', 'add.nameLabel': 'Nazwa formacji', 'add.namePlaceholder': 'np. Nick 01-01-2026 W1 / Kontra Dark-Undead v1',
-                'add.yourTeam': 'Twój skład', 'add.enemyTeam': 'Skład przeciwnika', 'add.swapSections': 'Zamień kolejność','add.commentLabel': 'Komentarz (opcjonalnie)',
-                'add.commentPlaceholder': 'np. Unikać Death, Silbren u przeciwnika, kolejność speed: xxx > yyy > zzz, Pao runa PR, itp.', 'add.saveBtn': 'ZAPISZ FORMACJĘ',
-                'add.addAtLeastOne': 'Dodaj przynajmniej jedną postać!', 'add.tooManyHeroes': 'Maks. 5 bohaterów w składzie (pet liczony osobno)!',
-                'kreator.petSlotsFull': 'Wszystkie pola Pet są zajęte!', 'kreator.formation': 'Skład', 'kreator.copied': '📋 Składy skopiowane do schowka!', 'kreator.savePrompt': 'Nazwa dla tego zestawu:', 'kreator.saved': '💾 Skład zapisany!', 'kreator.loaded': 'Załadowano', 'kreator.confirmDelete': 'Usunąć ten zapis?', 'kreator.deleted': 'Usunięto', 'kreator.confirmDeleteAll': 'Usunąć WSZYSTKIE zapisane składy?', 'kreator.allDeleted': 'Wszystkie zapisy usunięte', 'kreator.cleared': 'Wyczyszczono',
-                'add.unknownHeroes': 'Nieznani bohaterowie', 'add.unknownPets': 'Nieznane pety', 'add.saved': 'Zapisano formację',
-                'settings.title': 'Import / Eksport', 'settings.status': 'Status', 'settings.checking': 'Sprawdzanie połączenia...',
-                'settings.online': 'Połączono z bazą danych.', 'settings.offline': 'Brak połączenia z bazą.',
-                'settings.exportTitle': 'Eksport do CSV', 'settings.exportDesc': 'Pobierz wszystkie formacje jako plik CSV', 'settings.exportBtn': 'Eksportuj CSV',
-                'settings.importTitle': 'Import z CSV', 'settings.importDesc': 'Wczytaj formacje z pliku CSV (ten sam format co eksport)', 'settings.importBtn': 'Importuj CSV',
-                'settings.exported': 'Wyeksportowano', 'settings.imported': 'Zaimportowano', 'settings.importEmpty': 'Plik jest pusty lub ma tylko nagłówki', 'settings.importConfirm': 'Dodać nowe formacje do bazy (dotyczy wszystkich graczy)? Liczba:', 'settings.importNothing': 'Brak nowych formacji do dodania', 'settings.importDupes': 'duplikatów pominięto', 'settings.importSkipped': 'błędnych wierszy', 'settings.backupTitle': 'Kopia zapasowa (JSON)', 'settings.backupDesc': 'Pobierz pełną kopię: formacje, bohaterowie, pety, dane Obrony', 'settings.backupBtn': 'Pobierz kopię JSON', 'settings.backupDone': 'Pobrano kopię zapasową', 'settings.restoreTitle': 'Przywróć z kopii (JSON)', 'settings.restoreDesc': 'Wczytaj kopię JSON — dodaje tylko nowe rekordy, istniejące pomija, nic nie kasuje', 'settings.restoreBtn': 'Wczytaj kopię JSON', 'settings.restoreConfirm': 'Przywrócić z kopii? Dodane zostaną tylko nowe rekordy (nic nie jest kasowane). Nowych rekordów:', 'settings.restoreBad': 'Nieprawidłowy plik kopii', 'settings.restoreNothing': 'Kopia nie zawiera nowych rekordów', 'settings.restoreDone': 'Przywrócono z kopii', 'settings.statsTitle': 'Statystyki bazy', 'settings.statFormations': 'Formacje', 'settings.statDefense': 'Składy Obrony', 'settings.statHeroes': 'Bohaterowie', 'settings.statPets': 'Pety', 'settings.statBase': 'bazowe', 'settings.statUser': 'dodane', 'settings.statPlayers': 'gracze', 'settings.statPins': 'przypięcia', 'settings.exportScope': 'Zakres', 'settings.scopeAll': 'wszystkie', 'settings.scopeFav': '⭐ ulubione', 'settings.scopeUser': 'dodane', 'settings.scopeBase': 'bazowe', 'settings.lastBackup': 'Ostatnia kopia', 'settings.noBackup': 'Brak kopii w tej przeglądarce', 'settings.restorePreviewTitle': 'Podgląd przywracania', 'settings.restorePreviewDesc': 'Dodane zostaną tylko nowe rekordy — istniejące pominięte, nic nie jest kasowane.', 'settings.diffNone': 'brak nowych', 'settings.defenseCsvTitle': 'Obrona — CSV', 'settings.defenseCsvDesc': 'Eksport/import składów Obrony do arkusza (pełna Obrona jest w kopii JSON wyżej).', 'settings.defExportBtn': 'Eksport Obrony', 'settings.defImportBtn': 'Import Obrony',
-                'admin.title': 'Panel Administratora', 'admin.enterPassword': 'Wpisz hasło administratora', 'admin.passwordPlaceholder': 'Hasło...', 'admin.login': 'ZALOGUJ',
-                'admin.panelTitle': 'Panel Administratora', 'admin.modeActive': 'Tryb Admin aktywny', 'admin.modeDesc': 'Możesz zarządzać bohaterami, petami i usuwać dowolne formacje.',
-                'admin.heroes': 'Bohaterowie', 'admin.pets': 'Pety', 'admin.heroNamePlaceholder': 'Nazwa bohatera', 'admin.petNamePlaceholder': 'Nazwa peta',
-                'admin.session': 'Sesja', 'admin.logout': 'Wyloguj z trybu Admin', 'admin.loggedIn': 'Zalogowano jako Administrator!', 'admin.loggedOut': 'Wylogowano z trybu Admin',
-                'admin.wrongPassword': 'Nieprawidłowe hasło!', 'admin.alreadyLogged': 'Już jesteś zalogowany jako Admin',
-                'admin.heroAdded': 'Dodano bohatera', 'admin.heroDeleted': 'Usunięto', 'admin.heroExists': 'Bohater już istnieje!',
-                'admin.editHero': 'Edytuj bohatera', 'admin.heroSaved': 'Zapisano bohatera',
-                'admin.renameConfirm': 'Zmiana nazwy zaktualizuje też wszystkie formacje i składy obrony używające tego bohatera. Kontynuować?',
-                'admin.editPet': 'Edytuj peta', 'admin.petSaved': 'Zapisano peta',
-                'admin.renamePetConfirm': 'Zmiana nazwy zaktualizuje też wszystkie formacje i składy obrony używające tego peta. Kontynuować?',
-                'admin.config': 'Konfiguracja (globalna)', 'admin.configNewDays': 'Próg „NOWE" (dni)',
-                'admin.configMinMatch': 'Domyślny próg trafności', 'admin.configWarResult': 'Wyników w Planerze Wojny (5–100)', 'admin.configSort': 'Domyślne sortowanie wyników',
-                'admin.configDbFilter': 'Domyślny filtr bazy', 'admin.configPkgSupport': 'Pakiety: domyślne min. wystąpień', 'admin.configPkgWindow': 'Pakiety: domyślne okno', 'admin.configScreensCompress': 'Galeria: kompresuj screeny przy wgrywaniu',
-                'admin.tabVisibility': 'Widoczność zakładek', 'admin.visAll': 'Wszyscy', 'admin.visAdmin': 'Tylko admin',
-                'admin.placeBar': 'W pasku', 'admin.placeMore': 'W „Więcej"', 'admin.placeHidden': 'Ukryj',
-                'admin.tabLocked': 'Zawsze dostępna (tylko admin)', 'admin.tabLockedHint': 'Tej zakładki nie można ukryć ani przenieść — to wejście do panelu admina.',
-                'admin.dragHint': 'Przeciągnij, aby zmienić kolejność',
-                'admin.configHint': 'Zmiana działa dla wszystkich graczy gildii.', 'admin.configSaved': 'Zapisano konfigurację',
-                'admin.configInvalidDays': 'Podaj liczbę dni większą od 0!', 'admin.configInvalidMin': 'Podaj próg trafności większy od 0!',
-                'admin.petAdded': 'Dodano peta', 'admin.petExists': 'Pet już istnieje!', 'admin.enterHeroName': 'Podaj nazwę bohatera!', 'admin.enterPetName': 'Podaj nazwę peta!', 'admin.invalidKey': 'Nazwa nie może zawierać znaków . # $ [ ] /',
-                'admin.confirmDeleteHero': 'Usunąć bohatera', 'admin.confirmDeletePet': 'Usunąć peta',
-                'quickSelect.title': 'Szybki wybór', 'quickSelect.selectFor': 'Wybierz dla',
-                'quickTags.expandAll': 'Rozwiń wszystkie tagi', 'quickTags.collapseAll': 'Zwiń wszystkie tagi', 'quickTags.pets': 'Pety',
-                'common.error': 'Błąd', 'common.noConnection': 'Brak połączenia z bazą!', 'common.formationDeleted': 'Formacja usunięta!',
-                'common.confirmDelete': 'Usunąć formację',
-                'common.addedToFavorites': 'Dodano do ulubionych ⭐', 'common.removedFromFavorites': 'Usunięto z ulubionych',
-				'common.adminRequired': 'Tylko admin może usuwać formacje!', 'database.sortLabel': 'Sortuj:',
-				'edit.title': 'Edytuj formację', 'edit.saveBtn': 'ZAPISZ ZMIANY', 'add.markAsBase': 'Oznacz jako formację BAZOWĄ',
-				'add.baseHint': 'Formacje bazowe są oznaczone jako "BAZA".', 'preview.added': 'Dodano', 'preview.edited': 'Edytowano',
-				'guild.title': 'Strona gildii', 'guild.enterPassword': 'Wpisz hasło gildii aby wejść',
-				'guild.passwordPlaceholder': 'Hasło gildii...', 'guild.enter': 'WEJDŹ', 'guild.wrongPassword': 'Nieprawidłowe hasło!',
-				'admin.tools': 'Narzędzia', 'admin.scanDuplicates': 'Skanuj duplikaty',
-				'duplicates.title': 'Skaner duplikatów', 'duplicates.noDuplicates': 'Brak duplikatów!',
-				'duplicates.allUnique': 'Wszystkie formacje są unikalne.', 'duplicates.found': 'Znaleziono',
-				'duplicates.groups': 'grup', 'duplicates.identical': 'Identyczne', 'duplicates.almostIdentical': 'Prawie identyczne',
-				'duplicates.enemy': 'Przeciwnik', 'duplicates.counter': 'Kontra',
-				'duplicates.confirmDelete': 'Czy na pewno usunąć formację', 'duplicates.preview': 'Podgląd',
-				'duplicates.warningTitle': 'Znaleziono identyczną formację!', 'duplicates.warningText': 'Ta kombinacja przeciwnika i kontry już istnieje w bazie:',
-				'duplicates.cancel': 'Anuluj', 'duplicates.saveAnyway': 'Zapisz mimo to',
-				'common.close': 'Zamknij', 'common.delete': 'Usuń', 'database.deleted': 'Usunięto',
-				'search.history': 'Ostatnie wyszukiwania', 'search.historyEmpty': 'Brak historii', 'war.history': 'Historia planera',
-				'compare.title': 'Porównanie składów',
-				'compare.btn': 'Porównaj',
-				'compare.select': 'Zaznacz do porównania',
-				'compare.match': 'Zgodne (ta sama pozycja)',
-				'compare.moved': 'Inna pozycja',
-				'compare.unique': 'Tylko w tym składzie',
-				'exclude.title': 'Wyklucz bohaterów',
-				'exclude.empty': 'Brak wykluczonych',
-				'exclude.addPlaceholder': 'Dodaj bohatera...',
-				'exclude.hint': '💡 Ctrl+klik na tag = wyklucz',
-				'exclude.hideResults': 'Ukryj formacje z wykluczonymi',
-				'exclude.has': 'Zajęci',
-				'war.combinationSummary': 'Podsumowanie kombinacji',
-				'war.totalMatch': 'Dopasowanie',
-				'war.heroesMatched': 'Trafień',
-				'war.conflicts': 'Konflikty',
-				'war.noConflicts': 'Brak konfliktów', 'war.conflictFree': 'Tylko grywalne (bez konfliktów)', 'war.noConflictFree': 'Brak grywalnych kombinacji bez konfliktów. Odznacz filtr, aby zobaczyć opcje z konfliktami.',
-				'war.conflictsCount': 'konfliktów',
-				'war.battle': 'Walka',
-				'war.match': 'trafień',
-				'war.searchedEnemy': 'Szukany wróg',
-				'war.databaseEnemy': 'Wróg z bazy',
-				'war.yourTeam': 'TWÓJ SKŁAD',
-				'war.enemyZone': 'Wróg',
-				'war.counterLabel': 'kontra',
-				'war.comment': 'Komentarz',
-				'war.noComment': 'Brak komentarza',
-				'war.fullPreview': 'Pełny podgląd',
-				'war.copyTeam': 'Kopiuj skład',
-				'war.conflictsTitle': 'Konflikty',
-				'war.battles': 'walki',
-				'war.conflictsHint': 'Te postacie/pety są użyte w więcej niż jednej walce. Musisz wybrać alternatywne formacje.',
-				'war.noConflictsTitle': 'Brak konfliktów!',
-				'war.noConflictsDesc': 'Żaden bohater ani pet nie powtarza się między składami. Ta kombinacja jest gotowa do użycia.',
-				'war.legendMatched': 'Trafione',
-				'war.legendMissing': 'Brakuje',
-				'war.legendExtra': 'Dodatkowe w bazie',
-				'war.legendMoved': 'Inna pozycja',
-				'war.legendConflict': 'Konflikt (użyty wielokrotnie)',
-				'war.selectCombo': 'Wybierz kombinację z planera wojny',
-				'common.historyCleared': 'Historia wyczyszczona',
-				'excluded.alreadyExcluded': 'Bohater już wykluczony!',
-				'excluded.added': 'Wykluczono',
-				'excluded.removed': 'Usunięto z wykluczonych',
-				'excluded.confirmClear': 'Wyczyścić wszystkich wykluczonych?',
-				'excluded.cleared': '🗑️ Wyczyszczono wykluczonych',
-				'excluded.hiddenInResults': '{n} ukrytych z powodu wykluczonych bohaterów',
-				'excluded.hiddenCountLabel': 'ukrytych (wykluczone)',				'search.historyConfirmClear': 'Wyczyścić całą historię wyszukiwań?',
-				'search.loadedFromHistory': 'Wczytano z historii',
-				'search.clickFieldFirst': 'Najpierw kliknij w pole!',
-				'search.fieldIsPet': 'To pole jest na Peta!',
-				'search.selectPetField': 'Wybierz pole Pet!',
-				'war.historyConfirmClear': 'Wyczyścić całą historię planera?',
-				'war.max3': 'Maksymalnie 3 składy!',
-				'war.min2': 'Zaznacz minimum 2 składy!',
-				'war.selectPlanFirst': 'Najpierw wybierz plan wojny',
-				'preview.confirmClearViewed': 'Wyczyścić historię przeglądanych?',
-				'preview.viewedCleared': '🗑️ Historia wyczyszczona',
-				'preview.otherCounters': 'Inne kontry na tego przeciwnika',
-				'preview.noOtherCounters': 'Brak innych kontr',
-				'preview.prev': 'Poprzedni',
-				'preview.next': 'Następny',
-				'preview.show': 'POKAŻ',
-				'clipboard.formationCopied': '📋 Skład skopiowany do schowka!',
-				'clipboard.teamCopied': '📋 Skład skopiowany!',
-				'clipboard.copyFailed': '❌ Błąd kopiowania',
-				'clipboard.linkCopied': '🔗 Link skopiowany!',
-				'ordering.yourTeamFirst': 'Kolejność: Najpierw twój skład',
-				'ordering.enemyFirst': 'Kolejność: Najpierw przeciwnik',
-				'layout.top678': 'Układ: 6-7-8 na górze',
-				'layout.top123': 'Układ: 1-2-3 na górze',
-				'layout.sideBySide': 'Obok siebie',
-				'layout.stacked': 'Góra-dół',
-				'layout.sideBySideLabel': 'Układ: Obok siebie',
-				'layout.stackedLabel': 'Układ: Góra-dół',
-				'fields.enemy': 'Przeciwnik',
-				'fields.enemyPet': 'Przeciwnik Pet',
-				'fields.your': 'Twój',
-				'fields.yourPet': 'Twój Pet',
-				'war.exclude.alreadyExcluded': 'Ten bohater jest już wykluczony',
-				'war.exclude.confirmClear': 'Czy na pewno wyczyścić wszystkich wykluczonych?',
-				'war.exclude.cleared': 'Lista wykluczonych wyczyszczona',
-				'war.exclude.excludedFrom': '🚫 {name} wykluczony z planera',
-				'war.exclude.empty': 'Brak wykluczonych',
-				'kreator.hide.alreadyHidden': 'Ten bohater jest już ukryty',
-				'kreator.hide.confirmClear': 'Czy na pewno wyczyścić wszystkich ukrytych?',
-				'kreator.hide.cleared': 'Lista ukrytych wyczyszczona',
-				'kreator.hide.hiddenFrom': '🚫 {name} ukryty w tagach',
-				'kreator.hide.empty': 'Brak ukrytych',
-				'common.remove': 'Usuń',
-                'badge.base': 'BAZA', 'badge.user': 'DODANA', 'badge.new': 'NOWE',
-                'sort.relevance': 'Trafność', 'sort.newest': 'Najnowsze',
-                'sort.relevanceHint': 'Sortuj wg dopasowania', 'sort.newestHint': 'Sortuj od najnowszych (ID)',
-                'search.toggleComment': 'Kliknij aby rozwinąć/zwinąć', 'search.repeatLast': 'Powtórz ostatnie',
-                'search.minMatch': 'Min. trafność', 'search.minMatchAll': 'Wszystkie',
-                'search.belowThresholdHint': 'Ukryte: trafność poniżej progu',
-                'search.allBelowThreshold': 'Wszystkie dopasowania mają trafność poniżej {n}. Zmniejsz próg.',
-				'nav.defense': 'Obrona',
-				'nav.screens': 'Galeria',
-				'screens.title': 'Galeria screenów', 'screens.subtitle': 'Foldery i screeny gildii — kliknij kafelek, by otworzyć',
-				'screens.root': 'Galeria', 'screens.newFolder': 'Nowy folder', 'screens.upload': 'Wgraj screeny', 'screens.download': 'Pobierz',
-				'screens.empty': 'Ten folder jest pusty.', 'screens.emptyAdmin': 'Pusto. Dodaj folder lub wgraj screeny.',
-				'screens.folderNamePrompt': 'Nazwa folderu:', 'screens.renameFolderPrompt': 'Nowa nazwa folderu:',
-				'screens.renameShotPrompt': 'Nowa nazwa screena:', 'screens.moveTitle': 'Przenieś do…',
-				'screens.moveRoot': '🖼️ Galeria (korzeń)', 'screens.moved': 'Przeniesiono',
-				'screens.deleteFolderConfirm': 'Usunąć folder „{name}" wraz z całą zawartością ({n} screenów)? Tego nie można cofnąć.',
-				'screens.deleteShotConfirm': 'Usunąć ten screen? Tego nie można cofnąć.',
-				'screens.folderCount': '{n} elem.', 'screens.uploading': 'Wgrywanie {i}/{n}…',
-				'screens.uploaded': 'Wgrano {n} screenów', 'screens.uploadErr': 'Błąd wgrywania: {msg}',
-				'screens.notImage': 'Pominięto (nie obraz): {name}', 'screens.tooBig': 'Pominięto (za duży, >10 MB): {name}',
-				'screens.folderExists': 'Folder o tej nazwie już istnieje tutaj.', 'screens.deleted': 'Usunięto',
-				'screens.searchPlaceholder': '🔍 Szukaj screena (nazwa, opis lub tag)…', 'screens.searchNoResults': 'Brak wyników dla tej frazy.',
-				'screens.editComment': 'Edytuj opis', 'screens.commentPrompt': 'Opis / komentarz do screena:', 'screens.back': 'Wstecz', 'screens.noComment': 'brak opisu',
-				'screens.tagsPrompt': 'Tagi (po przecinku):', 'screens.noTags': 'brak tagów',
-				'screens.titleTooLong': 'Nazwa za długa (max {n} znaków).', 'screens.commentTooLong': 'Opis za długi (max {n} znaków).',
-				'screens.tooManyTags': 'Za dużo tagów (max {n}).', 'screens.tagTooLong': 'Tag za długi (max {n} znaków).',
-				'screens.helpBtn': 'Jak to działa',
-				'screens.helpView': '<h4>🖼️ Galeria — jak to działa</h4><p><strong>Przeglądanie</strong></p><ul><li>Kliknij <b>folder 📁</b>, żeby wejść do środka. U góry ścieżka (okruszki) — klik cofa do dowolnego poziomu; jest też <b>← Wstecz</b>.</li><li>Kliknij <b>miniaturę</b>, żeby otworzyć screen na pełnym ekranie.</li><li>W podglądzie: <b>scroll / dwuklik</b> = powiększ (telefon: <b>pinch</b>), <b>przeciąganie</b> = przesuwanie powiększonego, <b>‹ ›</b> lub <b>←/→</b> (telefon: <b>swipe</b>) = następny/poprzedni, <b>Esc / ✕</b> = zamknij (telefon: <b>swipe w dół</b>).</li><li><b>⬇️ Pobierz</b> zapisuje obraz na dysk.</li></ul><p><strong>Szukanie</strong></p><ul><li>Pole u góry szuka po <b>nazwie, opisie i tagach</b> w całej galerii.</li><li>Pod nim <b>klikalne tagi</b> — klik filtruje, ponowny klik wyłącza. Tagi pojawiają się dopiero, gdy jakiś screen ma dodany tag.</li></ul>',
-				'screens.helpAdmin': '<p><strong>Wgrywanie (admin)</strong> — zawsze do aktualnie otwartego folderu:</p><ul><li>Przycisk <b>⬆️ Wgraj screeny</b> — na komputerze wybierasz pliki; <b>na telefonie</b> otwiera się Galeria/Aparat, wybierz zrzut(y) z galerii (można kilka naraz),</li><li><b>(komputer) Przeciągnij</b> pliki z pulpitu na siatkę,</li><li><b>(komputer) Ctrl+V</b> — wklej zrzut ze schowka (np. po Win+Shift+S).</li></ul><p>Obrazy są automatycznie zmniejszane (kompresja — do wyłączenia w Konfiguracji). Tylko obrazy, do 10 MB.</p><p><strong>Porządkowanie (admin)</strong> — przyciski na kafelku (komputer: po najechaniu, telefon: zawsze widoczne):</p><ul><li><b>📁➕ Nowy folder</b> w bieżącym miejscu (foldery można zagnieżdżać),</li><li><b>✏️</b> zmień nazwę · <b>📁</b> przenieś · <b>🗑️</b> usuń (folder kasuje też zawartość),</li><li>W podglądzie <b>✏️</b> przy nazwie / opisie / tagach edytuje te pola.</li></ul><p><b>Limity:</b> nazwa 60 znaków, opis 300, tag 32, maks. 8 tagów.</p>',
-				'defense.title': 'Obrona gildii',
-				'defense.viewPlayers': 'Gracze', 'defense.viewFormations': 'Składy', 'defense.viewAdd': 'Dodaj skład',
-				'defense.newPlayerPlaceholder': 'Nazwa gracza...', 'defense.addPlayer': 'Dodaj gracza',
-				'defense.statsPlayers': 'Graczy', 'defense.statsFormations': 'Składów', 'defense.statsAssigned': 'Aktywnych przypięć',
-				'defense.noPlayers': 'Brak graczy. Dodaj pierwszego powyżej.',
-				'defense.noFormations': 'Brak składów. Dodaj pierwszy w zakładce "Dodaj skład".',
-				'defense.searchPlaceholder': '🔍 Szukaj po nazwie/bohaterze...',
-				'defense.formationNameLabel': 'Nazwa składu (opcjonalnie)', 'defense.formationNamePlaceholder': 'np. Anti-Horde v2',
-				'defense.formationTeam': 'Skład obronny',
-				'defense.assignToPlayerLabel': 'Przypisz od razu do gracza (opcjonalnie)', 'defense.noAssign': '— Nie przypisuj —',
-				'defense.commentLabel': 'Komentarz (opcjonalnie)', 'defense.commentPlaceholder': 'np. używany od marca 2026',
-				'defense.saveBtn': 'ZAPISZ SKŁAD',
-				'defense.backToPlayers': 'Wróć do graczy', 'defense.deletePlayer': 'Usuń gracza',
-				'defense.assignTitle': 'Przypisz skład do gracza', 'defense.assignFormationLabel': 'Skład',
-				'defense.assignPickPlayer': 'Wybierz gracza', 'defense.assignConfirm': 'Przypisz',
-				'defense.playerExists': 'Gracz o tej nazwie już istnieje!',
-				'defense.playerNameRequired': 'Podaj nazwę gracza!',
-				'defense.playerAdded': 'Dodano gracza',
-				'defense.confirmDeletePlayer': 'Usunąć gracza {name}? (Składy zostaną, przypięcia będą oznaczone jako odpięte)',
-				'defense.playerDeleted': 'Gracz usunięty',
-				'defense.formationEmpty': 'Skład musi mieć przynajmniej jednego bohatera!', 'defense.tooManyHeroes': 'Maks. 5 bohaterów w składzie (pet liczony osobno)!',
-				'defense.unknownHero': 'Nieznany bohater',
-				'defense.unknownPet': 'Nieznany pet',
-				'defense.formationSaved': 'Skład zapisany',
-				'defense.formationReused': 'Identyczny skład już istnieje — używam tego samego rekordu',
-				'defense.assignSuccess': 'Skład przypięty do gracza',
-				'defense.maxAssignmentsReached': 'Gracz ma już 3 aktywne składy! Najpierw odepnij jeden.',
-				'defense.duplicateHeroes': 'Konflikt — bohater {name} jest już w innym aktywnym składzie tego gracza',
-				'defense.duplicatePet': 'Konflikt — pet {name} jest już w innym aktywnym składzie tego gracza',
-				'defense.alreadyAssigned': 'Ten skład jest już przypięty do tego gracza',
-				'defense.unassignBtn': 'Odepnij', 'defense.unassignSuccess': 'Odpięto skład',
-				'defense.confirmUnassign': 'Odpiąć ten skład od gracza? (Skład zostanie w bazie)',
-				'defense.slot': 'Skład', 'defense.emptySlot': 'Pusty slot — dodaj kolejny skład w "Dodaj"',
-				'defense.assignedAt': 'Przypięto', 'defense.formationCreatedAt': 'Skład utworzony',
-				'defense.usersCount': 'Używa', 'defense.usersZero': 'Nikt nie używa',
-				'defense.historyTitle': 'Historia przypięć gracza',
-				'defense.historyEmpty': 'Brak historii przypięć',
-				'defense.historyActive': 'AKTYWNE', 'defense.historyUnpinned': 'odpięte',				'defense.deleteFormation': 'Usuń skład',
-				'defense.confirmDeleteFormation': 'Usunąć skład #{id}? Tej operacji nie da się cofnąć. Wszystkie przypięcia (aktywne i historyczne) zostaną też usunięte.',
-				'defense.formationDeleted': 'Skład usunięty',
-				'defense.cannotDeleteFormationInUse': 'Nie można usunąć — skład jest aktywnie przypięty do {n} graczy. Najpierw odepnij.',
-				'defense.editTitle': 'Edytuj skład', 'defense.editBtn': 'Edytuj', 'defense.editSaveBtn': 'ZAPISZ ZMIANY',
-				'defense.editHint': 'Zmiana slotów lub peta = nowy rekord, gracze zostaną automatycznie przepięci ze starego na nowy. Zmiana samej nazwy/komentarza = update w miejscu.',
-				'defense.editNoChange': 'Nic się nie zmieniło',
-				'defense.editMetaSaved': 'Zapisano zmiany (nazwa/komentarz)',
-				'defense.editMigratedNew': 'Skład zmieniony → nowy rekord #{id}. Przepięto: {ok}/{total}',
-				'defense.editMigratedReused': 'Skład zmieniony → reużyto istniejący #{id} (twoja nazwa zignorowana). Przepięto: {ok}/{total}',
-				'defense.editConflicts': 'Konflikty u: {names} — zostali przy starym składzie #{id}',
-				'defense.editImpactNoChange': 'Brak zmian',
-				'defense.editImpactMetaOnly': 'Tylko metadane (nazwa/komentarz) — update w miejscu, gracze bez zmian',
-				'defense.editImpactSlots': 'Sloty zmienione → {action}. Przepięcie {n} aktywnych graczy.',
-				'defense.editImpactActionNew': 'utworzymy nowy rekord',
-				'defense.editImpactActionReuse': 'reużyjemy istniejący #{id}',
-				'defense.alsoUsedBy': 'Też używa',
-				'defense.uniqueToPlayer': 'Tylko ten gracz',
-				'defense.sameSetOtherArrangement': 'Ten sam set, inne ustawienie',
-				'defense.sameSetShort': 'inne ustaw.',
-				'defense.speedTitle': 'Speed',
-				'defense.speedEmpty': 'Speed nieustawiony',
-				'defense.speedAdd': '+ Dodaj',
-				'defense.speedEdit': 'Edytuj speed',
-				'defense.speedSave': 'Zapisz',
-				'defense.speedCancel': 'Anuluj',
-				'defense.speedSaved': 'Speed zapisany',
-				'defense.speedPartial': '{n}/{total} ustawionych',
-				'defense.speedInvalidNumber': 'Speed musi być liczbą dodatnią',
-				'database.filterPackages': 'Pakiety',
-				'packages.minSize': 'Min wielkość', 'packages.mode': 'Tryb',
-				'packages.modeExact': 'Dokładnie N', 'packages.modeAtLeast': 'Co najmniej N',
-				'packages.source': 'Źródło', 'packages.sourceEnemy': 'Wrogowie', 'packages.sourceMy': 'Kontry', 'packages.sourceBoth': 'Oba',
-				'packages.window': 'Okno', 'packages.windowAll': 'Cała baza',
-				'packages.minSupport': 'Min wystąpień',
-				'packages.empty': 'Brak pakietów spełniających kryteria. Zmniejsz min wystąpień albo min wielkość.',
-				'packages.stats': '{n} pakietów z {total} formacji',
-				'packages.occurrences': '×'
-            },
-            en: {
-                'loading': 'Loading data...', 'common.loading': 'Loading...', 'common.cancel': 'Cancel', 'common.clear': 'Clear', 'common.save': 'Save',
-                'header.subtitle': 'Counter-formation finder', 'status.online': 'Online', 'status.offline': 'Offline', 'status.formations': 'formations',
-                'nav.search': 'Search', 'nav.database': 'Database', 'nav.preview': 'Preview', 'nav.add': 'Add', 'nav.import': 'Import', 'nav.war': 'War', 'nav.kreator': 'Creator', 'nav.heroes': 'Heroes', 'nav.admin': 'Admin', 'nav.more': 'More',
-                'heroes.title': 'Heroes', 'heroes.subtitle': 'Browse hero skills', 'heroes.searchPlaceholder': '🔍 Search: crit increase, "phrase", stun|silence, active:stun…', 'heroes.searchExamples': 'Search by content, e.g.:', 'heroes.exampleAdd': 'Add example', 'heroes.exampleAddPrompt': 'New search example:', 'heroes.exampleRename': 'Click to rename', 'heroes.exampleRenamePrompt': 'Rename example:', 'heroes.exampleDelete': 'Delete example', 'heroes.exampleEditMode': 'Examples edit mode (admin)', 'heroes.exampleExists': 'That example already exists.',
-                'heroes.helpTitle': '🔍 Advanced search', 'heroes.helpAnd': 'both words must be in the same skill', 'heroes.helpPhrase': 'exact phrase (words adjacent)', 'heroes.helpOr': 'either word', 'heroes.helpNot': 'has "crit" but no "heal"', 'heroes.helpField': 'search only in the chosen skill', 'heroes.helpFields': 'Fields for "field:word": active, passive, awaken, engraving, exclusive, name (pet: active, passive, energy). Rules can be combined.',
-                'heroes.fuzzyToggle': 'Typos', 'heroes.fuzzyHint': 'Typo tolerance — matches despite a small mistake (e.g. "incrase" → "increase")',
-                'heroes.synTitle': 'Synonyms', 'heroes.synNote': 'Type a shorthand and search finds the full form (e.g. "cc" → "crowd control"). Click to search.',
-                'syn.delete': 'Delete', 'syn.add': 'Add', 'syn.update': '💾 Save changes', 'syn.cancel': 'Cancel', 'syn.seed': 'Save defaults to database',
-                'syn.seeded': 'Default dictionary saved to database', 'syn.saved': 'Dictionary row saved', 'syn.needForms': 'Provide at least one form', 'syn.writeFail': 'Write failed (check Firebase rules for /synonyms)',
-                'syn.confirmDel': 'Delete this dictionary row?', 'syn.confirmSeed': 'Save the default synonym dictionary to the database? (they become editable)',
-                'syn.formsPh': 'Equivalent forms, comma-separated (e.g. acc, accuracy)', 'syn.expandPh': 'Expansion — optional, comma-separated (e.g. stun, silence)',
-                'syn.formatNote': 'Forms = searched both ways. Expansion = searched only when you type a form (asymmetric). Shorthands ≤3 chars match whole-word.', 'syn.fallbackNote': 'The dictionary is currently the default (from code). Save it to the database to edit and add rows.',
-                'heroes.allRaces': 'All races', 'heroes.allRoles': 'All roles', 'heroes.count': '{n} heroes', 'heroes.none': 'No heroes match the filter',
-                'heroes.noData': 'No skill data', 'heroes.noDataHint': 'Import skills in the Import tab (admin panel).', 'heroes.loading': 'Loading skills…',
-                'heroes.back': '← Back to list', 'heroes.pickHint': 'Pick a hero to see their skills',
-                'heroes.expandAll': 'Expand all', 'heroes.collapseAll': 'Collapse all', 'heroes.clearFilters': 'Clear filters', 'heroes.clearSearch': 'Clear', 'heroes.verified': 'Verified', 'petTab.pet': 'Pet',
-                'heroes.compareToggle': 'Compare', 'heroes.compareTitle': 'Comparison', 'heroes.compareBtn': 'Compare', 'heroes.compareHint': 'Tap 2–3 heroes to compare', 'heroes.compareMin': 'Pick at least 2 heroes', 'heroes.compareMax': 'Up to 3 heroes for comparison',
-                'skills.active': '⚡ Active Skill', 'skills.passive': '🛡️ Passive Skill', 'skills.awaken': '🌟 Awaken Skill', 'skills.engraving': '✦ Engraving', 'skills.exclusive': '⚔️ Exclusive Equipment', 'skills.noData': 'No skill data for this hero.',
-                'skills.unavailable': 'Unavailable', 'skills.edit': 'Edit', 'skills.saved': 'Skills saved', 'skills.editTitle': '— edit skills', 'skills.energy': '⚡ Energy gain',
-                'skills.role': 'Role', 'skills.stat': 'Stat', 'skills.fieldName': 'Name', 'skills.fieldDesc': 'Description', 'skills.passiveLabel': 'Passive',
-                'role.Dealer': 'Dealer', 'role.Healer': 'Healer', 'role.Support': 'Support', 'role.Tank': 'Tank',
-                'settings.skillsTitle': 'Hero skills (import / export)', 'settings.skillsDesc': 'Load heroSkills.json. Missing entries are added, existing ones kept — differences are shown for your decision.', 'settings.skillsBtn': 'Import skills (JSON)',
-                'settings.skillsImported': 'Skills imported: {n}', 'settings.skillsUnmatched': 'unmatched to hero database', 'settings.skillsBadFile': 'Invalid skills file (expected a map { Name: {...} }).',
-                'settings.skillsImportTitle': 'Skills import', 'settings.skillsImportDesc': 'Missing entries are added automatically. Differing ones — check to overwrite (uncheck to keep).',
-                'settings.skillsNew': 'New (will be added)', 'settings.skillsChanged': 'Differences (your choice)', 'settings.skillsApply': 'Apply', 'settings.skillsNothing': 'Nothing imported', 'settings.skillsUpToDate': 'Everything up to date — no changes',
-                'settings.petSkillsTitle': 'Pet skills (import / export)', 'settings.petSkillsDesc': 'Load petSkills.json. Missing entries are added, differences are your choice.', 'settings.petSkillsBtn': 'Import pets (JSON)',
-                'settings.skillsExportBtn': 'Export skills (JSON)', 'settings.petSkillsExportBtn': 'Export pets (JSON)', 'settings.skillsExported': 'Exported: {n}', 'settings.skillsExportEmpty': 'No data to export — import first.',
-                'search.title': 'Search counter-formations', 'search.subtitle': 'Enter enemy composition (or use tags)', 'search.btn': 'SEARCH', 'search.clear': 'Clear',
-                'search.emptyState': 'Enter enemy heroes and click "Search"', 'search.results': 'Results', 'search.found': 'Found', 'search.noResults': 'No matching formations found',
-                'search.enemy': 'Enemy', 'search.missing': 'Missing', 'search.allSlotsFull': 'All slots are full!', 'search.petSlotFull': 'Pet slot is full!',
-                'search.enterAtLeastOne': 'Enter at least one hero!', 'search.selected': 'Selected', 'search.maxHeroes': 'enemy has max 5 heroes',
-                'search.dataLoading': '⏳ Waiting for database…',
-                'database.title': 'Full formation database', 'database.statsAll': 'Total', 'database.statsBase': 'Base', 'database.statsUser': 'Added',
-                'database.filterAll': 'All', 'database.filterBase': 'Base', 'database.filterUser': 'Added', 'database.filterFavorites': 'Favorites',
-                'database.searchPlaceholder': '🔍 Search (name, hero, comment)...', 'database.noFormations': 'No formations',
-                'preview.title': 'Formation preview',
-                'preview.emptyState': 'Enter ID to see formation layout', 'preview.notFound': 'Formation not found',
-                'preview.enemy': 'ENEMY', 'preview.yourTeam': 'YOUR TEAM', 'preview.noPet': 'No pet', 'preview.invalidId': 'Enter a valid ID number!',
-                'preview.recentlyViewed': 'Recently viewed', 'preview.noRecent': 'No history',
-                'add.title': 'Add new formation', 'add.nameLabel': 'Formation name', 'add.namePlaceholder': 'e.g. Nick 01-01-2026 W1 / Counter Dark-Undead v1',
-                'add.yourTeam': 'Your team', 'add.enemyTeam': 'Enemy team', 'add.swapSections': 'Swap order', 'add.commentLabel': 'Comment (optional)',
-                'add.commentPlaceholder': 'e.g. Avoid Death, Silbren on enemy, speed order: xxx > yyy > zzz, Pao rune PR, etc.', 'add.saveBtn': 'SAVE FORMATION',
-                'add.addAtLeastOne': 'Add at least one hero!', 'add.tooManyHeroes': 'Max 5 heroes per formation (pet counted separately)!',
-                'kreator.petSlotsFull': 'All pet slots are full!', 'kreator.formation': 'Formation', 'kreator.copied': '📋 Formations copied to clipboard!', 'kreator.savePrompt': 'Name for this set:', 'kreator.saved': '💾 Formation saved!', 'kreator.loaded': 'Loaded', 'kreator.confirmDelete': 'Delete this save?', 'kreator.deleted': 'Deleted', 'kreator.confirmDeleteAll': 'Delete ALL saved formations?', 'kreator.allDeleted': 'All saves deleted', 'kreator.cleared': 'Cleared',
-                'add.unknownHeroes': 'Unknown heroes', 'add.unknownPets': 'Unknown pets', 'add.saved': 'Formation saved',
-                'settings.title': 'Import / Export', 'settings.status': 'Status', 'settings.checking': 'Checking connection...',
-                'settings.online': 'Connected to database.', 'settings.offline': 'No database connection.',
-                'settings.exportTitle': 'Export to CSV', 'settings.exportDesc': 'Download all formations as CSV file', 'settings.exportBtn': 'Export CSV',
-                'settings.importTitle': 'Import from CSV', 'settings.importDesc': 'Load formations from CSV file (same format as export)', 'settings.importBtn': 'Import CSV',
-                'settings.exported': 'Exported', 'settings.imported': 'Imported', 'settings.importEmpty': 'File is empty or has headers only', 'settings.importConfirm': 'Add new formations to the database (affects all players)? Count:', 'settings.importNothing': 'No new formations to add', 'settings.importDupes': 'duplicates skipped', 'settings.importSkipped': 'invalid rows', 'settings.backupTitle': 'Backup (JSON)', 'settings.backupDesc': 'Download a full backup: formations, heroes, pets, defense data', 'settings.backupBtn': 'Download JSON backup', 'settings.backupDone': 'Backup downloaded', 'settings.restoreTitle': 'Restore from backup (JSON)', 'settings.restoreDesc': 'Load a JSON backup — adds only new records, skips existing, deletes nothing', 'settings.restoreBtn': 'Load JSON backup', 'settings.restoreConfirm': 'Restore from backup? Only new records will be added (nothing is deleted). New records:', 'settings.restoreBad': 'Invalid backup file', 'settings.restoreNothing': 'Backup contains no new records', 'settings.restoreDone': 'Restored from backup', 'settings.statsTitle': 'Database stats', 'settings.statFormations': 'Formations', 'settings.statDefense': 'Defense sets', 'settings.statHeroes': 'Heroes', 'settings.statPets': 'Pets', 'settings.statBase': 'base', 'settings.statUser': 'added', 'settings.statPlayers': 'players', 'settings.statPins': 'pins', 'settings.exportScope': 'Scope', 'settings.scopeAll': 'all', 'settings.scopeFav': '⭐ favorites', 'settings.scopeUser': 'added', 'settings.scopeBase': 'base', 'settings.lastBackup': 'Last backup', 'settings.noBackup': 'No backup in this browser', 'settings.restorePreviewTitle': 'Restore preview', 'settings.restorePreviewDesc': 'Only new records will be added — existing skipped, nothing deleted.', 'settings.diffNone': 'none new', 'settings.defenseCsvTitle': 'Defense — CSV', 'settings.defenseCsvDesc': 'Export/import defense sets to a sheet (full defense is in the JSON backup above).', 'settings.defExportBtn': 'Export defense', 'settings.defImportBtn': 'Import defense',
-                'admin.title': 'Administrator Panel', 'admin.enterPassword': 'Enter administrator password', 'admin.passwordPlaceholder': 'Password...', 'admin.login': 'LOGIN',
-                'admin.panelTitle': 'Administrator Panel', 'admin.modeActive': 'Admin mode active', 'admin.modeDesc': 'You can manage heroes, pets and delete any formations.',
-                'admin.heroes': 'Heroes', 'admin.pets': 'Pets', 'admin.heroNamePlaceholder': 'Hero name', 'admin.petNamePlaceholder': 'Pet name',
-                'admin.session': 'Session', 'admin.logout': 'Logout from Admin mode', 'admin.loggedIn': 'Logged in as Administrator!', 'admin.loggedOut': 'Logged out from Admin mode',
-                'admin.wrongPassword': 'Wrong password!', 'admin.alreadyLogged': 'Already logged in as Admin',
-                'admin.heroAdded': 'Hero added', 'admin.heroDeleted': 'Deleted', 'admin.heroExists': 'Hero already exists!',
-                'admin.editHero': 'Edit hero', 'admin.heroSaved': 'Hero saved',
-                'admin.renameConfirm': 'Renaming will also update all formations and defense setups using this hero. Continue?',
-                'admin.editPet': 'Edit pet', 'admin.petSaved': 'Pet saved',
-                'admin.renamePetConfirm': 'Renaming will also update all formations and defense setups using this pet. Continue?',
-                'admin.config': 'Configuration (global)', 'admin.configNewDays': '"NEW" threshold (days)',
-                'admin.configMinMatch': 'Default match threshold', 'admin.configWarResult': 'War Planner results (5–100)', 'admin.configSort': 'Default results sorting',
-                'admin.configDbFilter': 'Default database filter', 'admin.configPkgSupport': 'Packages: default min. occurrences', 'admin.configPkgWindow': 'Packages: default window', 'admin.configScreensCompress': 'Gallery: compress screenshots on upload',
-                'admin.tabVisibility': 'Tab visibility', 'admin.visAll': 'Everyone', 'admin.visAdmin': 'Admin only',
-                'admin.placeBar': 'In bar', 'admin.placeMore': 'In „More"', 'admin.placeHidden': 'Hidden',
-                'admin.tabLocked': 'Always available (admin only)', 'admin.tabLockedHint': 'This tab cannot be hidden or moved — it is the entry to the admin panel.',
-                'admin.dragHint': 'Drag to reorder',
-                'admin.configHint': 'Applies to all guild players.', 'admin.configSaved': 'Configuration saved',
-                'admin.configInvalidDays': 'Enter a number of days greater than 0!', 'admin.configInvalidMin': 'Enter a match threshold greater than 0!',
-                'admin.petAdded': 'Pet added', 'admin.petExists': 'Pet already exists!', 'admin.enterHeroName': 'Enter hero name!', 'admin.enterPetName': 'Enter pet name!', 'admin.invalidKey': 'Name cannot contain . # $ [ ] / characters',
-                'admin.confirmDeleteHero': 'Delete hero', 'admin.confirmDeletePet': 'Delete pet',
-                'quickSelect.title': 'Quick select', 'quickSelect.selectFor': 'Select for',
-                'quickTags.expandAll': 'Expand all', 'quickTags.collapseAll': 'Collapse all', 'quickTags.pets': 'Pets',
-                'common.error': 'Error', 'common.noConnection': 'No database connection!', 'common.formationDeleted': 'Formation deleted!',
-                'common.confirmDelete': 'Delete formation',
-                'common.addedToFavorites': 'Added to favorites ⭐', 'common.removedFromFavorites': 'Removed from favorites',
-				'common.adminRequired': 'Only admin can delete formations!', 'database.sortLabel': 'Sort:',
-				'edit.title': 'Edit formation', 'edit.saveBtn': 'SAVE CHANGES', 'add.markAsBase': 'Mark as BASE formation',
-				'add.baseHint': 'Base formations are marked as "BASE".', 'preview.added': 'Added', 'preview.edited': 'Edited',
-				'guild.title': 'Guild page', 'guild.enterPassword': 'Enter guild password to access',
-				'guild.passwordPlaceholder': 'Guild password...', 'guild.enter': 'ENTER', 'guild.wrongPassword': 'Wrong password!',
-				'admin.tools': 'Tools', 'admin.scanDuplicates': 'Scan duplicates',
-				'duplicates.title': 'Duplicates scanner', 'duplicates.noDuplicates': 'No duplicates found!',
-				'duplicates.allUnique': 'All formations are unique.', 'duplicates.found': 'Found',
-				'duplicates.groups': 'groups', 'duplicates.identical': 'Identical', 'duplicates.almostIdentical': 'Almost identical',
-				'duplicates.enemy': 'Enemy', 'duplicates.counter': 'Counter',
-				'duplicates.confirmDelete': 'Are you sure you want to delete formation', 'duplicates.preview': 'Preview',
-				'duplicates.warningTitle': 'Identical formation found!', 'duplicates.warningText': 'This enemy and counter combination already exists:',
-				'duplicates.cancel': 'Cancel', 'duplicates.saveAnyway': 'Save anyway',
-				'common.close': 'Close', 'common.delete': 'Delete', 'database.deleted': 'Deleted',
-				'search.history': 'Recent searches', 'search.historyEmpty': 'No history', 'war.history': 'Planner history',
-				'compare.title': 'Compare formations',
-				'compare.btn': 'Compare',
-				'compare.select': 'Select to compare',
-				'compare.match': 'Match (same position)',
-				'compare.moved': 'Different position',
-				'compare.unique': 'Only in this formation',
-				'exclude.title': 'Exclude heroes',
-				'exclude.empty': 'No excluded heroes',
-				'exclude.addPlaceholder': 'Add hero...',
-				'exclude.hint': '💡 Ctrl+click on tag = exclude',
-				'exclude.hideResults': 'Hide formations with excluded',
-				'exclude.has': 'Excluded',
-				'war.combinationSummary': 'Combination summary',
-				'war.totalMatch': 'Match',
-				'war.heroesMatched': 'Hits',
-				'war.conflicts': 'Conflicts',
-				'war.noConflicts': 'No conflicts', 'war.conflictFree': 'Only playable (no conflicts)', 'war.noConflictFree': 'No conflict-free playable combinations. Uncheck the filter to see options with conflicts.',
-				'war.conflictsCount': 'conflicts',
-				'war.battle': 'Battle',
-				'war.match': 'match',
-				'war.searchedEnemy': 'Searched enemy',
-				'war.databaseEnemy': 'Database enemy',
-				'war.yourTeam': 'YOUR TEAM',
-				'war.enemyZone': 'Enemy',
-				'war.counterLabel': 'counter',
-				'war.comment': 'Comment',
-				'war.noComment': 'No comment',
-				'war.fullPreview': 'Full preview',
-				'war.copyTeam': 'Copy team',
-				'war.conflictsTitle': 'Conflicts',
-				'war.battles': 'battles',
-				'war.conflictsHint': 'These heroes/pets are used in more than one battle. You need to choose alternative formations.',
-				'war.noConflictsTitle': 'No conflicts!',
-				'war.noConflictsDesc': 'No hero or pet is repeated between teams. This combination is ready to use.',
-				'war.legendMatched': 'Matched',
-				'war.legendMissing': 'Missing',
-				'war.legendExtra': 'Extra in database',
-				'war.legendMoved': 'Different position',
-				'war.legendConflict': 'Conflict (used multiple times)',
-				'war.selectCombo': 'Select a combination from war planner',
-				'common.historyCleared': 'History cleared',
-				'excluded.alreadyExcluded': 'Hero already excluded!',
-				'excluded.added': 'Excluded',
-				'excluded.removed': 'Removed from excluded',
-				'excluded.confirmClear': 'Clear all excluded heroes?',
-				'excluded.cleared': '🗑️ Cleared excluded',
-				'excluded.hiddenInResults': '{n} hidden due to excluded heroes',
-				'excluded.hiddenCountLabel': 'hidden (excluded)',
-				'search.historyConfirmClear': 'Clear all search history?',
-				'search.loadedFromHistory': 'Loaded from history',
-				'search.clickFieldFirst': 'Click a field first!',
-				'search.fieldIsPet': 'This field is for Pet!',
-				'search.selectPetField': 'Select a Pet field!',
-				'war.historyConfirmClear': 'Clear all planner history?',
-				'war.max3': 'Maximum 3 formations!',
-				'war.min2': 'Select at least 2 formations!',
-				'war.selectPlanFirst': 'Select war plan first',
-				'preview.confirmClearViewed': 'Clear viewing history?',
-				'preview.viewedCleared': '🗑️ History cleared',
-				'preview.otherCounters': 'Other counters for this enemy',
-				'preview.noOtherCounters': 'No other counters',
-				'preview.prev': 'Previous',
-				'preview.next': 'Next',
-				'preview.show': 'SHOW',
-				'clipboard.formationCopied': '📋 Formation copied to clipboard!',
-				'clipboard.teamCopied': '📋 Team copied!',
-				'clipboard.copyFailed': '❌ Copy failed',
-				'clipboard.linkCopied': '🔗 Link copied!',
-				'ordering.yourTeamFirst': 'Order: Your team first',
-				'ordering.enemyFirst': 'Order: Enemy first',
-				'layout.top678': 'Layout: 6-7-8 on top',
-				'layout.top123': 'Layout: 1-2-3 on top',
-				'layout.sideBySide': 'Side by side',
-				'layout.stacked': 'Stacked',
-				'layout.sideBySideLabel': 'Layout: Side by side',
-				'layout.stackedLabel': 'Layout: Stacked (top-bottom)',
-				'fields.enemy': 'Enemy',
-				'fields.enemyPet': 'Enemy Pet',
-				'fields.your': 'Your',
-				'fields.yourPet': 'Your Pet',
-				'war.exclude.alreadyExcluded': 'This hero is already excluded',
-				'war.exclude.confirmClear': 'Clear all excluded heroes?',
-				'war.exclude.cleared': 'Excluded list cleared',
-				'war.exclude.excludedFrom': '🚫 {name} excluded from planner',
-				'war.exclude.empty': 'No excluded',
-				'kreator.hide.alreadyHidden': 'This hero is already hidden',
-				'kreator.hide.confirmClear': 'Clear all hidden?',
-				'kreator.hide.cleared': 'Hidden list cleared',
-				'kreator.hide.hiddenFrom': '🚫 {name} hidden from tags',
-				'kreator.hide.empty': 'None hidden',
-				'common.remove': 'Remove',
-                'badge.base': 'BASE', 'badge.user': 'ADDED', 'badge.new': 'NEW',
-                'sort.relevance': 'Relevance', 'sort.newest': 'Newest',
-                'sort.relevanceHint': 'Sort by match', 'sort.newestHint': 'Sort by newest (ID)',
-                'search.toggleComment': 'Click to expand/collapse', 'search.repeatLast': 'Repeat last',
-                'search.minMatch': 'Min. match', 'search.minMatchAll': 'All',
-                'search.belowThresholdHint': 'Hidden: match below threshold',
-                'search.allBelowThreshold': 'All matches are below {n}. Lower the threshold.',
-				'nav.defense': 'Defense',
-				'nav.screens': 'Gallery',
-				'screens.title': 'Screenshot gallery', 'screens.subtitle': 'Guild folders and screenshots — click a tile to open',
-				'screens.root': 'Gallery', 'screens.newFolder': 'New folder', 'screens.upload': 'Upload screens', 'screens.download': 'Download',
-				'screens.empty': 'This folder is empty.', 'screens.emptyAdmin': 'Empty. Add a folder or upload screens.',
-				'screens.folderNamePrompt': 'Folder name:', 'screens.renameFolderPrompt': 'New folder name:',
-				'screens.renameShotPrompt': 'New screenshot name:', 'screens.moveTitle': 'Move to…',
-				'screens.moveRoot': '🖼️ Gallery (root)', 'screens.moved': 'Moved',
-				'screens.deleteFolderConfirm': 'Delete folder “{name}” with all its contents ({n} screenshots)? This cannot be undone.',
-				'screens.deleteShotConfirm': 'Delete this screenshot? This cannot be undone.',
-				'screens.folderCount': '{n} items', 'screens.uploading': 'Uploading {i}/{n}…',
-				'screens.uploaded': 'Uploaded {n} screenshots', 'screens.uploadErr': 'Upload error: {msg}',
-				'screens.notImage': 'Skipped (not an image): {name}', 'screens.tooBig': 'Skipped (too big, >10 MB): {name}',
-				'screens.folderExists': 'A folder with this name already exists here.', 'screens.deleted': 'Deleted',
-				'screens.searchPlaceholder': '🔍 Search screenshot (name, description or tag)…', 'screens.searchNoResults': 'No results for this query.',
-				'screens.editComment': 'Edit description', 'screens.commentPrompt': 'Screenshot description / comment:', 'screens.back': 'Back', 'screens.noComment': 'no description',
-				'screens.tagsPrompt': 'Tags (comma-separated):', 'screens.noTags': 'no tags',
-				'screens.titleTooLong': 'Name too long (max {n} chars).', 'screens.commentTooLong': 'Description too long (max {n} chars).',
-				'screens.tooManyTags': 'Too many tags (max {n}).', 'screens.tagTooLong': 'Tag too long (max {n} chars).',
-				'screens.helpBtn': 'How it works',
-				'screens.helpView': '<h4>🖼️ Gallery — how it works</h4><p><strong>Browsing</strong></p><ul><li>Click a <b>folder 📁</b> to open it. The path (breadcrumbs) is on top — click jumps to any level; there is also <b>← Back</b>.</li><li>Click a <b>thumbnail</b> to open the screenshot full-screen.</li><li>In the viewer: <b>scroll / double-click</b> = zoom (mobile: <b>pinch</b>), <b>drag</b> = pan, <b>‹ ›</b> or <b>←/→</b> (mobile: <b>swipe</b>) = next/previous, <b>Esc / ✕</b> = close (mobile: <b>swipe down</b>).</li><li><b>⬇️ Download</b> saves the image to disk.</li></ul><p><strong>Search</strong></p><ul><li>The field on top searches by <b>name, description and tags</b> across the whole gallery.</li><li>Below it are <b>clickable tags</b> — click filters, click again clears. Tags appear only once some screenshot has a tag.</li></ul>',
-				'screens.helpAdmin': '<p><strong>Uploading (admin)</strong> — always into the currently open folder:</p><ul><li>The <b>⬆️ Upload screens</b> button — on desktop you pick files; <b>on phone</b> it opens the Gallery/Camera, pick the screenshot(s) from the gallery (multiple at once),</li><li><b>(desktop) Drag</b> files onto the grid,</li><li><b>(desktop) Ctrl+V</b> — paste a screenshot from the clipboard (e.g. after Win+Shift+S).</li></ul><p>Images are auto-shrunk (compression — can be turned off in Config). Images only, up to 10 MB.</p><p><strong>Organizing (admin)</strong> — tile buttons (desktop: on hover, phone: always visible):</p><ul><li><b>📁➕ New folder</b> in the current place (folders can nest),</li><li><b>✏️</b> rename · <b>📁</b> move · <b>🗑️</b> delete (a folder also deletes its contents),</li><li>In the viewer <b>✏️</b> next to name / description / tags edits those fields.</li></ul><p><b>Limits:</b> name 60 chars, description 300, tag 32, max 8 tags.</p>',
-				'defense.title': 'Guild defense',
-				'defense.viewPlayers': 'Players', 'defense.viewFormations': 'Formations', 'defense.viewAdd': 'Add formation',
-				'defense.newPlayerPlaceholder': 'Player name...', 'defense.addPlayer': 'Add player',
-				'defense.statsPlayers': 'Players', 'defense.statsFormations': 'Formations', 'defense.statsAssigned': 'Active pins',
-				'defense.noPlayers': 'No players. Add the first one above.',
-				'defense.noFormations': 'No formations. Add one in the "Add formation" tab.',
-				'defense.searchPlaceholder': '🔍 Search by name/hero...',
-				'defense.formationNameLabel': 'Formation name (optional)', 'defense.formationNamePlaceholder': 'e.g. Anti-Horde v2',
-				'defense.formationTeam': 'Defense formation',
-				'defense.assignToPlayerLabel': 'Assign to player right away (optional)', 'defense.noAssign': '— Do not assign —',
-				'defense.commentLabel': 'Comment (optional)', 'defense.commentPlaceholder': 'e.g. used since March 2026',
-				'defense.saveBtn': 'SAVE FORMATION',
-				'defense.backToPlayers': 'Back to players', 'defense.deletePlayer': 'Delete player',
-				'defense.assignTitle': 'Assign formation to player', 'defense.assignFormationLabel': 'Formation',
-				'defense.assignPickPlayer': 'Pick a player', 'defense.assignConfirm': 'Assign',
-				'defense.playerExists': 'A player with this name already exists!',
-				'defense.playerNameRequired': 'Enter a player name!',
-				'defense.playerAdded': 'Player added',
-				'defense.confirmDeletePlayer': 'Delete player {name}? (Formations stay; pins will be marked as unpinned)',
-				'defense.playerDeleted': 'Player deleted',
-				'defense.formationEmpty': 'Formation must have at least one hero!', 'defense.tooManyHeroes': 'Max 5 heroes per formation (pet counted separately)!',
-				'defense.unknownHero': 'Unknown hero',
-				'defense.unknownPet': 'Unknown pet',
-				'defense.formationSaved': 'Formation saved',
-				'defense.formationReused': 'Identical formation already exists — reusing the same record',
-				'defense.assignSuccess': 'Formation pinned to player',
-				'defense.maxAssignmentsReached': 'Player already has 3 active formations! Unpin one first.',
-				'defense.duplicateHeroes': 'Conflict — hero {name} is already in another active formation for this player',
-				'defense.duplicatePet': 'Conflict — pet {name} is already in another active formation for this player',
-				'defense.alreadyAssigned': 'This formation is already pinned to this player',
-				'defense.unassignBtn': 'Unpin', 'defense.unassignSuccess': 'Unpinned',
-				'defense.confirmUnassign': 'Unpin this formation from the player? (Formation stays in the database)',
-				'defense.slot': 'Formation', 'defense.emptySlot': 'Empty slot — add another formation in "Add"',
-				'defense.assignedAt': 'Pinned', 'defense.formationCreatedAt': 'Formation created',
-				'defense.usersCount': 'Used by', 'defense.usersZero': 'Nobody uses this',
-				'defense.historyTitle': 'Player pin history',
-				'defense.historyEmpty': 'No pin history',
-				'defense.historyActive': 'ACTIVE', 'defense.historyUnpinned': 'unpinned',
-				'defense.deleteFormation': 'Delete formation',
-				'defense.confirmDeleteFormation': 'Delete formation #{id}? This cannot be undone. All pins (active and historical) will also be removed.',
-				'defense.formationDeleted': 'Formation deleted',
-				'defense.cannotDeleteFormationInUse': 'Cannot delete — formation is actively pinned to {n} players. Unpin first.',
-				'defense.editTitle': 'Edit formation', 'defense.editBtn': 'Edit', 'defense.editSaveBtn': 'SAVE CHANGES',
-				'defense.editHint': 'Changing slots or pet = new record, players are auto-migrated from the old to the new. Changing only name/comment = in-place update.',
-				'defense.editNoChange': 'Nothing changed',
-				'defense.editMetaSaved': 'Saved (name/comment)',
-				'defense.editMigratedNew': 'Formation changed → new record #{id}. Migrated: {ok}/{total}',
-				'defense.editMigratedReused': 'Formation changed → reused existing #{id} (your name ignored). Migrated: {ok}/{total}',
-				'defense.editConflicts': 'Conflicts for: {names} — left on old formation #{id}',
-				'defense.editImpactNoChange': 'No changes',
-				'defense.editImpactMetaOnly': 'Only metadata (name/comment) — in-place update, no player impact',
-				'defense.editImpactSlots': 'Slots changed → {action}. Will migrate {n} active players.',
-				'defense.editImpactActionNew': 'create a new record',
-				'defense.editImpactActionReuse': 'reuse existing #{id}',
-				'defense.alsoUsedBy': 'Also used by',
-				'defense.uniqueToPlayer': 'Unique to this player',
-				'defense.sameSetOtherArrangement': 'Same set, different arrangement',
-				'defense.sameSetShort': 'diff. arr.',
-				'defense.speedTitle': 'Speed',
-				'defense.speedEmpty': 'Speed not set',
-				'defense.speedAdd': '+ Add',
-				'defense.speedEdit': 'Edit speed',
-				'defense.speedSave': 'Save',
-				'defense.speedCancel': 'Cancel',
-				'defense.speedSaved': 'Speed saved',
-				'defense.speedPartial': '{n}/{total} set',
-				'defense.speedInvalidNumber': 'Speed must be a positive number',
-				'database.filterPackages': 'Packages',
-				'packages.minSize': 'Min size', 'packages.mode': 'Mode',
-				'packages.modeExact': 'Exactly N', 'packages.modeAtLeast': 'At least N',
-				'packages.source': 'Source', 'packages.sourceEnemy': 'Enemies', 'packages.sourceMy': 'Counters', 'packages.sourceBoth': 'Both',
-				'packages.window': 'Window', 'packages.windowAll': 'All time',
-				'packages.minSupport': 'Min occurrences',
-				'packages.empty': 'No packages matching criteria. Lower min occurrences or min size.',
-				'packages.stats': '{n} packages from {total} formations',
-				'packages.occurrences': '×'
-            }
-        };
+        // Słownik translations.pl/en → wydzielony do souls-war-i18n.js (ładowany <script>-em PRZED tym plikiem).
+        // `translations` jest globalne; t() i applyTranslations używają go bez zmian. Nowe napisy dodawaj w tamtym pliku.
         
         const t = (key, params) => {
             let str = translations[currentLang][key] || translations['pl'][key] || key;
@@ -8948,16 +8382,22 @@
         function screensGoTo(folderId) {
             screensCurrentFolder = folderId || null;
             screensSearch = '';
+            screensTagFilter.clear();
+            screensFavOnly = false;
             const si = $('screens-search'); if (si) si.value = '';
             renderScreensTab();
         }
 
         function renderScreensTab() {
             const bar = $('screens-admin-bar');
-            if (bar) bar.style.display = isAdmin ? 'flex' : 'none';
+            if (bar) bar.style.display = isAdmin ? 'grid' : 'none';
+            const upRow = $('screens-upload-row');
+            if (upRow) upRow.style.display = isAdmin ? 'block' : 'none';
+            if (!isAdmin && screensSelectMode) { screensSelectMode = false; screensSelected.clear(); }
             renderScreensBreadcrumb();
             renderScreensHelp();
             renderScreensTagBar();
+            renderScreensToolbar();
             renderScreensGrid();
         }
 
@@ -8981,24 +8421,31 @@
             const el = $('screens-tags');
             if (!el) return;
             const tags = [...new Set(allScreenshots.flatMap(s => s.tags || []))].sort((a, b) => a.localeCompare(b));
-            el.innerHTML = tags.map(tg =>
-                `<button class="screen-tag-chip${tg.toLowerCase() === screensSearch ? ' active' : ''}" onclick="toggleScreenTagFilter('${jsStr(tg)}')">🏷️ ${escapeHtml(tg)}</button>`
+            let html = tags.map(tg =>
+                `<button class="screen-tag-chip${screensTagFilter.has(tg.toLowerCase()) ? ' active' : ''}" onclick="toggleScreenTagFilter('${jsStr(tg)}')">🏷️ ${escapeHtml(tg)}</button>`
             ).join('');
+            if (screensTagFilter.size > 1) html += `<span class="screen-tag-and">${t('screens.tagAnd')}</span>`; // przypomnienie: AND
+            if (screensTagFilter.size) html += `<button class="screen-tag-chip screen-tag-clear" onclick="clearScreenTagFilter()">✕ ${t('screens.clearTags')}</button>`;
+            el.innerHTML = html;
         }
+        // Wielotagowy filtr (AND) — klik przełącza tag w zbiorze.
         function toggleScreenTagFilter(tag) {
-            const v = (screensSearch === tag.toLowerCase()) ? '' : tag;
-            const si = $('screens-search');
-            if (si) si.value = v;
-            setScreensSearch(v);
+            const k = tag.toLowerCase();
+            if (screensTagFilter.has(k)) screensTagFilter.delete(k); else screensTagFilter.add(k);
+            renderScreensTagBar();
+            renderScreensGrid();
         }
+        function clearScreenTagFilter() { screensTagFilter.clear(); renderScreensTagBar(); renderScreensGrid(); }
 
         function renderScreensBreadcrumb() {
             const el = $('screens-breadcrumb');
             if (!el) return;
-            let html = screensCurrentFolder ? `<button class="screens-crumb screens-back" onclick="screensGoBack()">← ${t('screens.back')}</button>` : '';
-            html += `<button class="screens-crumb" onclick="screensGoTo(null)">🖼️ ${t('screens.root')}</button>`;
+            // data-folder na okruszkach = cel drag&drop (upuść kafelek, by przenieść do tego poziomu). '' = korzeń.
+            const back = screensCurrentFolder ? (findScreenFolder(screensCurrentFolder)?.parentId || '') : '';
+            let html = screensCurrentFolder ? `<button class="screens-crumb screens-back" data-folder="${escapeHtml(back)}" onclick="screensGoBack()">← ${t('screens.back')}</button>` : '';
+            html += `<button class="screens-crumb" data-folder="" onclick="screensGoTo(null)">🖼️ ${t('screens.root')}</button>`;
             screenFolderPath(screensCurrentFolder).forEach(f => {
-                html += `<span class="screens-crumb-sep">›</span><button class="screens-crumb" onclick="screensGoTo('${jsStr(f.id)}')">${escapeHtml(f.name)}</button>`;
+                html += `<span class="screens-crumb-sep">›</span><button class="screens-crumb" data-folder="${escapeHtml(f.id)}" onclick="screensGoTo('${jsStr(f.id)}')">${escapeHtml(f.name)}</button>`;
             });
             el.innerHTML = html;
         }
@@ -9017,49 +8464,69 @@
 
         function setScreensSearch(v) { screensSearch = (v || '').trim().toLowerCase(); renderScreensTagBar(); renderScreensGrid(); }
 
+        // Sortowanie screenów w siatce wg screensSort (data/nazwa). Foldery zawsze alfabetycznie.
+        function sortScreenshots(shots) {
+            const arr = shots.slice();
+            if (screensSort === 'date-asc') arr.sort((a, b) => String(a.uploadedAt || '').localeCompare(String(b.uploadedAt || '')));
+            else if (screensSort === 'name-asc') arr.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+            else if (screensSort === 'name-desc') arr.sort((a, b) => (b.title || '').localeCompare(a.title || ''));
+            else arr.sort((a, b) => String(b.uploadedAt || '').localeCompare(String(a.uploadedAt || ''))); // date-desc (domyślne)
+            return arr;
+        }
         function renderScreensGrid() {
             const grid = $('screens-grid');
             if (!grid) return;
-            const actions = (kind, id) => !isAdmin ? '' : `<div class="screen-card-actions">
+            grid.className = 'screens-grid tiles-' + screensTile + (screensSelectMode ? ' select-mode' : '');
+            const selecting = isAdmin && screensSelectMode;
+            const dragA = isAdmin ? ' draggable="true"' : ''; // drag&drop kafelka do folderu (desktop)
+            // W trybie zaznaczania chowamy przyciski akcji (klik = zaznacz), pokazujemy checkbox.
+            const actions = (kind, id) => (!isAdmin || selecting) ? '' : `<div class="screen-card-actions">
                     <button title="✏️" onclick="event.stopPropagation(); ${kind === 'folder' ? 'renameScreenFolder' : 'renameScreenshot'}('${jsStr(id)}')">✏️</button>
                     <button title="📁" onclick="event.stopPropagation(); openScreenMove('${kind}','${jsStr(id)}')">📁</button>
                     <button title="🗑️" onclick="event.stopPropagation(); ${kind === 'folder' ? 'deleteScreenFolder' : 'deleteScreenshot'}('${jsStr(id)}')">🗑️</button>
                 </div>`;
-            const folderCard = (f, subLabel) => `<div class="screen-folder-card" onclick="screensGoTo('${jsStr(f.id)}')">
+            const selBox = id => selecting ? `<div class="screen-sel-box${screensSelected.has(id) ? ' checked' : ''}">${screensSelected.has(id) ? '✓' : ''}</div>` : '';
+            // ⭐ Ulubione (dla wszystkich, per-user) — ukryte w trybie zaznaczania.
+            const favBtn = s => selecting ? '' : (on => `<button class="screen-fav${on ? ' on' : ''}" title="${t('screens.favTitle')}" onclick="event.stopPropagation(); toggleScreenFav('${jsStr(s.id)}')">${on ? '⭐' : '☆'}</button>`)(screenFavorites.includes(s.id));
+            const folderCard = (f, subLabel) => `<div class="screen-folder-card" data-kind="folder" data-id="${escapeHtml(f.id)}"${dragA} onclick="screenCardClick('folder','${jsStr(f.id)}',event)">
                     ${actions('folder', f.id)}
                     <div class="screen-folder-icon">📁</div>
                     <div class="screen-folder-name">${escapeHtml(f.name)}</div>
                     <div class="screen-folder-count">${subLabel}</div>
                 </div>`;
-            const shotCard = (s, locLabel) => `<div class="screen-thumb-card" onclick="openScreenLightbox('${jsStr(s.id)}')">
-                    ${actions('shot', s.id)}
+            const shotCard = (s, locLabel) => `<div class="screen-thumb-card${screensSelected.has(s.id) ? ' selected' : ''}" data-kind="shot" data-id="${escapeHtml(s.id)}"${dragA} onclick="screenCardClick('shot','${jsStr(s.id)}',event)">
+                    ${selBox(s.id)}${favBtn(s)}${actions('shot', s.id)}
                     <img class="screen-thumb-img" loading="lazy" src="${escapeHtml(s.thumbUrl || s.url)}" alt="${escapeHtml(s.title || '')}">
                     <div class="screen-thumb-name">${escapeHtml(s.title || '') || '—'}</div>
                     ${(s.tags && s.tags.length) ? `<div class="screen-thumb-tags">${s.tags.slice(0, 3).map(tg => `<span class="screen-tag">${escapeHtml(tg)}</span>`).join('')}</div>` : ''}
                     ${locLabel ? `<div class="screen-thumb-loc">📁 ${locLabel}</div>` : ''}
+                    <div class="screen-thumb-meta">${typeof s.size === 'number' ? fmtBytes(s.size) + ' | ' : ''}${(s.uploadedAt || '').slice(0, 10)}</div>
                 </div>`;
 
-            // ── Tryb szukajki: płaskie wyniki z CAŁEJ galerii (nazwa + opis + tagi) ──
-            if (screensSearch) {
-                const q = screensSearch;
-                const folders = allScreenFolders.filter(f => (f.name || '').toLowerCase().includes(q))
-                    .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-                const shots = allScreenshots.filter(s => (s.title || '').toLowerCase().includes(q) || (s.comment || '').toLowerCase().includes(q) || (s.tags || []).some(tg => tg.toLowerCase().includes(q)))
-                    .sort((a, b) => String(b.uploadedAt || '').localeCompare(String(a.uploadedAt || '')));
+            // ── Widok globalny: szukajka / tagi (AND) / ulubione — płaska lista z CAŁEJ galerii ──
+            if (screensSearch || screensTagFilter.size || screensFavOnly) {
+                const folders = screensSearch ? allScreenFolders.filter(f => (f.name || '').toLowerCase().includes(screensSearch))
+                    .sort((a, b) => (a.name || '').localeCompare(b.name || '')) : [];
+                const shots = sortScreenshots(allScreenshots.filter(screenMatchesFilters));
                 screensViewShots = shots;
-                if (!folders.length && !shots.length) {
-                    grid.innerHTML = `<div class="screens-empty">${t('screens.searchNoResults')}</div>`;
-                    return;
-                }
-                grid.innerHTML = folders.map(f => folderCard(f, screenFolderLabel(f.id))).join('')
-                    + shots.map(s => shotCard(s, screenFolderLabel(s.folderId))).join('');
+                updateScreensCount(folders.length, shots.length);
+                grid.innerHTML = (!folders.length && !shots.length)
+                    ? `<div class="screens-empty">${t('screens.searchNoResults')}</div>`
+                    : folders.map(f => folderCard(f, screenFolderLabel(f.id))).join('') + shots.map(s => shotCard(s, screenFolderLabel(s.folderId))).join('');
                 return;
             }
 
-            // ── Normalny widok bieżącego folderu ──
+            // ── Normalny widok bieżącego folderu (opcjonalnie rekurencyjnie po podfolderach) ──
             const folders = screenFolderChildren(screensCurrentFolder);
-            const shots = screenshotsInFolder(screensCurrentFolder);
+            let shots;
+            if (screensRecursive) {
+                const ids = new Set(screenFolderSubtree(screensCurrentFolder));
+                shots = sortScreenshots(allScreenshots.filter(s => ids.has(s.folderId || null)));
+            } else {
+                shots = sortScreenshots(screenshotsInFolder(screensCurrentFolder));
+            }
             screensViewShots = shots;
+            updateScreensCount(folders.length, shots.length);
             if (!folders.length && !shots.length) {
                 grid.innerHTML = `<div class="screens-empty">${t(isAdmin ? 'screens.emptyAdmin' : 'screens.empty')}</div>`;
                 return;
@@ -9067,7 +8534,178 @@
             grid.innerHTML = folders.map(f => {
                 const count = screenshotsInFolder(f.id).length + screenFolderChildren(f.id).length;
                 return folderCard(f, t('screens.folderCount', { n: count }));
-            }).join('') + shots.map(s => shotCard(s)).join('');
+            }).join('') + shots.map(s => shotCard(s, screensRecursive ? screenFolderLabel(s.folderId) : '')).join('');
+        }
+        // Czy screen przechodzi aktywne filtry globalne (szukajka + tagi AND + ulubione).
+        function screenMatchesFilters(s) {
+            if (screensSearch) {
+                const q = screensSearch;
+                if (!((s.title || '').toLowerCase().includes(q) || (s.comment || '').toLowerCase().includes(q) || (s.tags || []).some(tg => tg.toLowerCase().includes(q)))) return false;
+            }
+            if (screensTagFilter.size) {
+                const have = new Set((s.tags || []).map(x => x.toLowerCase()));
+                for (const tg of screensTagFilter) if (!have.has(tg)) return false;
+            }
+            if (screensFavOnly && !screenFavorites.includes(s.id)) return false;
+            return true;
+        }
+        // ── Ulubione + rekurencja (przełączniki paska narzędzi) ──
+        function toggleScreenFav(id) {
+            const i = screenFavorites.indexOf(id);
+            if (i >= 0) screenFavorites.splice(i, 1); else screenFavorites.push(id);
+            storage.setJson('souls_screen_favorites', screenFavorites);
+            renderScreensGrid();
+            renderScreensToolbar();
+            if (screensLightboxId === id) openScreenLightbox(id); // odśwież gwiazdkę w podglądzie
+        }
+        function toggleScreensFavView() { screensFavOnly = !screensFavOnly; renderScreensToolbar(); renderScreensGrid(); }
+        function toggleScreensRecursive() { screensRecursive = !screensRecursive; renderScreensToolbar(); renderScreensGrid(); }
+
+        // ── Pasek narzędzi Galerii: rozmiar kafelków, sortowanie, licznik, tryb zaznaczania ──
+        function renderScreensToolbar() {
+            ['large', 'normal', 'small', 'list'].forEach(sz => $('screens-tile-' + sz)?.classList.toggle('active', screensTile === sz));
+            const sortSel = $('screens-sort'); if (sortSel) sortSel.value = screensSort;
+            $('screens-select-toggle')?.classList.toggle('active', screensSelectMode);
+            const favBtn = $('screens-fav-toggle');
+            if (favBtn) { favBtn.classList.toggle('active', screensFavOnly); favBtn.textContent = screenFavorites.length ? '⭐' + screenFavorites.length : '⭐'; }
+            $('screens-recursive-toggle')?.classList.toggle('active', screensRecursive);
+            renderScreensStorage();
+            renderScreensBulkBar();
+        }
+        function setScreensTile(v) { screensTile = v; storage.setJson('souls_screens_tile', v); renderScreensToolbar(); renderScreensGrid(); }
+        function setScreensSort(v) { screensSort = v; storage.setJson('souls_screens_sort', v); renderScreensGrid(); }
+        // Licznik: bieżący folder + całość galerii (+ przybliżony rozmiar dla screenów, które mają zapisany size).
+        function fmtBytes(b) { return b >= 1073741824 ? (b / 1073741824).toFixed(2) + ' GB' : b >= 1048576 ? (b / 1048576).toFixed(1) + ' MB' : b >= 1024 ? Math.round(b / 1024) + ' KB' : b + ' B'; }
+        // Wskaźnik zużycia Firebase Storage (admin) — chroni darmowy tier 5 GB. Rozmiar z pola size (stare screeny bez niego → „+").
+        const SCREENS_STORAGE_LIMIT = 5 * 1073741824; // 5 GB
+        function renderScreensStorage() {
+            const el = $('screens-storage'); if (!el) return;
+            if (!isAdmin) { el.style.display = 'none'; el.innerHTML = ''; return; }
+            const sized = allScreenshots.filter(s => typeof s.size === 'number');
+            const bytes = sized.reduce((a, s) => a + (s.size || 0), 0);
+            const pct = Math.min(100, bytes / SCREENS_STORAGE_LIMIT * 100);
+            const partial = sized.length < allScreenshots.length;
+            const level = pct >= 95 ? 'crit' : pct >= 80 ? 'warn' : 'ok';
+            el.style.display = 'flex';
+            el.innerHTML = `<span class="screens-storage-txt"${partial ? ` title="${t('screens.storagePartial')}"` : ''}>💾 ${fmtBytes(bytes)}${partial ? '+' : ''} / 5 GB · ${pct.toFixed(pct < 10 ? 1 : 0)}%</span>
+                <div class="screens-storage-track"><div class="screens-storage-fill ${level}" style="width:${Math.max(1.5, pct)}%"></div></div>${partial ? `<button id="screens-backfill-btn" class="screens-backfill-btn" onclick="backfillScreenSizes()" title="${t('screens.backfill')}">🔄</button>` : ''}`;
+        }
+        // Jednorazowe uzupełnienie brakujących size ze Storage — czyta metadane (bez pobierania obrazka).
+        async function backfillScreenSizes() {
+            if (!isAdmin || !screensStorageRef) return;
+            const missing = allScreenshots.filter(s => typeof s.size !== 'number' && s.storagePath);
+            if (!missing.length) return;
+            const btn = $('screens-backfill-btn'); if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+            let done = 0, fail = 0;
+            for (const s of missing) {
+                try {
+                    const meta = await screensStorageRef.child(s.storagePath).getMetadata();
+                    if (typeof meta.size === 'number') { await screenshotsRef.child(s.id).update({ size: meta.size }); s.size = meta.size; done++; }
+                    else fail++;
+                } catch (e) { fail++; }
+            }
+            showToast('✅ ' + t('screens.backfillDone', { n: done }) + (fail ? ' · ' + t('screens.backfillFail', { n: fail }) : ''));
+            renderScreensToolbar();
+        }
+        function updateScreensCount(nFolders, nShots) {
+            const el = $('screens-count'); if (!el) return;
+            // Krótko i czytelnie: 🖼️ screeny · 📁 foldery (w bieżącym widoku). Szczegóły w tooltipie.
+            const parts = [];
+            if (nShots) parts.push('🖼️ ' + nShots);
+            if (nFolders) parts.push('📁 ' + nFolders);
+            el.textContent = parts.join(' · ');
+            el.title = t('screens.countTotal', { s: allScreenshots.length, f: allScreenFolders.length });
+        }
+
+        // ── Zaznaczanie wielu screenów + akcje masowe (admin) ──
+        function toggleScreensSelect() {
+            if (!isAdmin) return;
+            screensSelectMode = !screensSelectMode;
+            if (!screensSelectMode) screensSelected.clear();
+            renderScreensToolbar();
+            renderScreensGrid();
+        }
+        // Klik w kafelek: folder zawsze wchodzi; screen w trybie zaznaczania = przełącz zaznaczenie, inaczej lightbox.
+        function screenCardClick(kind, id, ev) {
+            if (kind === 'folder') { screensGoTo(id); return; }
+            if (isAdmin && screensSelectMode) { toggleScreenSelected(id); return; }
+            openScreenLightbox(id);
+        }
+        function toggleScreenSelected(id) {
+            if (screensSelected.has(id)) screensSelected.delete(id); else screensSelected.add(id);
+            renderScreensGrid();
+            renderScreensBulkBar();
+        }
+        function screensSelectAllShots() { screensViewShots.forEach(s => screensSelected.add(s.id)); renderScreensGrid(); renderScreensBulkBar(); }
+        function screensDeselectAll() { screensSelected.clear(); renderScreensGrid(); renderScreensBulkBar(); }
+        function renderScreensBulkBar() {
+            const bar = $('screens-bulk-bar'); if (!bar) return;
+            if (!isAdmin || !screensSelectMode) { bar.style.display = 'none'; bar.innerHTML = ''; return; }
+            const n = screensSelected.size, d = n ? '' : ' disabled';
+            bar.style.display = 'flex';
+            bar.innerHTML = `<span class="bulk-count">${t('screens.selectedN', { n })}</span>
+                <button class="screens-bulk-btn" onclick="screensSelectAllShots()">${t('screens.selectAll')}</button>
+                <button class="screens-bulk-btn" onclick="screensDeselectAll()">${t('screens.deselect')}</button>
+                <button class="screens-bulk-btn"${d} onclick="bulkMoveScreens()">📁 ${t('screens.bulkMove')}</button>
+                <button class="screens-bulk-btn"${d} onclick="bulkTagScreens()">🏷️ ${t('screens.bulkTag')}</button>
+                <button class="screens-bulk-btn danger"${d} onclick="bulkDeleteScreens()">🗑️ ${t('screens.bulkDelete')}</button>
+                <button class="screens-bulk-btn" onclick="toggleScreensSelect()">✕ ${t('screens.selectExit')}</button>`;
+        }
+        function bulkMoveScreens() {
+            const ids = [...screensSelected]; if (!isAdmin || !ids.length) return;
+            screenMoveCtx = { kind: 'bulk', ids };
+            renderScreenMoveList();
+            $('screens-move-modal')?.classList.remove('hidden');
+        }
+        async function bulkDeleteScreens() {
+            const ids = [...screensSelected]; if (!isAdmin || !ids.length) return;
+            if (!confirm(t('screens.bulkDeleteConfirm', { n: ids.length }))) return;
+            let done = 0;
+            for (const id of ids) {
+                const s = findScreenshot(id); if (!s) continue;
+                try { await deleteScreenStorageFiles(s); await screenshotsRef.child(id).remove(); done++; } catch (e) {}
+            }
+            screensSelected.clear();
+            showToast('🗑️ ' + t('screens.bulkDeleted', { n: done }));
+            renderScreensTab();
+        }
+        async function bulkTagScreens() {
+            const ids = [...screensSelected]; if (!isAdmin || !ids.length) return;
+            const raw = prompt(t('screens.bulkTagPrompt')); if (raw === null) return;
+            const add = [...new Set(raw.split(',').map(x => x.trim()).filter(Boolean))];
+            if (!add.length) return;
+            if (add.some(tg => tg.length > SCREENS_TAG_MAX)) { showToast('⚠️ ' + t('screens.tagTooLong', { n: SCREENS_TAG_MAX }), true); return; }
+            let done = 0, skipped = 0;
+            for (const id of ids) {
+                const s = findScreenshot(id); if (!s) continue;
+                const merged = [...new Set([...(s.tags || []), ...add])];
+                if (merged.length > SCREENS_TAGS_MAX) { skipped++; continue; } // przekroczyłby limit — pomiń
+                try { await screenshotsRef.child(id).update({ tags: merged }); s.tags = merged; done++; } catch (e) {}
+            }
+            showToast('🏷️ ' + t('screens.bulkTagged', { n: done }) + (skipped ? ' · ' + t('screens.bulkTagSkipped', { n: skipped }) : ''));
+            renderScreensTagBar();
+            renderScreensGrid();
+        }
+        // Upuszczenie przeciąganego kafelka na folder (drag&drop). targetFolderId '' → korzeń.
+        async function dropScreenOnFolder(drag, targetFolderId) {
+            if (!isAdmin || !drag) return;
+            targetFolderId = targetFolderId || null;
+            if (drag.kind === 'folder') {
+                if (drag.id === targetFolderId) return;
+                if (screenFolderSubtree(drag.id).includes(targetFolderId)) { showToast('⚠️ ' + t('screens.moveIntoSelf'), true); return; }
+                const f = findScreenFolder(drag.id);
+                if (!f || (f.parentId || null) === targetFolderId) return; // już tam
+                if (screenFolderChildren(targetFolderId).some(o => o.id !== drag.id && (o.name || '').toLowerCase() === (f.name || '').toLowerCase())) {
+                    showToast('⚠️ ' + t('screens.folderExists'), true); return;
+                }
+                try { await screenFoldersRef.child(drag.id).update({ parentId: targetFolderId }); showToast('✅ ' + t('screens.moved')); }
+                catch (e) { showToast(t('common.error') + ': ' + e.message, true); }
+            } else {
+                const s = findScreenshot(drag.id);
+                if (!s || (s.folderId || null) === targetFolderId) return; // już tam
+                try { await screenshotsRef.child(drag.id).update({ folderId: targetFolderId }); showToast('✅ ' + t('screens.moved')); }
+                catch (e) { showToast(t('common.error') + ': ' + e.message, true); }
+            }
         }
 
         // ── Lightbox ──
@@ -9079,7 +8717,11 @@
             $('screens-lightbox-img').src = s.url; // lightbox = pełny obraz (nie miniatura)
             const meta = [];
             const penTitle = isAdmin ? `<button class="lb-edit-mini" title="${t('screens.renameShotPrompt')}" onclick="renameScreenshot('${jsStr(id)}')">✏️</button>` : '';
-            meta.push(`<div class="lb-title-row"><span class="lb-title">${escapeHtml(s.title || '—')}</span>${penTitle}</div>`);
+            // C: przenieś prosto z podglądu (modal wchodzi nad lightbox — patrz #screens-move-modal z-index)
+            const penMove = isAdmin ? `<button class="lb-edit-mini" title="${t('screens.moveTitle')}" onclick="openScreenMove('shot','${jsStr(id)}')">📁</button>` : '';
+            const favOn = screenFavorites.includes(id); // ⭐ dla wszystkich
+            const favLb = `<button class="lb-edit-mini lb-fav${favOn ? ' on' : ''}" title="${t('screens.favTitle')}" onclick="toggleScreenFav('${jsStr(id)}')">${favOn ? '⭐' : '☆'}</button>`;
+            meta.push(`<div class="lb-title-row"><span class="lb-title">${escapeHtml(s.title || '—')}</span>${favLb}${penTitle}${penMove}</div>`);
             if (s.comment || isAdmin) {
                 const penCmt = isAdmin ? `<button class="lb-edit-mini" title="${t('screens.commentPrompt')}" onclick="editScreenshotComment('${jsStr(id)}')">✏️</button>` : '';
                 const cmt = s.comment
@@ -9192,13 +8834,73 @@
             });
             const grid = $('screens-grid');
             if (grid) {
-                grid.addEventListener('dragover', e => { if (isAdmin) { e.preventDefault(); grid.classList.add('drag-over'); } });
+                const hasFiles = e => Array.from(e.dataTransfer?.types || []).includes('Files');
+                // Drop plików z pulpitu = upload (tylko gdy faktycznie ciągniemy pliki, nie wewnętrzny kafelek).
+                grid.addEventListener('dragover', e => { if (isAdmin && hasFiles(e)) { e.preventDefault(); grid.classList.add('drag-over'); } });
                 grid.addEventListener('dragleave', e => { if (e.target === grid) grid.classList.remove('drag-over'); });
                 grid.addEventListener('drop', e => {
                     grid.classList.remove('drag-over');
                     if (!isAdmin) return;
                     const files = Array.from(e.dataTransfer?.files || []).filter(f => (f.type || '').startsWith('image/'));
                     if (files.length) { e.preventDefault(); handleScreenUpload(files); }
+                });
+
+                // ── Wewnętrzny drag&drop: przeciągnij kafelek (screen/folder) na folder lub okruszek ──
+                grid.addEventListener('dragstart', e => {
+                    const card = e.target.closest('[data-kind]');
+                    if (!card || !isAdmin) return;
+                    screenDrag = { kind: card.dataset.kind, id: card.dataset.id };
+                    e.dataTransfer.effectAllowed = 'move';
+                    try { e.dataTransfer.setData('text/plain', card.dataset.id); } catch (_) {}
+                    card.classList.add('dragging');
+                });
+                grid.addEventListener('dragend', () => {
+                    screenDrag = null;
+                    grid.querySelectorAll('.dragging, .drop-target').forEach(el => el.classList.remove('dragging', 'drop-target'));
+                });
+                grid.addEventListener('dragover', e => {
+                    if (!screenDrag) return;
+                    const folder = e.target.closest('.screen-folder-card');
+                    if (!folder || (screenDrag.kind === 'folder' && folder.dataset.id === screenDrag.id)) return;
+                    e.preventDefault();
+                    folder.classList.add('drop-target');
+                });
+                grid.addEventListener('dragleave', e => {
+                    const folder = e.target.closest('.screen-folder-card');
+                    if (folder && !folder.contains(e.relatedTarget)) folder.classList.remove('drop-target');
+                });
+                grid.addEventListener('drop', e => {
+                    if (!screenDrag) return;
+                    const folder = e.target.closest('.screen-folder-card');
+                    if (!folder) return;
+                    e.preventDefault(); e.stopPropagation();
+                    folder.classList.remove('drop-target');
+                    dropScreenOnFolder(screenDrag, folder.dataset.id);
+                    screenDrag = null;
+                });
+            }
+            // Okruszki jako cele drop (przenieś w górę drzewa / do korzenia).
+            const crumbs = $('screens-breadcrumb');
+            if (crumbs) {
+                crumbs.addEventListener('dragover', e => {
+                    if (!screenDrag) return;
+                    const c = e.target.closest('.screens-crumb');
+                    if (!c || c.dataset.folder === undefined) return;
+                    e.preventDefault();
+                    c.classList.add('drop-target');
+                });
+                crumbs.addEventListener('dragleave', e => {
+                    const c = e.target.closest('.screens-crumb');
+                    if (c) c.classList.remove('drop-target');
+                });
+                crumbs.addEventListener('drop', e => {
+                    if (!screenDrag) return;
+                    const c = e.target.closest('.screens-crumb');
+                    if (!c || c.dataset.folder === undefined) return;
+                    e.preventDefault();
+                    c.classList.remove('drop-target');
+                    dropScreenOnFolder(screenDrag, c.dataset.folder);
+                    screenDrag = null;
                 });
             }
 
@@ -9288,7 +8990,9 @@
             if (!isAdmin) return;
             const s = findScreenshot(id);
             if (!s) return;
-            const title = (prompt(t('screens.renameShotPrompt'), s.title || '') || '').trim();
+            const raw = prompt(t('screens.renameShotPrompt'), s.title || '');
+            if (raw === null) return; // anulowano — NIE czyścimy nazwy (pusty string z „Anuluj" wcześniej kasował nazwę)
+            const title = raw.trim();
             if (title === (s.title || '')) return;
             if (title.length > SCREENS_TITLE_MAX) { showToast('⚠️ ' + t('screens.titleTooLong', { n: SCREENS_TITLE_MAX }), true); return; }
             try {
@@ -9345,8 +9049,10 @@
             const list = $('screens-move-list');
             if (!list || !screenMoveCtx) return;
             const { kind, id } = screenMoveCtx;
+            const titleEl = $('screens-move-title');
+            if (titleEl) titleEl.textContent = kind === 'bulk' ? t('screens.moveBulkTitle', { n: screenMoveCtx.ids.length }) : t('screens.moveTitle');
             const blocked = kind === 'folder' ? new Set(screenFolderSubtree(id)) : new Set(); // folder nie może trafić do siebie/poddrzewa
-            const cur = kind === 'folder' ? (findScreenFolder(id)?.parentId || null) : (findScreenshot(id)?.folderId || null);
+            const cur = kind === 'folder' ? (findScreenFolder(id)?.parentId || null) : kind === 'shot' ? (findScreenshot(id)?.folderId || null) : undefined; // bulk: brak jednego „bieżącego"
             const rows = [moveRow(null, '🖼️ ' + t('screens.moveRoot'), 0, cur === null, false)];
             const walk = (parentId, depth) => {
                 screenFolderChildren(parentId).forEach(f => {
@@ -9355,17 +9061,44 @@
                 });
             };
             walk(null, 1);
-            list.innerHTML = rows.join('');
+            // Feature 1: utwórz nowy folder (w bieżąco przeglądanym miejscu) i od razu tu przenieś.
+            const newBtn = `<button class="screens-move-new" onclick="createFolderAndMove()">➕ ${t('screens.newFolderHere', { loc: screenFolderLabel(screensCurrentFolder) })}</button>`;
+            list.innerHTML = newBtn + rows.join('');
             function moveRow(targetId, label, depth, isCurrent, isBlocked) {
                 const disabled = isCurrent || isBlocked;
                 const target = targetId === null ? 'null' : `'${jsStr(targetId)}'`;
                 return `<button class="screens-move-item" style="padding-left:${8 + depth * 16}px"${disabled ? ' disabled' : ''} onclick="doScreenMove(${target})">${label}${isCurrent ? ' ✓' : ''}</button>`;
             }
         }
+        // Tworzy folder w bieżąco przeglądanym folderze i przenosi do niego aktualny kontekst (screen/folder/bulk).
+        async function createFolderAndMove() {
+            if (!isAdmin || !screenMoveCtx) return;
+            const parent = screensCurrentFolder || null;
+            const name = (prompt(t('screens.folderNamePrompt')) || '').trim();
+            if (!name) return;
+            if (name.length > SCREENS_TITLE_MAX) { showToast('⚠️ ' + t('screens.titleTooLong', { n: SCREENS_TITLE_MAX }), true); return; }
+            if (screenFolderChildren(parent).some(f => (f.name || '').toLowerCase() === name.toLowerCase())) { showToast('⚠️ ' + t('screens.folderExists'), true); return; }
+            try {
+                const ref = screenFoldersRef.push();
+                await ref.set({ id: ref.key, name, parentId: parent, createdAt: new Date().toISOString() });
+                await doScreenMove(ref.key); // przenosi bieżący kontekst do nowego folderu i zamyka modal
+            } catch (e) { showToast(t('common.error') + ': ' + e.message, true); }
+        }
         async function doScreenMove(targetFolderId) {
             if (!isAdmin || !screenMoveCtx) return;
             const { kind, id } = screenMoveCtx;
             try {
+                if (kind === 'bulk') {
+                    let done = 0;
+                    for (const sid of screenMoveCtx.ids) {
+                        try { await screenshotsRef.child(sid).update({ folderId: targetFolderId }); done++; } catch (e) {}
+                    }
+                    screensSelected.clear();
+                    closeScreenMove();
+                    showToast('✅ ' + t('screens.bulkMoved', { n: done }));
+                    renderScreensTab();
+                    return;
+                }
                 if (kind === 'folder') {
                     if (screenFolderSubtree(id).includes(targetFolderId)) { closeScreenMove(); return; } // nigdy do własnego poddrzewa
                     const f = findScreenFolder(id);
@@ -9409,10 +9142,12 @@
             const status = $('screens-upload-status');
             const compress = appConfig.screensCompress !== false;
             const targetFolder = screensCurrentFolder || null;
+            // B: pokaż dokąd lecą screeny (nazwa folderu, niezaescape'owana — status/toast to tekst).
+            const folderLabel = targetFolder ? screenFolderPath(targetFolder).map(f => f.name).join(' / ') : t('screens.root');
             let done = 0; const skipped = [];
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
-                if (status) status.textContent = t('screens.uploading', { i: i + 1, n: files.length });
+                if (status) status.textContent = t('screens.uploadingTo', { i: i + 1, n: files.length, folder: folderLabel });
                 if (!/^image\//.test(file.type || '')) { skipped.push(t('screens.notImage', { name: file.name })); continue; }
                 try {
                     let blob = file;
@@ -9433,12 +9168,12 @@
                         const tSnap = await screensStorageRef.child(thumbPath).put(thumbBlob, { contentType: 'image/jpeg', cacheControl: CACHE });
                         thumbUrl = await tSnap.ref.getDownloadURL();
                     } catch (e) { thumbUrl = null; thumbPath = null; }
-                    await ref.set({ id, folderId: targetFolder, url, storagePath: path, thumbUrl, thumbPath, title: file.name.replace(/\.[^.]+$/, '').slice(0, SCREENS_TITLE_MAX), comment: '', tags: [], uploadedAt: new Date().toISOString() });
+                    await ref.set({ id, folderId: targetFolder, url, storagePath: path, thumbUrl, thumbPath, size: blob.size, title: file.name.replace(/\.[^.]+$/, '').slice(0, SCREENS_TITLE_MAX), comment: '', tags: [], uploadedAt: new Date().toISOString() });
                     done++;
                 } catch (e) { showToast('⚠️ ' + t('screens.uploadErr', { msg: e.message || String(e) }), true); }
             }
             if (status) status.textContent = '';
-            if (done) showToast('✅ ' + t('screens.uploaded', { n: done }));
+            if (done) showToast('✅ ' + t('screens.uploadedTo', { n: done, folder: folderLabel }));
             skipped.forEach(m => showToast('⚠️ ' + m, true));
         }
 

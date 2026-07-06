@@ -3087,11 +3087,16 @@
 		.screens-crumb:hover { border-color: var(--accent-gold); color: var(--accent-gold); }
 		.screens-crumb-sep { color: var(--text-muted); }
 
-		.screens-admin-bar {
-			display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
-			margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px solid var(--border);
-		}
-		.screens-upload-status { color: var(--accent-gold); font-size: 0.9rem; }
+		/* Górny rząd 50/50: po lewej szukajka + „?", po prawej licznik zajętości; równa wysokość. */
+		.screens-topbar { display: flex; flex-wrap: wrap; align-items: stretch; gap: 10px; margin-bottom: 12px; }
+		.screens-topbar .screens-searchbar { flex: 3 1 0; min-width: 180px; margin-bottom: 0; }
+		.screens-topbar .screens-storage { flex: 1 1 0; min-width: 130px; margin-bottom: 0; }
+		/* Nowy folder + Zaznacz: wyśrodkowane, równej szerokości, szersze. */
+		.screens-admin-bar { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 78%; max-width: 480px; margin: 0 auto 14px; }
+		/* Wgraj — szerszy od pary przycisków, ale nie na całą szerokość (margines po bokach). */
+		.screens-upload-row { text-align: center; margin-bottom: 12px; }
+		.screens-upload-row .screens-upload-btn { display: block; width: 90%; max-width: 600px; margin: 0 auto; padding: 9px 13px; font-size: 0.9rem; }
+		.screens-upload-status { display: block; margin-top: 6px; text-align: center; color: var(--accent-gold); font-size: 0.85rem; }
 
 		.screens-search {
 			width: 100%; padding: 10px 12px; margin-bottom: 14px;
@@ -3208,6 +3213,75 @@
 
 		.screens-grid.drag-over { outline: 2px dashed var(--accent-gold); outline-offset: 6px; border-radius: 10px; }
 
+		/* ── Pasek narzędzi (rozmiar kafelków / sortowanie / licznik) ── */
+		.screens-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; }
+		.screens-tile-btns { display: flex; gap: 4px; }
+		.screens-tile-btn {
+			width: 38px; height: 38px; background: var(--bg-input); color: var(--text-light);
+			border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-size: 1rem; line-height: 1;
+		}
+		.screens-tile-btn:hover { border-color: var(--accent-gold); }
+		.screens-tile-btn.active { background: var(--accent-gold); color: #000; border-color: var(--accent-gold); }
+		.screens-sort {
+			width: auto; flex: 0 0 auto; max-width: 160px;
+			background: var(--bg-input); color: var(--text-light); border: 1px solid var(--border);
+			border-radius: 8px; padding: 8px 10px; font-family: inherit; font-size: 0.9rem; cursor: pointer;
+		}
+		.screens-sort:focus { outline: none; border-color: var(--accent-gold); }
+		.screens-count { margin-left: auto; color: var(--text-muted); font-size: 0.8rem; text-align: right; }
+
+		/* ── Warianty rozmiaru siatki ── */
+		.screens-grid.tiles-large { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+		.screens-grid.tiles-normal { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+		.screens-grid.tiles-small { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; }
+		.screens-grid.tiles-small .screen-thumb-name { font-size: 0.72rem; padding: 4px 6px; }
+		.screens-grid.tiles-small .screen-folder-card { padding: 12px 8px; }
+		.screens-grid.tiles-list { grid-template-columns: 1fr; gap: 6px; }
+		/* Tryb listy (szczegóły, bez obrazka); meta = „rozmiar | data" wyrównane do prawej */
+		.screen-thumb-meta { display: none; font-size: 0.72rem; color: var(--text-muted); }
+		.screens-grid.tiles-list .screen-thumb-card,
+		.screens-grid.tiles-list .screen-folder-card { display: flex; align-items: center; gap: 12px; padding: 8px 12px; text-align: left; }
+		.screens-grid.tiles-list .screen-thumb-img { display: none; }
+		.screens-grid.tiles-list .screen-folder-icon { font-size: 1.6rem; }
+		.screens-grid.tiles-list .screen-thumb-name,
+		.screens-grid.tiles-list .screen-folder-name { border-top: none; padding: 0; margin: 0; font-weight: 600; order: 1; }
+		.screens-grid.tiles-list .screen-thumb-tags,
+		.screens-grid.tiles-list .screen-thumb-loc { order: 2; padding: 0; margin: 0; }
+		.screens-grid.tiles-list .screen-folder-count { padding: 0; margin: 0; }
+		.screens-grid.tiles-list .screen-thumb-meta { display: block; order: 3; margin-left: auto; padding: 0; white-space: nowrap; }
+
+		/* ── Zaznaczanie wielu + akcje masowe ── */
+		.screen-thumb-card.selected { border-color: var(--accent-gold); box-shadow: inset 0 0 0 2px var(--accent-gold); }
+		.screen-sel-box {
+			position: absolute; top: 6px; left: 6px; z-index: 2; width: 24px; height: 24px; border-radius: 6px;
+			background: rgba(0,0,0,.6); border: 2px solid #fff; color: #fff;
+			display: flex; align-items: center; justify-content: center; font-size: 0.9rem; line-height: 1;
+		}
+		.screen-sel-box.checked { background: var(--accent-gold); color: #000; border-color: var(--accent-gold); }
+		.screens-grid.select-mode .screen-thumb-card { cursor: pointer; }
+		.screens-grid.tiles-list .screen-sel-box { position: static; flex: 0 0 auto; }
+		.screens-bulk-bar {
+			display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+			background: var(--bg-card); border: 1px solid var(--accent-gold); border-radius: 8px;
+			padding: 8px 12px; margin-bottom: 12px; position: sticky; top: 6px; z-index: 6;
+		}
+		.screens-bulk-bar .bulk-count { font-weight: 700; color: var(--accent-gold); margin-right: 4px; }
+		.screens-bulk-btn {
+			background: var(--bg-input); color: var(--text-light); border: 1px solid var(--border);
+			border-radius: 6px; padding: 6px 10px; cursor: pointer; font-family: inherit; font-size: 0.85rem;
+		}
+		.screens-bulk-btn:hover:not(:disabled) { border-color: var(--accent-gold); }
+		.screens-bulk-btn:disabled { opacity: .5; cursor: default; }
+		.screens-bulk-btn.danger:hover:not(:disabled) { border-color: var(--accent-red); background: var(--accent-red); color: #fff; }
+
+		/* ── Drag&drop kafelka do folderu ── */
+		.screen-thumb-card.dragging, .screen-folder-card.dragging { opacity: .4; }
+		.screen-folder-card.drop-target { border-color: var(--accent-gold); box-shadow: 0 0 0 3px var(--accent-gold); }
+		.screens-crumb.drop-target { border-color: var(--accent-gold); color: var(--accent-gold); background: var(--bg-card); }
+
+		/* Modal „Przenieś" musi być nad lightboxem (3000), gdy otwierany z podglądu screena. */
+		#screens-move-modal { z-index: 3100; }
+
 		/* Modal przenoszenia */
 		.screens-move-list { display: flex; flex-direction: column; gap: 6px; max-height: 50vh; overflow-y: auto; margin-top: 12px; }
 		.screens-move-item {
@@ -3224,6 +3298,53 @@
 		}
 		.screens-move-close:hover { color: var(--accent-gold); }
 		.screens-back { border-color: var(--accent-gold); color: var(--accent-gold); font-weight: 700; }
+
+		.screens-move-new {
+			background: var(--bg-card); color: var(--accent-gold); border: 1px dashed var(--accent-gold);
+			border-radius: 6px; padding: 9px 12px; cursor: pointer; text-align: left; font-family: inherit; font-weight: 700; margin-bottom: 4px;
+		}
+		.screens-move-new:hover { background: var(--accent-gold); color: #000; }
+
+		/* ── Przyciski akcji admina (równe, wyśrodkowane w siatce 2-kol) ── */
+		.screens-section { padding-top: 14px; }
+		.screens-admin-bar .btn { width: 100%; margin-top: 0; padding: 9px 13px; font-size: 0.85rem; white-space: nowrap; }
+
+		/* ── Ulubione (⭐) ── */
+		.screen-fav {
+			position: absolute; top: 4px; left: 4px; z-index: 2; width: 26px; height: 26px;
+			background: rgba(0,0,0,.6); color: #fff; border: none; border-radius: 6px;
+			cursor: pointer; font-size: 0.95rem; line-height: 1; opacity: 0; transition: opacity .15s;
+		}
+		.screen-thumb-card:hover .screen-fav, .screen-fav.on { opacity: 1; }
+		.screen-fav.on { color: var(--accent-gold); background: rgba(0,0,0,.7); }
+		.screen-fav:hover { background: var(--accent-gold); color: #000; }
+		@media (hover: none) { .screen-fav { opacity: 1; } }
+		.screens-grid.tiles-list .screen-fav { position: static; flex: 0 0 auto; opacity: 1; background: none; color: var(--text-muted); width: auto; }
+		.screens-grid.tiles-list .screen-fav.on { color: var(--accent-gold); }
+		.lb-fav.on { color: var(--accent-gold); }
+
+		/* ── Filtr tagów (multi/AND) ── */
+		.screen-tag-and { align-self: center; color: var(--text-muted); font-size: 0.72rem; font-style: italic; }
+		.screen-tag-clear { border-color: var(--accent-red); color: var(--accent-red); }
+		.screen-tag-clear:hover { background: var(--accent-red); color: #fff; }
+
+		/* ── Wskaźnik zużycia Storage (admin) — jedna linia, w górnym rzędzie obok szukajki ── */
+		.screens-storage {
+			display: flex; align-items: center; gap: 8px;
+			background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 0 12px;
+		}
+		.screens-storage-txt { white-space: nowrap; font-size: 0.78rem; color: var(--text-muted); }
+		.screens-storage-track { flex: 1 1 auto; min-width: 30px; height: 8px; background: var(--bg-input); border-radius: 5px; overflow: hidden; }
+		.screens-storage-fill { height: 100%; border-radius: 5px; transition: width .3s; }
+		.screens-storage-fill.ok { background: var(--accent-green); }
+		.screens-storage-fill.warn { background: var(--accent-gold); }
+		.screens-storage-fill.crit { background: var(--accent-red); }
+		.screens-backfill-btn {
+			background: var(--bg-input); color: var(--accent-gold); border: 1px solid var(--accent-gold);
+			border-radius: 6px; padding: 3px 8px; margin-left: 6px; cursor: pointer; font-family: inherit; font-size: 0.74rem;
+		}
+		.screens-backfill-btn:hover:not(:disabled) { background: var(--accent-gold); color: #000; }
+		.screens-backfill-btn:disabled { opacity: .6; cursor: default; }
 
 		/* ===== SCROLLBAR ===== */
 		::-webkit-scrollbar { width: 6px; }
