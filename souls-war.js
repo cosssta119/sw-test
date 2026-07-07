@@ -62,7 +62,16 @@
         let screensRecursive = false;    // pokaż screeny z podfolderów bieżącego folderu
         let screensTagFilter = new Set();// wybrane tagi (AND) — filtr wielotagowy
         let screensRenderLimit = 0;      // ile screenów renderujemy w siatce (paginacja „pokaż więcej" — chroni DOM przy dużych folderach)
-        let screensViewSig = '';         // sygnatura bieżącego widoku (folder+filtry+sort) — zmiana resetuje screensRenderLimit
+        let screensFolderLimit = 0;      // analogicznie dla FOLDERÓW (Heroes ma ~150 podfolderów) — paginacja kafelków folderów
+        let screensViewSig = '';         // sygnatura bieżącego widoku (folder+filtry+sort) — zmiana resetuje limity renderowania
+        // Inkrementalne listenery galerii (child_added/changed/removed) zamiast .on('value') — przy dużej galerii NIE re-syncujemy
+        // całych metadanych przy każdej zmianie, tylko różnice. Źródłem prawdy są Mapy po id; tablice allScreen* budujemy z nich (debounce).
+        const screenshotsById = new Map(), screenFoldersById = new Map();
+        let screenCountByFolder = new Map(); // folderId(|null=korzeń) -> liczba screenów; utrzymywane przy rebuildzie; O(1) liczniki (siatka + chipy bohatera)
+        let screensCacheTimer = null, screensDirty = { shots: false, folders: false };
+        // Foldery bohaterów w Galerii (zarządzane, nie do edycji/usunięcia). Kategorie rozszerzalne — na razie tylko Mastery.
+        const HEROES_ROOT_NAME = 'Heroes';
+        const HERO_GALLERY_CATEGORIES = [{ key: 'mastery', label: 'Mastery', icon: '⭐' }];
         let screenFavorites = storage.getJson('souls_screen_favorites', []); // per-user ulubione screeny (ids)
         let isOnline = false, isAdmin = false;
         let headerClickCount = 0, headerClickTimer = null;
@@ -6244,6 +6253,7 @@
         // Podświetlenie treści w modalu gdy przyszło z szukajki (hl = słowa); inaczej zwykły escape.
         function hlx(text, hl) { return hl && hl.length ? highlightHTML(text, hl) : escSkill(text == null ? '' : text); }
 
+        let hskModalHero = null; // bohater aktualnie otwarty w modalu skilli (do odświeżania paska Galerii; null = pet/zamknięte)
         // Modal z kartą skilli — wywoływany z kafelka ORAZ z klikalnych nazw w formacjach.
         // hl (opcjonalne) = słowa do podświetlenia (przekazywane tylko z zakładki Bohaterowie).
         function showHeroSkills(name, hl) {
@@ -6264,6 +6274,7 @@
         // Render zawartości modalu (kolumny obok siebie: Active | Pasywne | Przebudzenie | Grawerunek | Exclusive).
         // Exclusive i poziomy grawerunku są ZAWSZE pokazane — brak danych = „Niedostępne".
         function renderHeroSkillsModal(name, hl) {
+            hskModalHero = name;
             const titleEl = $('hero-skills-title'), body = $('hero-skills-body');
             const hero = findHero(name);
             const s = getHeroSkills(name);
@@ -6298,7 +6309,8 @@
             const exclHtml = (exclName || Object.keys(exclLv).length)
                 ? (exclName ? `<div class="skill-item excl-name"><div class="skill-name">${hlx(exclName, hl)}</div></div>` : '') + exclTiers
                 : na;
-            body.innerHTML = `<div class="skill-cols">`
+            body.innerHTML = heroGalleryBarHtml(name)
+                + `<div class="skill-cols">`
                 + col('skills.active', s && s.active ? item(s.active) : na)
                 + col('skills.passive', s && s.passives && s.passives.length ? s.passives.map(item).join('') : na)
                 + col('skills.awaken', s && s.awaken ? item(s.awaken) : na)
@@ -6306,7 +6318,44 @@
                 + col('skills.exclusive', exclHtml)
                 + `</div>`;
         }
-        function closeHeroSkills() { $('hero-skills-modal')?.classList.remove('show'); }
+        function closeHeroSkills() { hskModalHero = null; $('hero-skills-modal')?.classList.remove('show'); }
+
+        // ── Podgląd bohatera ↔ Galeria: pasek chipów per kategoria (⭐ Mastery…) z licznikiem screenów ──
+        // Widoczny tylko dla mających dostęp do Galerii (config); dla graczy bez dostępu wraca '' (brak martwych linków).
+        function canSeeGallery() {
+            if (isAdmin) return true;
+            const vis = appConfig.tabVisibility?.screens || 'all';
+            const place = appConfig.tabPlacement?.screens || 'bar';
+            return vis === 'all' && place !== 'hidden';
+        }
+        function heroGalleryBarHtml(heroName) {
+            if (!canSeeGallery()) return '';
+            const hk = normalize(heroName);
+            const chips = HERO_GALLERY_CATEGORIES.map(cat => {
+                const folder = heroCatFolder(hk, cat.key);
+                const n = folder ? screenCount(folder.id) : 0;
+                const target = folder ? `'${jsStr(folder.id)}'` : 'null';
+                const label = `${cat.icon} ${escSkill(cat.label)} · ${n > 0 ? n : t('heroGallery.empty')}`;
+                return `<button class="hero-gal-chip${n > 0 ? ' has' : ''}" onclick="openHeroGalleryFolder(${target})">${label}</button>`;
+            }).join('');
+            return `<div class="hero-gallery-bar" id="hero-gallery-bar"><span class="hero-gallery-label">🖼️ ${t('heroGallery.section')}</span>${chips}</div>`;
+        }
+        // Skok z podglądu bohatera do folderu kategorii w Galerii.
+        function openHeroGalleryFolder(catId) {
+            if (!canSeeGallery()) return;
+            if (!catId) { if (isAdmin) showToast(t('heroGallery.notSeeded'), true); return; } // folder jeszcze niezseedowany
+            closeHeroSkills();
+            switchTab('screens');
+            screensGoTo(catId);
+        }
+        // Po zmianie screenów odśwież liczniki paska, jeśli podgląd bohatera otwarty.
+        function refreshOpenHeroGalleryBar() {
+            if (!hskModalHero) return;
+            const modal = $('hero-skills-modal');
+            if (!modal || !modal.classList.contains('show')) return;
+            const bar = $('hero-gallery-bar');
+            if (bar) bar.outerHTML = heroGalleryBarHtml(hskModalHero);
+        }
 
         // Zwiń/rozwiń poziom grawerunku w Podglądzie + zapamiętaj wybór (per-poziom) w localStorage.
         function toggleEngravingTier(el, tier) {
@@ -6337,6 +6386,7 @@
             modal.classList.add('show');
         }
         function renderPetSkillsModal(name, hl) {
+            hskModalHero = null; // pet — brak paska Galerii
             const titleEl = $('hero-skills-title'), body = $('hero-skills-body');
             const s = getPetSkills(name);
             const editBtn = isAdmin ? `<button class="hsk-edit-btn" onclick="openPetSkillsEdit('${jsStr(name)}')" title="${escSkill(t('skills.edit'))}" aria-label="${escSkill(t('skills.edit'))}">✏️</button>` : '';
@@ -7663,6 +7713,7 @@
                 p.newDP.forEach(x => writes.push(() => defensePlayersRef.child(String(x.id)).set(x)));
                 p.newDA.forEach(x => writes.push(() => defenseAssignmentsRef.child(String(x.id)).set(x)));
                 for (let i = 0; i < writes.length; i += 200) await Promise.all(writes.slice(i, i + 200).map(fn => fn()));
+                if (p.newH.length) ensureHeroFolders(false, p.newH); // dosej foldery galerii dla dodanych bohaterów
                 showToast(`♻️ ${t('settings.restoreDone')} (+${p.total})`);
             } catch (err) { console.error('Restore error:', err); showToast(`${t('common.error')}: ${err.message}`, true); }
             pendingRestore = null;
@@ -7853,7 +7904,9 @@
             const races = [...ADMIN_RACE_ORDER.filter(r => byRace[r]),
                            ...Object.keys(byRace).filter(r => !ADMIN_RACE_ORDER.includes(r))];
 
-            $('heroes-list').innerHTML = races.map(r => {
+            // Pasek: seed/synchronizacja folderów galerii bohaterów (Heroes → per-bohater → Mastery).
+            const seedRow = `<div class="admin-seed-row"><button class="btn-secondary admin-seed-btn" onclick="ensureHeroFolders(true)">🦸 ${t('heroGallery.syncBtn')}</button><span class="admin-seed-hint">${t('heroGallery.syncHint')}</span></div>`;
+            $('heroes-list').innerHTML = seedRow + (races.map(r => {
                 const rc = r.toLowerCase();
                 const list = byRace[r].slice().sort((a, b) => a.name.localeCompare(b.name, 'pl'));
                 const tiles = list.map(h => h.name === editingHeroName
@@ -7870,7 +7923,7 @@
                     <div class="admin-race-header" style="color:var(--race-${rc})">${RACE_EMOJI[r] || ''} ${raceLabel(r)} (${list.length})</div>
                     <div class="admin-tile-grid">${tiles}</div>
                 </div>`;
-            }).join('') || `<p style="color:var(--text-muted);text-align:center;">${t('database.noFormations')}</p>`;
+            }).join('') || `<p style="color:var(--text-muted);text-align:center;">${t('database.noFormations')}</p>`);
         }
 
         function renderHeroEditRow(h, rc) {
@@ -7918,6 +7971,17 @@
                     }
                 });
                 if (Object.keys(dUpdates).length) await defenseFormationsRef.update(dUpdates);
+            }
+            // Foldery galerii bohatera trzymają się przez heroKey — przy rename przepisz heroKey (+ nazwę folderu bohatera).
+            if (screenFoldersRef) {
+                const oldKey = normalize(oldName), newKey = normalize(newName), sUpdates = {};
+                allScreenFolders.forEach(f => {
+                    if (f.heroKey === oldKey && (f.kind === 'hero' || f.kind === 'heroCat')) {
+                        sUpdates[`${f.id}/heroKey`] = newKey;
+                        if (f.kind === 'hero') sUpdates[`${f.id}/name`] = newName;
+                    }
+                });
+                if (Object.keys(sUpdates).length) await screenFoldersRef.update(sUpdates);
             }
             return count;
         }
@@ -8115,6 +8179,7 @@
             if (heroes.some(h => h.name.toLowerCase() === name.toLowerCase())) { showToast(t('admin.heroExists'), true); return; }
             try {
                 await heroesRef.child(name).set({ name, race });
+                ensureHeroFolders(false, [{ name }]); // auto-utwórz folder galerii bohatera (+ Mastery)
                 $('new-hero-name').value = '';
                 showToast(`${t('admin.heroAdded')}: ${name}`);
             } catch (e) { showToast(`${t('common.error')}: ${e.message}`, true); }
@@ -8367,10 +8432,80 @@
         const SCREENS_PAGE = 200, SCREENS_UPLOAD_CONCURRENCY = 3; // paginacja siatki + ile plików wgrywamy równolegle
         let lbScale = 1, lbTx = 0, lbTy = 0; // stan zoom/pan lightboxa
 
+        // ── Rebuild cache z Map (debounce; scala bursty child_* w jeden przebieg) ──
+        function scheduleScreensCache(kind) {
+            screensDirty[kind] = true;
+            if (screensCacheTimer) clearTimeout(screensCacheTimer);
+            screensCacheTimer = setTimeout(applyScreensCache, 60);
+        }
+        function applyScreensCache() {
+            screensCacheTimer = null;
+            if (screensDirty.folders) { allScreenFolders = [...screenFoldersById.values()]; screensDirty.folders = false; }
+            if (screensDirty.shots) {
+                allScreenshots = [...screenshotsById.values()];
+                screenCountByFolder = new Map();
+                for (const s of allScreenshots) { const k = s.folderId || null; screenCountByFolder.set(k, (screenCountByFolder.get(k) || 0) + 1); }
+                screensDirty.shots = false;
+            }
+            if ($('tab-screens')?.classList.contains('active')) renderScreensTab();
+            refreshOpenHeroGalleryBar(); // odśwież liczniki „⭐ Mastery" jeśli podgląd bohatera otwarty
+        }
+        function screenCount(folderId) { return screenCountByFolder.get(folderId || null) || 0; }
+
+        // ── Foldery bohaterów (zarządzane) — lookup po heroKey/kategorii + idempotentny seed ──
+        function heroesRootFolder() { return allScreenFolders.find(f => f.kind === 'heroesRoot') || null; }
+        function heroFolder(heroKey) { return allScreenFolders.find(f => f.kind === 'hero' && f.heroKey === heroKey) || null; }
+        function heroCatFolder(heroKey, catKey) { return allScreenFolders.find(f => f.kind === 'heroCat' && f.heroKey === heroKey && f.category === catKey) || null; }
+        // Serializacja: wywołania idą w łańcuchu, żeby dwa równoległe (np. podwójny klik „Synchronizuj" albo add+sync)
+        // nie czytały tego samego nieaktualnego cache i nie tworzyły duplikatów folderów.
+        let ensureHeroFoldersChain = Promise.resolve();
+        function ensureHeroFolders(announce, heroList) {
+            const run = () => ensureHeroFoldersImpl(announce, heroList);
+            ensureHeroFoldersChain = ensureHeroFoldersChain.then(run, run);
+            return ensureHeroFoldersChain;
+        }
+        // Tworzy brakujące foldery: Heroes → per-bohater → podfoldery kategorii. Idempotentne (tylko brakujące),
+        // JEDEN batchowy update (klucze z push().key bez zapisu) → jeden re-sync zamiast setek. heroList domyślnie = heroes
+        // (przy dodaniu bohatera podajemy [{name}] zanim cache się odświeży, żeby nie było wyścigu).
+        async function ensureHeroFoldersImpl(announce, heroList) {
+            if (!isAdmin || !screenFoldersRef) return;
+            const list = heroList || heroes;
+            const updates = {}, now = new Date().toISOString();
+            const gen = () => screenFoldersRef.push().key;
+            let root = heroesRootFolder();
+            const rootId = root ? root.id : gen();
+            if (!root) updates[rootId] = { id: rootId, name: HEROES_ROOT_NAME, parentId: null, createdAt: now, managed: true, kind: 'heroesRoot' };
+            let created = 0;
+            for (const h of list) {
+                const hk = normalize(h.name);
+                if (!hk) continue;
+                let hf = heroFolder(hk);
+                const hfId = hf ? hf.id : gen();
+                if (!hf) { updates[hfId] = { id: hfId, name: h.name, parentId: rootId, createdAt: now, managed: true, kind: 'hero', heroKey: hk }; created++; }
+                for (const cat of HERO_GALLERY_CATEGORIES) {
+                    if (heroCatFolder(hk, cat.key)) continue;
+                    const cid = gen();
+                    updates[cid] = { id: cid, name: cat.label, parentId: hfId, createdAt: now, managed: true, kind: 'heroCat', heroKey: hk, category: cat.key };
+                    created++;
+                }
+            }
+            if (!Object.keys(updates).length) { if (announce) showToast(t('heroGallery.syncNone')); return; }
+            try {
+                await screenFoldersRef.update(updates);
+                // Zaktualizuj cache NATYCHMIAST (nie czekaj na child_added+debounce) — kolejne wywołania widzą nowe foldery → brak duplikatów.
+                Object.entries(updates).forEach(([id, f]) => screenFoldersById.set(id, f));
+                allScreenFolders = [...screenFoldersById.values()];
+                if ($('tab-screens')?.classList.contains('active')) renderScreensTab();
+                refreshOpenHeroGalleryBar();
+                if (announce) showToast('✅ ' + t('heroGallery.syncDone', { n: created }));
+            } catch (e) { showToast(t('common.error') + ': ' + e.message, true); }
+        }
+
         // ── odczyty drzewa z cache (allScreenFolders/allScreenshots) ──
         function screenFolderChildren(parentId) {
+            // Foldery zarządzane (Heroes itp.) zawsze przed zwykłymi; w obrębie grupy alfabetycznie.
             return allScreenFolders.filter(f => (f.parentId || null) === (parentId || null))
-                .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+                .sort((a, b) => ((b.managed ? 1 : 0) - (a.managed ? 1 : 0)) || (a.name || '').localeCompare(b.name || ''));
         }
         function screenshotsInFolder(folderId) {
             return allScreenshots.filter(s => (s.folderId || null) === (folderId || null))
@@ -8464,7 +8599,17 @@
             screenFolderPath(screensCurrentFolder).forEach(f => {
                 html += `<span class="screens-crumb-sep">›</span><button class="screens-crumb" data-folder="${escapeHtml(f.id)}" onclick="screensGoTo('${jsStr(f.id)}')">${escapeHtml(f.name)}</button>`;
             });
+            // W folderze bohatera/Mastery → skrót „🦸 {bohater}" otwierający jego podgląd (modal wchodzi nad galerią; chip Mastery wraca do folderu).
+            const heroName = screenFolderHeroName(screensCurrentFolder);
+            if (heroName) html += `<button class="screens-crumb screens-hero-link" onclick="showHeroSkills('${jsStr(heroName)}')" title="${escapeHtml(t('heroGallery.backToHero', { name: heroName }))}">🦸 ${escapeHtml(heroName)}</button>`;
             el.innerHTML = html;
+        }
+        // Nazwa bohatera przypisanego do folderu (hero/heroCat) — po heroKey; źródłem nazwy jest folder bohatera (żywa nazwa po rename).
+        function screenFolderHeroName(folderId) {
+            const f = findScreenFolder(folderId);
+            if (!f || !f.heroKey) return null;
+            const hf = heroFolder(f.heroKey);
+            return hf ? hf.name : (heroes.find(h => normalize(h.name) === f.heroKey)?.name || null);
         }
         // Wstecz = do folderu-rodzica bieżącego (albo do korzenia).
         function screensGoBack() {
@@ -8505,9 +8650,12 @@
             const selBox = id => selecting ? `<div class="screen-sel-box${screensSelected.has(id) ? ' checked' : ''}">${screensSelected.has(id) ? '✓' : ''}</div>` : '';
             // ⭐ Ulubione (dla wszystkich, per-user) — ukryte w trybie zaznaczania.
             const favBtn = s => selecting ? '' : (on => `<button class="screen-fav${on ? ' on' : ''}" title="${t('screens.favTitle')}" onclick="event.stopPropagation(); toggleScreenFav('${jsStr(s.id)}')">${on ? '⭐' : '☆'}</button>`)(screenFavorites.includes(s.id));
-            const folderCard = (f, subLabel) => `<div class="screen-folder-card" data-kind="folder" data-id="${escapeHtml(f.id)}"${dragA} onclick="screenCardClick('folder','${jsStr(f.id)}',event)">
-                    ${actions('folder', f.id)}
-                    <div class="screen-folder-icon">📁</div>
+            // Foldery zarządzane (bohaterów) — inna ikona (🦸 / ikona kategorii), bez drag i bez akcji edycji/usuwania.
+            const folderIcon = f => f.kind === 'heroCat' ? ((HERO_GALLERY_CATEGORIES.find(c => c.key === f.category) || {}).icon || '📁')
+                : (f.kind === 'hero' || f.kind === 'heroesRoot') ? '🦸' : '📁';
+            const folderCard = (f, subLabel) => `<div class="screen-folder-card${f.managed ? ' managed' : ''}" data-kind="folder" data-id="${escapeHtml(f.id)}"${f.managed ? '' : dragA} onclick="screenCardClick('folder','${jsStr(f.id)}',event)">
+                    ${f.managed ? `<div class="screen-folder-lock" title="${escapeHtml(t('heroGallery.protected'))}">🔒</div>` : actions('folder', f.id)}
+                    <div class="screen-folder-icon">${folderIcon(f)}</div>
                     <div class="screen-folder-name">${escapeHtml(f.name)}</div>
                     <div class="screen-folder-count">${subLabel}</div>
                 </div>`;
@@ -8522,7 +8670,15 @@
 
             // Paginacja: zmiana widoku (folder/filtry/sort) resetuje limit renderowania; „pokaż więcej" go zwiększa.
             const sig = JSON.stringify([screensCurrentFolder, screensSearch, [...screensTagFilter].sort(), screensFavOnly, screensRecursive, screensSort]);
-            if (sig !== screensViewSig) { screensViewSig = sig; screensRenderLimit = SCREENS_PAGE; }
+            if (sig !== screensViewSig) { screensViewSig = sig; screensRenderLimit = SCREENS_PAGE; screensFolderLimit = SCREENS_PAGE; }
+            // Render kafelków folderów z limitem (Heroes ma ~150 dzieci) + „pokaż więcej".
+            const foldersHtml = (folders, labelFn) => {
+                const shown = folders.slice(0, screensFolderLimit);
+                let html = shown.map(f => folderCard(f, labelFn(f))).join('');
+                const more = folders.length - shown.length;
+                if (more > 0) html += `<button class="screens-show-more" onclick="screensShowMoreFolders()">${t('screens.showMoreFolders', { n: more })}</button>`;
+                return html;
+            };
             // Render listy screenów z limitem + przycisk „pokaż więcej" (chroni DOM przy dużych folderach; nawigacja ‹ › i tak leci po pełnym screensViewShots).
             const shotsHtml = (shots, locFn) => {
                 const shown = shots.slice(0, screensRenderLimit);
@@ -8541,7 +8697,7 @@
                 updateScreensCount(folders.length, shots.length);
                 grid.innerHTML = (!folders.length && !shots.length)
                     ? `<div class="screens-empty">${t('screens.searchNoResults')}</div>`
-                    : folders.map(f => folderCard(f, screenFolderLabel(f.id))).join('') + shotsHtml(shots, s => screenFolderLabel(s.folderId));
+                    : foldersHtml(folders, f => screenFolderLabel(f.id)) + shotsHtml(shots, s => screenFolderLabel(s.folderId));
                 return;
             }
 
@@ -8560,17 +8716,15 @@
                 grid.innerHTML = `<div class="screens-empty">${t(isAdmin ? 'screens.emptyAdmin' : 'screens.empty')}</div>`;
                 return;
             }
-            // Liczniki zawartości folderów policzone jednym przejściem (Map) zamiast filtra po całej bazie per folder (było O(folders×screenshots)).
-            const shotCountByFolder = new Map(), childCountByParent = new Map();
-            allScreenshots.forEach(s => { const k = s.folderId || null; shotCountByFolder.set(k, (shotCountByFolder.get(k) || 0) + 1); });
+            // Liczniki: screeny z globalnej Map (screenCount), podfoldery jednym przejściem (folderów mało/średnio).
+            const childCountByParent = new Map();
             allScreenFolders.forEach(f => { const k = f.parentId || null; childCountByParent.set(k, (childCountByParent.get(k) || 0) + 1); });
-            grid.innerHTML = folders.map(f => {
-                const count = (shotCountByFolder.get(f.id) || 0) + (childCountByParent.get(f.id) || 0);
-                return folderCard(f, t('screens.folderCount', { n: count }));
-            }).join('') + shotsHtml(shots, s => screensRecursive ? screenFolderLabel(s.folderId) : '');
+            grid.innerHTML = foldersHtml(folders, f => t('screens.folderCount', { n: screenCount(f.id) + (childCountByParent.get(f.id) || 0) }))
+                + shotsHtml(shots, s => screensRecursive ? screenFolderLabel(s.folderId) : '');
         }
-        // „Pokaż więcej" — dorenderuj kolejną porcję screenów w bieżącym widoku.
+        // „Pokaż więcej" — dorenderuj kolejną porcję screenów / folderów w bieżącym widoku.
         function screensShowMore() { screensRenderLimit += SCREENS_PAGE; renderScreensGrid(); }
+        function screensShowMoreFolders() { screensFolderLimit += SCREENS_PAGE; renderScreensGrid(); }
         // Czy screen przechodzi aktywne filtry globalne (szukajka + tagi AND + ulubione).
         function screenMatchesFilters(s) {
             if (screensSearch) {
@@ -8726,6 +8880,7 @@
             if (!isAdmin || !drag) return;
             targetFolderId = targetFolderId || null;
             if (drag.kind === 'folder') {
+                if (findScreenFolder(drag.id)?.managed) { showToast('🔒 ' + t('heroGallery.protected'), true); return; } // zarządzanego folderu nie przenosimy
                 if (drag.id === targetFolderId) return;
                 if (screenFolderSubtree(drag.id).includes(targetFolderId)) { showToast('⚠️ ' + t('screens.moveIntoSelf'), true); return; }
                 const f = findScreenFolder(drag.id);
@@ -9049,6 +9204,7 @@
             if (!isAdmin) return;
             const f = findScreenFolder(id);
             if (!f) return;
+            if (f.managed) { showToast('🔒 ' + t('heroGallery.protected'), true); return; }
             const name = (prompt(t('screens.renameFolderPrompt'), f.name) || '').trim();
             if (!name || name === f.name) return;
             if (name.length > SCREENS_TITLE_MAX) { showToast('⚠️ ' + t('screens.titleTooLong', { n: SCREENS_TITLE_MAX }), true); return; }
@@ -9095,6 +9251,7 @@
             if (!isAdmin) return;
             const f = findScreenFolder(id);
             if (!f) return;
+            if (f.managed) { showToast('🔒 ' + t('heroGallery.protected'), true); return; }
             const subtree = screenFolderSubtree(id);                 // folder + podfoldery (ID)
             const shots = allScreenshots.filter(s => subtree.includes(s.folderId));
             if (!confirm(t('screens.deleteFolderConfirm', { name: f.name, n: shots.length }))) return;
@@ -9112,6 +9269,7 @@
         // ── Przenoszenie (modal z drzewem folderów) ──
         function openScreenMove(kind, id) {
             if (!isAdmin) return;
+            if (kind === 'folder' && findScreenFolder(id)?.managed) { showToast('🔒 ' + t('heroGallery.protected'), true); return; }
             screenMoveCtx = { kind, id };
             renderScreenMoveList();
             $('screens-move-modal')?.classList.remove('hidden');
@@ -9172,6 +9330,7 @@
                     return;
                 }
                 if (kind === 'folder') {
+                    if (findScreenFolder(id)?.managed) { closeScreenMove(); return; } // zarządzanego folderu nie przenosimy
                     if (screenFolderSubtree(id).includes(targetFolderId)) { closeScreenMove(); return; } // nigdy do własnego poddrzewa
                     const f = findScreenFolder(id);
                     if (f && screenFolderChildren(targetFolderId).some(o => o.id !== id && (o.name || '').toLowerCase() === (f.name || '').toLowerCase())) {
@@ -9358,16 +9517,14 @@
             catch (e) { console.error('Storage init error:', e); }
 
             // id ZAWSZE z klucza Firebase (nie z pola) — odporne na rozjazd zapisanego 'id' vs klucza.
-            screenFoldersRef.on('value', snap => {
-                const v = snap.val() || {};
-                allScreenFolders = Object.entries(v).map(([id, f]) => ({ ...f, id }));
-                if ($('tab-screens')?.classList.contains('active')) renderScreensTab();
-            });
-            screenshotsRef.on('value', snap => {
-                const v = snap.val() || {};
-                allScreenshots = Object.entries(v).map(([id, s]) => ({ ...s, id }));
-                if ($('tab-screens')?.classList.contains('active')) renderScreensTab();
-            });
+            // Inkrementalnie (child_*): przy zmianie leci tylko delta, nie cały zrzut. Bursty (start, seed ~300 folderów)
+            // scalane debounce'em w jeden rebuild, żeby uniknąć O(n²) przy setkach eventów na starcie.
+            screenFoldersRef.on('child_added', s => { screenFoldersById.set(s.key, { ...s.val(), id: s.key }); scheduleScreensCache('folders'); });
+            screenFoldersRef.on('child_changed', s => { screenFoldersById.set(s.key, { ...s.val(), id: s.key }); scheduleScreensCache('folders'); });
+            screenFoldersRef.on('child_removed', s => { screenFoldersById.delete(s.key); scheduleScreensCache('folders'); });
+            screenshotsRef.on('child_added', s => { screenshotsById.set(s.key, { ...s.val(), id: s.key }); scheduleScreensCache('shots'); });
+            screenshotsRef.on('child_changed', s => { screenshotsById.set(s.key, { ...s.val(), id: s.key }); scheduleScreensCache('shots'); });
+            screenshotsRef.on('child_removed', s => { screenshotsById.delete(s.key); scheduleScreensCache('shots'); });
 
             // ─── Globalna konfiguracja gildii ───
             // Pod-węzeł 'config/settings' (a nie całe /config), bo reguły Firebase trzymają

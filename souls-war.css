@@ -3010,6 +3010,22 @@
 		.heroes-race-tiles { margin: 6px 0 4px; }
 
 		/* kolumny skilli obok siebie */
+		/* Pasek Galerii w podglądzie bohatera (chipy per kategoria: ⭐ Mastery…) */
+		.hero-gallery-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+		.hero-gallery-label { font-size: 0.9rem; color: var(--text-muted); font-weight: 600; }
+		.hero-gal-chip { display: inline-flex; align-items: center; gap: 4px; padding: 5px 12px; border-radius: 20px; cursor: pointer; font-size: 0.85rem; font-weight: 600;
+			background: var(--bg-input); color: var(--text-muted); border: 1px solid var(--border); opacity: 0.75; transition: all 0.15s; }
+		.hero-gal-chip:hover { opacity: 1; border-color: var(--accent-gold); color: var(--text-light); }
+		.hero-gal-chip.has { opacity: 1; color: var(--text-light); border-color: #2ecc71; background: color-mix(in srgb, #2ecc71 14%, var(--bg-input)); }
+		.hero-gal-chip.has::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: #2ecc71; box-shadow: 0 0 5px #2ecc71; }
+		/* Foldery zarządzane (bohaterów) — wyróżnienie + brak kursora „edytuj" */
+		.screen-folder-card.managed { border-color: var(--accent-gold); background: color-mix(in srgb, var(--accent-gold) 7%, var(--bg-card)); }
+		.screen-folder-card.managed .screen-folder-name { color: var(--accent-gold); }
+		.screen-folder-lock { position: absolute; top: 4px; right: 6px; font-size: 0.8rem; opacity: 0.65; pointer-events: none; }
+		/* Pasek seeda folderów bohaterów w panelu admina */
+		.admin-seed-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+		.admin-seed-btn { padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: 600; }
+		.admin-seed-hint { font-size: 0.8rem; color: var(--text-muted); }
 		.skill-cols { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-start; }
 		.skill-col { flex: 1 1 190px; min-width: 180px; border-left: 3px solid var(--accent-gold); padding-left: 12px; }
 		.skill-col-title { font-size: 0.92rem; color: var(--text-light); margin: 0 0 8px; letter-spacing: 0.3px; }
@@ -3086,6 +3102,9 @@
 		}
 		.screens-crumb:hover { border-color: var(--accent-gold); color: var(--accent-gold); }
 		.screens-crumb-sep { color: var(--text-muted); }
+		/* Skrót do podglądu bohatera z folderu Mastery — wyróżniony (osobny od nawigacji) */
+		.screens-hero-link { margin-left: auto; border-color: var(--accent-gold); color: var(--accent-gold); font-weight: 700; background: color-mix(in srgb, var(--accent-gold) 12%, var(--bg-input)); }
+		.screens-hero-link:hover { background: var(--accent-gold); color: #000; }
 
 		/* Górny rząd 50/50: po lewej szukajka + „?", po prawej licznik zajętości; równa wysokość. */
 		.screens-topbar { display: flex; flex-wrap: wrap; align-items: stretch; gap: 10px; margin-bottom: 12px; }
