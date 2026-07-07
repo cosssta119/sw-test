@@ -3134,14 +3134,17 @@
 		.lb-tags-row { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; align-items: center; margin-top: 6px; }
 
 		/* Zoom lightboxa */
-		#screens-lightbox-img { cursor: zoom-in; touch-action: none; transition: transform .08s ease-out; }
+		#screens-lightbox-img { cursor: zoom-in; touch-action: none; transition: transform .08s ease-out, filter .2s ease-out; }
 		#screens-lightbox-img.zoomed { cursor: grab; }
+		#screens-lightbox-img.lb-loading { filter: blur(6px); } /* miniatura-placeholder zanim doleci pełny obraz */
 
 		.screens-grid {
 			display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
 			gap: 12px;
 		}
 		.screens-empty { grid-column: 1/-1; text-align: center; color: var(--text-muted); padding: 40px 0; }
+		.screens-show-more { grid-column: 1/-1; justify-self: center; margin: 12px 0; padding: 10px 22px; background: var(--bg-card); color: var(--accent-gold); border: 1px solid var(--accent-gold); border-radius: 8px; cursor: pointer; font-weight: 600; transition: all 0.2s; }
+		.screens-show-more:hover { background: var(--accent-gold); color: #000; }
 
 		.screen-folder-card, .screen-thumb-card {
 			background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px;

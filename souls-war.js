@@ -47,6 +47,7 @@
         let allScreenFolders = [], allScreenshots = [];
         let screensCurrentFolder = null; // null = korzeń galerii
         let screensLightboxId = null;    // aktualnie otwarty screen w lightboxie (do pobierania)
+        const screensFullLoaded = new Set(); // URL-e pełnych obrazów już w cache przeglądarki — bez migotania miniatury przy powrocie/odświeżeniu
         let screensSearch = '';          // filtr szukajki galerii (po nazwie/opisie, globalnie)
         let screensHelpOpen = storage.getBool('souls_screens_help_open', false); // panel „❔ jak to działa"
         let screensViewShots = [];       // lista screenów aktualnie wyświetlanych (folder lub wynik szukajki) — kontekst nawigacji ‹ ›
@@ -60,6 +61,8 @@
         let screensFavOnly = false;      // filtr „⭐ tylko ulubione" (widok globalny)
         let screensRecursive = false;    // pokaż screeny z podfolderów bieżącego folderu
         let screensTagFilter = new Set();// wybrane tagi (AND) — filtr wielotagowy
+        let screensRenderLimit = 0;      // ile screenów renderujemy w siatce (paginacja „pokaż więcej" — chroni DOM przy dużych folderach)
+        let screensViewSig = '';         // sygnatura bieżącego widoku (folder+filtry+sort) — zmiana resetuje screensRenderLimit
         let screenFavorites = storage.getJson('souls_screen_favorites', []); // per-user ulubione screeny (ids)
         let isOnline = false, isAdmin = false;
         let headerClickCount = 0, headerClickTimer = null;
@@ -507,16 +510,27 @@
             if (info) info.innerHTML = `<strong>${online ? '🟢' : '🔴'} ${t(online ? 'status.online' : 'status.offline')}:</strong> ${t(online ? 'settings.online' : 'settings.offline')}`;
         }
 
-        function updateUI() {
-            $('total-count').textContent = allFormations.length;
-            $('db-stat-total').textContent = allFormations.length;
-            $('db-stat-base').textContent = allFormations.filter(f => f.isBase).length;
-            $('db-stat-user').textContent = allFormations.filter(f => !f.isBase).length;
+        // Render listy Bazy wg aktualnego filtra (lista albo widok Pakietów). Czyści flagę „brudne".
+        let dbRenderDirty = false; // zmiana formacji poza zakładką Baza → oznacz do przerenderowania przy wejściu (nie rebuilduj DOM w tle)
+        function renderDatabaseView() {
+            dbRenderDirty = false;
             if (currentDbFilter === 'packages') renderPackagesView(); else filterDatabase();
+        }
+
+        function updateUI() {
+            const total = allFormations.length;
+            let baseCount = 0;
+            for (const f of allFormations) if (f.isBase) baseCount++; // jedno przejście zamiast 2× filter (updateUI leci na każdą zmianę formacji)
+            $('total-count').textContent = total;
+            $('db-stat-total').textContent = total;
+            $('db-stat-base').textContent = baseCount;
+            $('db-stat-user').textContent = total - baseCount;
+            // Render Bazy tylko gdy zakładka aktywna; inaczej oznacz „brudne" i odłóż do wejścia (switchTab) — bez rebuildu DOM w tle przy każdym live-update gildii.
+            if ($('tab-database')?.classList.contains('active')) renderDatabaseView();
+            else dbRenderDirty = true;
+            // Tagi Szukajki liczą wrogów z formacji → odświeżamy je tutaj.
+            // Tagi War/Kreator/Dodaj zależą TYLKO od heroes/pets → generują je listenery heroes/pets (nie przebudowujemy ich na każdą zmianę formacji, bo to najczęstszy event).
             generateQuickTags();
-            generateAddFormTags();
-            generateWarTags();
-            generateKreatorTags();
         }
 
         function showToast(msg, isError = false) {
@@ -548,6 +562,8 @@
 				}
 			}
 
+			// Baza: jeśli w tle przyszły zmiany formacji (dbRenderDirty) — dorenderuj teraz, przy wejściu.
+			if (name === 'database' && dbRenderDirty) renderDatabaseView();
 			// Defense: zawsze rerenduj bieżący pod-widok przy wejściu (świeże liczniki/listy)
 			if (name === 'defense') switchDefenseView(currentDefenseView);
 			if (name === 'settings') renderImportStats();
@@ -8348,6 +8364,7 @@
         const SCREENS_MAX_DIM = 1600, SCREENS_JPEG_Q = 0.85, SCREENS_MAX_BYTES = 10 * 1024 * 1024;
         const SCREENS_THUMB_DIM = 320, SCREENS_THUMB_Q = 0.7; // miniatura do siatki
         const SCREENS_TITLE_MAX = 60, SCREENS_COMMENT_MAX = 300, SCREENS_TAG_MAX = 32, SCREENS_TAGS_MAX = 8; // limity tekstu
+        const SCREENS_PAGE = 200, SCREENS_UPLOAD_CONCURRENCY = 3; // paginacja siatki + ile plików wgrywamy równolegle
         let lbScale = 1, lbTx = 0, lbTy = 0; // stan zoom/pan lightboxa
 
         // ── odczyty drzewa z cache (allScreenFolders/allScreenshots) ──
@@ -8496,12 +8513,24 @@
                 </div>`;
             const shotCard = (s, locLabel) => `<div class="screen-thumb-card${screensSelected.has(s.id) ? ' selected' : ''}" data-kind="shot" data-id="${escapeHtml(s.id)}"${dragA} onclick="screenCardClick('shot','${jsStr(s.id)}',event)">
                     ${selBox(s.id)}${favBtn(s)}${actions('shot', s.id)}
-                    <img class="screen-thumb-img" loading="lazy" src="${escapeHtml(s.thumbUrl || s.url)}" alt="${escapeHtml(s.title || '')}">
+                    <img class="screen-thumb-img" loading="lazy" decoding="async" src="${escapeHtml(s.thumbUrl || s.url)}" alt="${escapeHtml(s.title || '')}">
                     <div class="screen-thumb-name">${escapeHtml(s.title || '') || '—'}</div>
                     ${(s.tags && s.tags.length) ? `<div class="screen-thumb-tags">${s.tags.slice(0, 3).map(tg => `<span class="screen-tag">${escapeHtml(tg)}</span>`).join('')}</div>` : ''}
                     ${locLabel ? `<div class="screen-thumb-loc">📁 ${locLabel}</div>` : ''}
                     <div class="screen-thumb-meta">${typeof s.size === 'number' ? fmtBytes(s.size) + ' | ' : ''}${(s.uploadedAt || '').slice(0, 10)}</div>
                 </div>`;
+
+            // Paginacja: zmiana widoku (folder/filtry/sort) resetuje limit renderowania; „pokaż więcej" go zwiększa.
+            const sig = JSON.stringify([screensCurrentFolder, screensSearch, [...screensTagFilter].sort(), screensFavOnly, screensRecursive, screensSort]);
+            if (sig !== screensViewSig) { screensViewSig = sig; screensRenderLimit = SCREENS_PAGE; }
+            // Render listy screenów z limitem + przycisk „pokaż więcej" (chroni DOM przy dużych folderach; nawigacja ‹ › i tak leci po pełnym screensViewShots).
+            const shotsHtml = (shots, locFn) => {
+                const shown = shots.slice(0, screensRenderLimit);
+                let html = shown.map(s => shotCard(s, locFn(s))).join('');
+                const more = shots.length - shown.length;
+                if (more > 0) html += `<button class="screens-show-more" onclick="screensShowMore()">${t('screens.showMore', { n: more })}</button>`;
+                return html;
+            };
 
             // ── Widok globalny: szukajka / tagi (AND) / ulubione — płaska lista z CAŁEJ galerii ──
             if (screensSearch || screensTagFilter.size || screensFavOnly) {
@@ -8512,7 +8541,7 @@
                 updateScreensCount(folders.length, shots.length);
                 grid.innerHTML = (!folders.length && !shots.length)
                     ? `<div class="screens-empty">${t('screens.searchNoResults')}</div>`
-                    : folders.map(f => folderCard(f, screenFolderLabel(f.id))).join('') + shots.map(s => shotCard(s, screenFolderLabel(s.folderId))).join('');
+                    : folders.map(f => folderCard(f, screenFolderLabel(f.id))).join('') + shotsHtml(shots, s => screenFolderLabel(s.folderId));
                 return;
             }
 
@@ -8531,11 +8560,17 @@
                 grid.innerHTML = `<div class="screens-empty">${t(isAdmin ? 'screens.emptyAdmin' : 'screens.empty')}</div>`;
                 return;
             }
+            // Liczniki zawartości folderów policzone jednym przejściem (Map) zamiast filtra po całej bazie per folder (było O(folders×screenshots)).
+            const shotCountByFolder = new Map(), childCountByParent = new Map();
+            allScreenshots.forEach(s => { const k = s.folderId || null; shotCountByFolder.set(k, (shotCountByFolder.get(k) || 0) + 1); });
+            allScreenFolders.forEach(f => { const k = f.parentId || null; childCountByParent.set(k, (childCountByParent.get(k) || 0) + 1); });
             grid.innerHTML = folders.map(f => {
-                const count = screenshotsInFolder(f.id).length + screenFolderChildren(f.id).length;
+                const count = (shotCountByFolder.get(f.id) || 0) + (childCountByParent.get(f.id) || 0);
                 return folderCard(f, t('screens.folderCount', { n: count }));
-            }).join('') + shots.map(s => shotCard(s, screensRecursive ? screenFolderLabel(s.folderId) : '')).join('');
+            }).join('') + shotsHtml(shots, s => screensRecursive ? screenFolderLabel(s.folderId) : '');
         }
+        // „Pokaż więcej" — dorenderuj kolejną porcję screenów w bieżącym widoku.
+        function screensShowMore() { screensRenderLimit += SCREENS_PAGE; renderScreensGrid(); }
         // Czy screen przechodzi aktywne filtry globalne (szukajka + tagi AND + ulubione).
         function screenMatchesFilters(s) {
             if (screensSearch) {
@@ -8714,7 +8749,7 @@
             if (!s) return;
             screensLightboxId = id;
             resetLbZoom();
-            $('screens-lightbox-img').src = s.url; // lightbox = pełny obraz (nie miniatura)
+            setLightboxImage(s, id); // miniatura natychmiast (z cache siatki) → pełny obraz doczytuje się w tle
             const meta = [];
             const penTitle = isAdmin ? `<button class="lb-edit-mini" title="${t('screens.renameShotPrompt')}" onclick="renameScreenshot('${jsStr(id)}')">✏️</button>` : '';
             // C: przenieś prosto z podglądu (modal wchodzi nad lightbox — patrz #screens-move-modal z-index)
@@ -8740,6 +8775,43 @@
             const multi = screensViewShots.length > 1;
             document.querySelectorAll('.screens-lightbox-nav').forEach(b => b.style.display = multi ? 'block' : 'none');
             $('screens-lightbox').classList.remove('hidden');
+            preloadNeighborScreens(); // sąsiedzi (‹ › / swipe) doczytani w tle → natychmiastowa nawigacja
+        }
+        // Ustawia obraz lightboxa: jeśli pełny już w cache → od razu; inaczej miniatura (jest w cache siatki, więc widać ją natychmiast)
+        // jako placeholder + pełny doczytywany w tle i podmieniany. Znika „pusta" sekunda czekania na duży plik ze Storage.
+        function setLightboxImage(s, id) {
+            const img = $('screens-lightbox-img');
+            if (!img) return;
+            const full = s.url, thumb = s.thumbUrl || s.url;
+            if (full === thumb || screensFullLoaded.has(full)) { // brak miniatury albo pełny już wczytany → bez migotania
+                img.classList.remove('lb-loading');
+                img.src = full;
+                return;
+            }
+            img.classList.add('lb-loading'); // lekki blur maskuje niską rozdzielczość miniatury do czasu wyostrzenia
+            img.src = thumb;
+            const pre = new Image();
+            pre.onload = () => {
+                screensFullLoaded.add(full);
+                if (screensLightboxId === id) { img.src = full; img.classList.remove('lb-loading'); }
+            };
+            pre.onerror = () => { if (screensLightboxId === id) img.classList.remove('lb-loading'); };
+            pre.src = full;
+        }
+        // Prefetch pełnych obrazów sąsiadów (poprzedni/następny) w tle → swipe/‹ › natychmiast.
+        function preloadNeighborScreens() {
+            const shots = screensViewShots;
+            if (!shots || shots.length < 2) return;
+            const idx = shots.findIndex(x => x.id === screensLightboxId);
+            if (idx < 0) return;
+            [1, -1].forEach(d => {
+                const n = shots[(idx + d + shots.length) % shots.length];
+                if (n && n.url && !screensFullLoaded.has(n.url)) {
+                    const im = new Image();
+                    im.onload = () => screensFullLoaded.add(n.url);
+                    im.src = n.url;
+                }
+            });
         }
         function closeScreenLightbox() {
             $('screens-lightbox')?.classList.add('hidden');
@@ -9115,25 +9187,33 @@
         }
 
         // ── Upload z opcjonalną kompresją (canvas) ──
-        function compressImage(file, maxDim = SCREENS_MAX_DIM, quality = SCREENS_JPEG_Q) {
+        // Dekoduje plik obrazu RAZ do elementu <img> (do wielokrotnego rysowania w różnych rozmiarach — pełny + miniatura z jednego dekodowania).
+        function decodeImageFile(file) {
             return new Promise((resolve, reject) => {
                 const img = new Image();
                 const url = URL.createObjectURL(file);
-                img.onload = () => {
-                    URL.revokeObjectURL(url);
-                    let { width, height } = img;
-                    if (width > maxDim || height > maxDim) {
-                        if (width >= height) { height = Math.round(height * maxDim / width); width = maxDim; }
-                        else { width = Math.round(width * maxDim / height); height = maxDim; }
-                    }
-                    const canvas = document.createElement('canvas');
-                    canvas.width = width; canvas.height = height;
-                    canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-                    canvas.toBlob(b => b ? resolve(b) : reject(new Error('toBlob failed')), 'image/jpeg', quality);
-                };
+                img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
                 img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('image load failed')); };
                 img.src = url;
             });
+        }
+        // Rysuje już zdekodowany obraz do JPEG-a o zadanym maksymalnym boku.
+        function imageToBlob(img, maxDim, quality) {
+            return new Promise((resolve, reject) => {
+                let width = img.width, height = img.height;
+                if (width > maxDim || height > maxDim) {
+                    if (width >= height) { height = Math.round(height * maxDim / width); width = maxDim; }
+                    else { width = Math.round(width * maxDim / height); height = maxDim; }
+                }
+                const canvas = document.createElement('canvas');
+                canvas.width = width; canvas.height = height;
+                canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+                canvas.toBlob(b => b ? resolve(b) : reject(new Error('toBlob failed')), 'image/jpeg', quality);
+            });
+        }
+        // Kompresja pojedynczego rozmiaru (dekoduje raz) — zachowana dla ewentualnych innych wywołań.
+        async function compressImage(file, maxDim = SCREENS_MAX_DIM, quality = SCREENS_JPEG_Q) {
+            return imageToBlob(await decodeImageFile(file), maxDim, quality);
         }
         async function handleScreenUpload(fileList) {
             if (!isAdmin || !screensStorageRef || !screenshotsRef) return;
@@ -9144,34 +9224,52 @@
             const targetFolder = screensCurrentFolder || null;
             // B: pokaż dokąd lecą screeny (nazwa folderu, niezaescape'owana — status/toast to tekst).
             const folderLabel = targetFolder ? screenFolderPath(targetFolder).map(f => f.name).join(' / ') : t('screens.root');
-            let done = 0; const skipped = [];
-            for (let i = 0; i < files.length; i++) {
-                const file = files[i];
-                if (status) status.textContent = t('screens.uploadingTo', { i: i + 1, n: files.length, folder: folderLabel });
-                if (!/^image\//.test(file.type || '')) { skipped.push(t('screens.notImage', { name: file.name })); continue; }
-                try {
-                    let blob = file;
-                    if (compress) { try { blob = await compressImage(file); } catch (e) { blob = file; } }
-                    if (blob.size > SCREENS_MAX_BYTES) { skipped.push(t('screens.tooBig', { name: file.name })); continue; }
-                    const ref = screenshotsRef.push();
-                    const id = ref.key;
-                    const path = `screenshots/${id}`;
-                    // Cache-Control: przeglądarka trzyma obraz tydzień → powtórne wejścia bez transferu.
-                    const CACHE = 'public, max-age=604800';
-                    const snap = await screensStorageRef.child(path).put(blob, { contentType: blob.type || 'image/jpeg', cacheControl: CACHE });
-                    const url = await snap.ref.getDownloadURL();
-                    // Miniatura (~320px) do siatki — mocno tnie transfer przy dużych galeriach. Opcjonalna.
-                    let thumbUrl = null, thumbPath = null;
+            const CACHE = 'public, max-age=604800'; // przeglądarka trzyma obraz tydzień → powtórne wejścia bez transferu
+            let done = 0, finished = 0; const skipped = [];
+            const updateStatus = () => { if (status) status.textContent = t('screens.uploadingProgress', { done: finished, n: files.length, folder: folderLabel }); };
+            updateStatus();
+            // Przetwarza jeden plik: dekoduje RAZ, kompresuje pełny+miniaturę i wysyła oba do Storage równolegle.
+            const processOne = async (file) => {
+                if (!/^image\//.test(file.type || '')) { skipped.push(t('screens.notImage', { name: file.name })); return; }
+                let fullBlob = file, thumbBlob = null;
+                if (compress) {
                     try {
-                        const thumbBlob = await compressImage(file, SCREENS_THUMB_DIM, SCREENS_THUMB_Q);
-                        thumbPath = `screenshots/${id}_thumb`;
-                        const tSnap = await screensStorageRef.child(thumbPath).put(thumbBlob, { contentType: 'image/jpeg', cacheControl: CACHE });
-                        thumbUrl = await tSnap.ref.getDownloadURL();
-                    } catch (e) { thumbUrl = null; thumbPath = null; }
-                    await ref.set({ id, folderId: targetFolder, url, storagePath: path, thumbUrl, thumbPath, size: blob.size, title: file.name.replace(/\.[^.]+$/, '').slice(0, SCREENS_TITLE_MAX), comment: '', tags: [], uploadedAt: new Date().toISOString() });
-                    done++;
-                } catch (e) { showToast('⚠️ ' + t('screens.uploadErr', { msg: e.message || String(e) }), true); }
-            }
+                        const img = await decodeImageFile(file); // jedno dekodowanie → oba rozmiary
+                        [fullBlob, thumbBlob] = await Promise.all([
+                            imageToBlob(img, SCREENS_MAX_DIM, SCREENS_JPEG_Q),
+                            imageToBlob(img, SCREENS_THUMB_DIM, SCREENS_THUMB_Q),
+                        ]);
+                    } catch (e) { fullBlob = file; thumbBlob = null; }
+                }
+                if (fullBlob.size > SCREENS_MAX_BYTES) { skipped.push(t('screens.tooBig', { name: file.name })); return; }
+                const ref = screenshotsRef.push();
+                const id = ref.key;
+                const path = `screenshots/${id}`;
+                // Pełny obraz i miniatura lecą do Storage równolegle (miniatura opcjonalna — błąd nie blokuje wgrania).
+                const fullPromise = screensStorageRef.child(path).put(fullBlob, { contentType: fullBlob.type || 'image/jpeg', cacheControl: CACHE })
+                    .then(snap => snap.ref.getDownloadURL());
+                let thumbPromise = Promise.resolve({ thumbUrl: null, thumbPath: null });
+                if (thumbBlob) {
+                    const thumbPath = `screenshots/${id}_thumb`;
+                    thumbPromise = screensStorageRef.child(thumbPath).put(thumbBlob, { contentType: 'image/jpeg', cacheControl: CACHE })
+                        .then(snap => snap.ref.getDownloadURL()).then(thumbUrl => ({ thumbUrl, thumbPath }))
+                        .catch(() => ({ thumbUrl: null, thumbPath: null }));
+                }
+                const [url, thumb] = await Promise.all([fullPromise, thumbPromise]);
+                await ref.set({ id, folderId: targetFolder, url, storagePath: path, thumbUrl: thumb.thumbUrl, thumbPath: thumb.thumbPath, size: fullBlob.size, title: file.name.replace(/\.[^.]+$/, '').slice(0, SCREENS_TITLE_MAX), comment: '', tags: [], uploadedAt: new Date().toISOString() });
+                done++;
+            };
+            // Pula robocza: kilka plików naraz (cap) zamiast jeden-po-drugim — mocno skraca wgrywanie paczki.
+            let next = 0;
+            const worker = async () => {
+                while (next < files.length) {
+                    const file = files[next++];
+                    try { await processOne(file); }
+                    catch (e) { showToast('⚠️ ' + t('screens.uploadErr', { msg: e.message || String(e) }), true); }
+                    finished++; updateStatus();
+                }
+            };
+            await Promise.all(Array.from({ length: Math.min(SCREENS_UPLOAD_CONCURRENCY, files.length) }, worker));
             if (status) status.textContent = '';
             if (done) showToast('✅ ' + t('screens.uploadedTo', { n: done, folder: folderLabel }));
             skipped.forEach(m => showToast('⚠️ ' + m, true));
@@ -9206,22 +9304,24 @@
                     if (isAdmin) renderHeroesList();
                     // Nowy/zmieniony bohater pojawia się od razu w zakładce Bohaterowie (z „brak danych" dopóki admin nie uzupełni skilli)
                     if ($('tab-heroes')?.classList.contains('active')) renderHeroesGrid();
-                    // Regeneruj tagi po załadowaniu bohaterów z bazy
+                    // Regeneruj tagi zależne od heroes (War/Kreator/Dodaj + grupowanie Szukajki po rasie) — updateUI już ich nie rusza
                     generateWarTags();
                     generateKreatorTags();
                     generateAddFormTags();
+                    generateQuickTags();
                 }
             });
-            
+
             petsRef.on('value', snap => {
                 if (snap.val()) {
                     pets = Object.values(snap.val()).map(getPetName).sort();
                     if (isAdmin) renderPetsList();
                     if ($('tab-heroes')?.classList.contains('active')) renderHeroesGrid(); // nowy pet pojawia się od razu w sekcji Pety
-                    // Regeneruj tagi po załadowaniu petów z bazy
+                    // Regeneruj tagi zależne od pets (War/Kreator/Dodaj + pety w Szukajce) — updateUI już ich nie rusza
                     generateWarTags();
                     generateKreatorTags();
                     generateAddFormTags();
+                    generateQuickTags();
                 }
             });
             
