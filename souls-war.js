@@ -6147,7 +6147,7 @@
             if (bookFilterBooks.size) list = list.filter(b => bookFilterBooks.has(b.book));
             if (!parsed.empty) list = list.filter(b => bookMatches(b, parsed));
             const cnt = $('book-count');
-            if (cnt) cnt.textContent = t('heroes.count', { n: list.length });
+            if (cnt) cnt.textContent = t('book.count', { n: list.length });
             const groups = {};
             list.forEach(b => { (groups[b.book] = groups[b.book] || []).push(b); });
             const section = (label, count, cards) => `<div class="quick-tags-section"><div class="quick-tags-header expanded" onclick="toggleBookSection(this)">`
