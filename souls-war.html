@@ -756,23 +756,45 @@
          ═══════════════════════════════════════════════════════ -->
     <div id="tab-heroes" class="tab-content">
         <div class="section">
-            <h2>🧙 <span data-i18n="heroes.title">Bohaterowie</span></h2>
-            <p class="section-subtitle" data-i18n="heroes.subtitle">Przeglądaj umiejętności bohaterów</p>
-            <div class="heroes-toolbar">
-                <input type="text" id="heroes-search" class="heroes-search" data-i18n-placeholder="heroes.searchPlaceholder" placeholder="🔍 Szukaj bohatera..." oninput="setHeroesSearch(this.value)">
-                <button id="heroes-help-toggle" class="heroes-help-toggle" onclick="toggleHeroesHelp()" title="Zaawansowane wyszukiwanie">❔</button>
-                <button id="heroes-fuzzy-toggle" class="heroes-compare-btn" onclick="toggleHeroesFuzzy()" data-i18n-title="heroes.fuzzyHint" title="Tolerancja literówek">🔤~ <span data-i18n="heroes.fuzzyToggle">Literówki</span></button>
-                <button id="heroes-compare-toggle" class="heroes-compare-btn" onclick="toggleHeroCompareMode()">⚖️ <span data-i18n="heroes.compareToggle">Porównaj</span></button>
+            <h2>📖 <span data-i18n="heroes.title">Kompendium</span></h2>
+            <p class="section-subtitle" data-i18n="heroes.subtitle">Bohaterowie, pety i Księga bonusów</p>
+            <div class="heroes-mode-switch">
+                <button id="heroes-mode-btn-heroes" class="heroes-mode-btn active" onclick="setHeroesMode('heroes')">🦸 <span data-i18n="heroes.modeHeroes">Bohaterowie</span></button>
+                <button id="heroes-mode-btn-book" class="heroes-mode-btn" onclick="setHeroesMode('book')">📖 <span data-i18n="heroes.modeBook">Księga</span></button>
             </div>
-            <div class="heroes-search-help" id="heroes-search-help"></div>
-            <div class="heroes-synonyms" id="heroes-synonyms"></div>
-            <div class="heroes-search-examples" id="heroes-search-examples"></div>
-            <div class="heroes-chips" id="heroes-race-chips"></div>
-            <div class="heroes-chips" id="heroes-role-chips"></div>
-            <div class="heroes-chips" id="heroes-stat-chips"></div>
-            <div class="heroes-chips" id="heroes-exclusive-chips"></div>
-            <div class="heroes-count" id="heroes-count"></div>
-            <div class="heroes-grid" id="heroes-grid"></div>
+            <div id="heroes-mode-heroes">
+                <div class="heroes-toolbar">
+                    <input type="text" id="heroes-search" class="heroes-search" data-i18n-placeholder="heroes.searchPlaceholder" placeholder="🔍 Szukaj bohatera..." oninput="setHeroesSearch(this.value)">
+                    <button id="heroes-help-toggle" class="heroes-help-toggle" onclick="toggleHeroesHelp()" title="Zaawansowane wyszukiwanie">❔</button>
+                    <button id="heroes-fuzzy-toggle" class="heroes-compare-btn" onclick="toggleHeroesFuzzy()" data-i18n-title="heroes.fuzzyHint" title="Tolerancja literówek">🔤~ <span data-i18n="heroes.fuzzyToggle">Literówki</span></button>
+                    <button id="heroes-compare-toggle" class="heroes-compare-btn" onclick="toggleHeroCompareMode()">⚖️ <span data-i18n="heroes.compareToggle">Porównaj</span></button>
+                    <span class="heroes-tile-switch">
+                        <button id="heroes-tile-small" class="heroes-tile-btn" onclick="setHeroesTile('small')" data-i18n-title="heroes.tileSmall" title="Małe kafelki">▪</button>
+                        <button id="heroes-tile-normal" class="heroes-tile-btn active" onclick="setHeroesTile('normal')" data-i18n-title="heroes.tileNormal" title="Średnie kafelki">◼</button>
+                        <button id="heroes-tile-large" class="heroes-tile-btn" onclick="setHeroesTile('large')" data-i18n-title="heroes.tileLarge" title="Duże kafelki">⬛</button>
+                    </span>
+                </div>
+                <div class="heroes-search-help" id="heroes-search-help"></div>
+                <div class="heroes-synonyms" id="heroes-synonyms"></div>
+                <div class="heroes-search-examples" id="heroes-search-examples"></div>
+                <div class="heroes-chips" id="heroes-race-chips"></div>
+                <div class="heroes-chips" id="heroes-role-chips"></div>
+                <div class="heroes-chips" id="heroes-stat-chips"></div>
+                <div class="heroes-chips" id="heroes-exclusive-chips"></div>
+                <div class="heroes-count" id="heroes-count"></div>
+                <div class="heroes-grid" id="heroes-grid"></div>
+            </div>
+            <div id="heroes-mode-book" style="display: none;">
+                <div class="heroes-toolbar">
+                    <input type="text" id="book-search" class="heroes-search" data-i18n-placeholder="book.searchPlaceholder" placeholder="🔍 Szukaj: Elf Undead · crit|dodge · book:light · race:elf" oninput="setBookSearch(this.value)">
+                    <button id="book-help-toggle" class="heroes-help-toggle" onclick="toggleBookHelp()" data-i18n-title="book.helpHint" title="Zaawansowane wyszukiwanie">❔</button>
+                </div>
+                <div id="book-search-help"></div>
+                <div class="heroes-synonyms" id="book-synonyms"></div>
+                <div class="heroes-chips" id="book-filter-chips"></div>
+                <div class="heroes-count" id="book-count"></div>
+                <div class="heroes-grid" id="book-grid"></div>
+            </div>
         </div>
     </div>
 
@@ -1048,7 +1070,8 @@
 
             <!-- VIEW: SKŁADY -->
             <div class="defense-view" id="defense-view-formations" style="display: none;">
-                <input type="text" class="search-input" id="defense-formation-search" data-i18n-placeholder="defense.searchPlaceholder" placeholder="🔍 Szukaj po nazwie/bohaterze..." oninput="renderDefenseFormations()" style="margin-bottom: 12px;">
+                <input type="text" class="search-input" id="defense-formation-search" data-i18n-placeholder="defense.searchPlaceholder" placeholder="🔍 Szukaj: Jack Leovalt (oba) · Jack|Leovalt (dowolny) · -Akmon (bez)…" oninput="renderDefenseFormations()" style="margin-bottom: 6px;">
+                <div class="defense-search-hint" data-i18n="defense.searchHint" style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 12px;">💡 Spacja = ORAZ (oba muszą być) · | = ALBO (Jack|Leovalt) · - = wyklucz (-Akmon) · "…" = nazwa wielowyrazowa. Szuka po bohaterach, pecie, nazwie i komentarzu.</div>
                 <div class="sort-bar" style="margin-bottom: 12px;">
                     <span class="sort-label" data-i18n="database.sortLabel">Sortuj:</span>
                     <button class="sort-btn active" data-defense-sort="id-desc" onclick="setDefenseSort('id-desc')" title="ID malejąco">ID ↓</button>
@@ -1268,6 +1291,46 @@
         </div>
     </div>
 
+    <!-- Modal: edycja bonusu Księgi (tylko admin) -->
+    <div class="hsk-modal-bg" id="book-edit-modal" onclick="if(event.target===this) closeBookEdit()">
+        <div class="hsk-modal">
+            <button class="hsk-close" onclick="closeBookEdit()" aria-label="close">×</button>
+            <h3 class="hsk-title"><span class="hsk-name" id="book-edit-title"></span></h3>
+            <div class="hse-form">
+                <label class="hse-field"><span data-i18n="book.fieldBook">Księga</span>
+                    <select id="be-book" class="hse-input"></select>
+                </label>
+                <label class="hse-field"><span data-i18n="book.fieldName">Nazwa</span><input id="be-name" class="hse-input"></label>
+                <label class="hse-field"><span data-i18n="book.fieldDesc">Opis / efekt</span><textarea id="be-desc" class="hse-textarea" oninput="autoSizeTextarea(this)"></textarea></label>
+            </div>
+            <div class="hse-actions">
+                <button class="btn btn-secondary" onclick="closeBookEdit()" data-i18n="common.cancel">Anuluj</button>
+                <button class="btn btn-success" onclick="saveBookEdit()" data-i18n="common.save">Zapisz</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: zarządzanie księgami (tylko admin) -->
+    <div class="hsk-modal-bg" id="book-meta-modal" onclick="if(event.target===this) closeBookMetaModal()">
+        <div class="hsk-modal">
+            <button class="hsk-close" onclick="closeBookMetaModal()" aria-label="close">×</button>
+            <h3 class="hsk-title"><span class="hsk-name" data-i18n="book.manageTitle">Zarządzaj księgami</span></h3>
+            <div id="book-meta-list"></div>
+            <div class="hse-form" style="margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px;">
+                <div class="hse-row2">
+                    <label class="hse-field"><span data-i18n="book.metaKey">Klucz (id)</span><input id="bm-key" class="hse-input" placeholder="np. nature"></label>
+                    <label class="hse-field"><span data-i18n="book.metaIcon">Ikona</span><input id="bm-icon" class="hse-input" maxlength="4" value="📖"></label>
+                </div>
+                <label class="hse-field"><span data-i18n="book.metaLabel">Nazwa księgi</span><input id="bm-label" class="hse-input" placeholder="np. Book of Nature"></label>
+                <label class="hse-field"><span data-i18n="book.metaColor">Kolor</span><input id="bm-color" class="hse-input" type="color" value="#d9a441"></label>
+            </div>
+            <div class="hse-actions">
+                <button class="btn btn-secondary" onclick="resetBookMetaForm()" data-i18n="book.metaNew">Wyczyść</button>
+                <button class="btn btn-success" onclick="saveBookMeta()" data-i18n="book.metaSave">Zapisz księgę</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal: podgląd importu skilli (nowe + różnice) -->
     <div class="hsk-modal-bg" id="skills-import-modal" onclick="if(event.target===this) closeSkillsImport()">
         <div class="hsk-modal">
@@ -1367,7 +1430,7 @@
         <button class="nav-btn" id="nav-add" onclick="switchTab('add')"><span class="icon">➕</span><span data-i18n="nav.add">Dodaj</span></button>
         <button class="nav-btn" id="nav-war" onclick="switchTab('war')"><span class="icon">⚔️</span><span data-i18n="nav.war">Wojna</span></button>
         <button class="nav-btn" id="nav-kreator" onclick="switchTab('kreator')"><span class="icon">🎯</span><span data-i18n="nav.kreator">Kreator</span></button>
-        <button class="nav-btn" id="nav-heroes" onclick="switchTab('heroes')"><span class="icon">🧙</span><span data-i18n="nav.heroes">Bohaterowie</span></button>
+        <button class="nav-btn" id="nav-heroes" onclick="switchTab('heroes')"><span class="icon">📖</span><span data-i18n="nav.heroes">Kompendium</span></button>
         <button class="nav-btn admin-only" id="nav-defense" onclick="switchTab('defense')"><span class="icon">🛡️</span><span data-i18n="nav.defense">Obrona</span></button>
         <button class="nav-btn admin-only" id="nav-screens" onclick="switchTab('screens')"><span class="icon">🖼️</span><span data-i18n="nav.screens">Galeria</span></button>
         <button class="nav-btn admin-only" id="nav-settings" onclick="switchTab('settings')"><span class="icon">⚙️</span><span data-i18n="nav.import">Import</span></button>

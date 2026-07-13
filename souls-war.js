@@ -35,8 +35,12 @@
             }
         });
 
-        let db, formationsRef, heroesRef, petsRef, heroSkillsRef, petSkillsRef, synonymsRef;
+        let db, formationsRef, heroesRef, petsRef, heroSkillsRef, petSkillsRef, synonymsRef, bookBonusesRef, bookMetaRef;
         let allFormations = [];
+        let allBookBonuses = [];         // cache /bookBonuses (Księga bonusów; live przez .on; pusto → DEFAULT_BOOK_BONUSES)
+        let allBookMeta = [];            // cache /bookMeta (definicje ksiąg; live przez .on; scalane z DEFAULT_BOOK_META)
+        let editingBookId = null;        // id edytowanego bonusu Księgi (null = tryb dodawania)
+        let editingBookMetaKey = null;   // klucz edytowanej księgi (null = tryb dodawania nowej)
         let allSynonyms = [];            // cache /synonyms (słownik synonimów wyszukiwarki; live przez .on)
         let editingSynId = null;         // id edytowanego wiersza słownika (null = tryb dodawania)
         let allHeroSkills = {};          // cache /heroSkills (lazy-load przy 1. wejściu na zakładkę Bohaterowie)
@@ -283,7 +287,7 @@
         }
 
 		// Konfigurowalne zakładki (kolejność = w panelu). 'admin' zawsze admin-only (locked).
-		const TAB_ICONS = { search: '🔍', database: '📚', view: '👁️', add: '➕', settings: '⚙️', war: '⚔️', kreator: '🎯', defense: '🛡️', admin: '👑', heroes: '🧙', screens: '🖼️' };
+		const TAB_ICONS = { search: '🔍', database: '📚', view: '👁️', add: '➕', settings: '⚙️', war: '⚔️', kreator: '🎯', defense: '🛡️', admin: '👑', heroes: '📖', screens: '🖼️' };
 		const TAB_I18N = { search: 'nav.search', database: 'nav.database', view: 'nav.preview', add: 'nav.add', settings: 'nav.import', war: 'nav.war', kreator: 'nav.kreator', defense: 'nav.defense', admin: 'nav.admin', heroes: 'nav.heroes', screens: 'nav.screens' };
 		const tabLabel = tab => `${TAB_ICONS[tab]} ${t(TAB_I18N[tab])}`;
 
@@ -576,7 +580,7 @@
 			// Defense: zawsze rerenduj bieżący pod-widok przy wejściu (świeże liczniki/listy)
 			if (name === 'defense') switchDefenseView(currentDefenseView);
 			if (name === 'settings') renderImportStats();
-			if (name === 'heroes') renderHeroesTab(); // lazy-load /heroSkills + render listy
+			if (name === 'heroes') applyHeroesMode(); // Bohaterowie albo Księga (wg zapisanego trybu)
 			if (name === 'screens') renderScreensTab();
 
 		}
@@ -793,11 +797,12 @@
 						return;
 					}
 					
-					// Aktualizuj kolor inputa dla War Planner i Kreator
+					// Aktualizuj kolor inputa dla War Planner, Kreator i Obrony (add + edit)
 					if (input.id.startsWith('war-') || input.id.startsWith('kreator-')) {
 						const isPet = input.id.includes('-pet');
 						updateInputHeroColor(input, isPet);
 					}
+					if (input.id.startsWith('defense-')) updateInputHeroColor(input, input.dataset.type === 'pet');
 					
 					// Walidacja dla formularza dodawania
 					if (input.id.startsWith('add-') && !['add-name', 'add-comment'].includes(input.id)) {
@@ -849,7 +854,8 @@
 						updateKreatorTagsSelection();
 						updateInputHeroColor(input, input.id.includes('-pet'));
 					}
-					
+					if (input.id.startsWith('defense-')) updateInputHeroColor(input, input.dataset.type === 'pet');
+
 					const val = input.value.toLowerCase();
 					if (val.length < 1) { targetList.classList.remove('show'); return; }
 					
@@ -5572,10 +5578,106 @@
         // Dane skilli (/heroSkills) są lazy-load przy 1. wejściu (loadHeroSkills) —
         // świadomie NIE trzymamy stałego .on('value'), żeby nie obciążać startu apki.
 
+        // ─── Pod-widok „Księga" (Book of Heroes/Light/Darkness) w zakładce Bohaterowie ───
+        // Statyczne bonusy pasywne z gry, edytowalne przez admina (Firebase /bookBonuses, live przez .on).
+        // Wyszukiwanie w duchu Bohaterów: spacja=ORAZ, |=ALBO, -=wyklucz, "fraza", pole:x (book/race/row/name/desc)
+        // + rozwijanie synonimów (acc→accuracy itd.). Przy pustym /bookBonuses działa na DEFAULT_BOOK_BONUSES.
+        let heroesMode = storage.getJson('souls_heroes_mode', 'heroes'); // 'heroes' | 'book'
+        if (heroesMode !== 'book') heroesMode = 'heroes';
+        let bookSearchQuery = '', bookFilterBooks = new Set(); // filtr ksiąg (pusty = wszystkie)
+        let bookHelpOpen = storage.getBool('souls_book_help', false);
+
+        // Domyślne 3 księgi (fallback). Nowe księgi / zmiany admin robi w UI → Firebase /bookMeta.
+        const DEFAULT_BOOK_META = [
+            { key: 'heroes',   label: 'Book of Heroes',   icon: '📕', color: '#d9a441', order: 0 },
+            { key: 'light',    label: 'Book of Light',    icon: '📗', color: '#e5d9a8', order: 1 },
+            { key: 'darkness', label: 'Book of Darkness', icon: '📘', color: '#8f7bd6', order: 2 },
+        ];
+        // Lista ksiąg = domyślne ⊕ nadpisania/nowe z /bookMeta ⊕ osierocone klucze obecne w bonusach. Sort po order.
+        function getBooks() {
+            const map = new Map();
+            DEFAULT_BOOK_META.forEach(b => map.set(b.key, { ...b }));
+            allBookMeta.forEach(b => { if (b && b.key) map.set(b.key, { ...(map.get(b.key) || {}), ...b }); });
+            for (const bo of getBookBonuses()) {
+                if (bo.book && !map.has(bo.book)) map.set(bo.book, { key: bo.book, label: bo.book, icon: '📖', color: 'var(--border)', order: 90 });
+            }
+            return Array.from(map.values()).sort((a, b) => (a.order || 0) - (b.order || 0) || String(a.key).localeCompare(String(b.key)));
+        }
+        function bookMeta(key) { return getBooks().find(b => b.key === key) || { key, label: key || '', icon: '📖', color: 'var(--border)', order: 99 }; }
+        function bookMetaRecord(key) { return allBookMeta.find(b => b.key === key) || null; } // rekord w /bookMeta (do edycji/usuwania; null = tylko domyślna)
+        // Aliasy pól scope'owanych w szukajce Księgi (pole:term)
+        const BOOK_FIELD_ALIAS = {
+            book: 'book', ks: 'book', ksiega: 'book', 'księga': 'book',
+            name: 'name', n: 'name', nazwa: 'name',
+            desc: 'desc', d: 'desc', opis: 'desc', effect: 'desc', efekt: 'desc',
+            race: 'race', rasa: 'race',
+            row: 'row', rzad: 'row', 'rząd': 'row',
+        };
+        // Słowa ras/rzędów rozpoznawane w treści bonusu (do scope'a race:/row: i chipów).
+        const BOOK_RACE_WORDS = ['human', 'horde', 'elf', 'undead', 'light', 'darkness', 'dark'];
+        const BOOK_ROW_WORDS = ['first', 'second', 'third'];
+        const BOOK_HELP = [
+            ['Elf Undead',        'oba słowa muszą wystąpić (ORAZ)'],
+            ['crit|dodge',        'którekolwiek (ALBO)'],
+            ['atk -light',        'jest „atk", ale bez „light"'],
+            ['"crit rate"',       'dokładna fraza'],
+            ['book:light',        'tylko z Księgi Światła'],
+            ['race:elf',          'bonusy dotyczące Elfów'],
+            ['row:second',        'bonusy dla drugiego rzędu'],
+        ];
+
+        // 37 domyślnych bonusów (fallback + seed do bazy przyciskiem admina). order = globalny numer 1..37.
+        const DEFAULT_BOOK_BONUSES = [
+            { book: 'heroes', order: 1,  name: "Human's Resilience",        desc: "For each Human in the combat, the Physical Resistance of all allies increase by 2%." },
+            { book: 'heroes', order: 2,  name: "Horde's Agility",           desc: "For each Horde in the combat, the Crit Rate of all allies increase by 2.5%." },
+            { book: 'heroes', order: 3,  name: "Elf's Protection",          desc: "For each Elf in the combat, the Magic Resistance of all allies increase by 2.5%." },
+            { book: 'heroes', order: 4,  name: "Undead's Curse",            desc: "For each Undead in the combat, the Lifesteal Rate of all allies increase by 2.5%." },
+            { book: 'heroes', order: 5,  name: "Subterranean Shield",       desc: "Reduce total damage received from Cave Boss by 10%." },
+            { book: 'heroes', order: 6,  name: "Relic Guardian",            desc: "Increase total Healing received at the Sanctum by 10%." },
+            { book: 'heroes', order: 7,  name: "Undead's Frenzy",           desc: "Every time an enemy dies, ATK of Undead heroes increase by 3.5% (Stacks up to 4 times)" },
+            { book: 'heroes', order: 8,  name: "Elf's Analytical Insight",  desc: "Every time an Elf hero uses Active Skill, their ATK increase by 2.5% (Stacks up to 4 times)" },
+            { book: 'heroes', order: 9,  name: "Horde's Fury",              desc: "Every time an ally dies, ATK of Horde heroes increase by 3.5% (Stacks up to 4 times)" },
+            { book: 'heroes', order: 10, name: "Human's Valor",             desc: "ATK of Human heroes increase by 1.5% every round (Stacks up to 8 times)" },
+            { book: 'heroes', order: 11, name: "Human's Focus",             desc: "For each Human in the combat, the Accuracy of all allies increase by 3.5%." },
+            { book: 'heroes', order: 12, name: "Horde's Agility",           desc: "For each Horde in the combat, the Dodge Rate of all allies increase by 2.5%." },
+            { book: 'heroes', order: 13, name: "Elf's Wisdom",              desc: "For each Elf in the combat, the Magic Damage inflicted on enemies increase by 3%." },
+            { book: 'heroes', order: 14, name: "Undead's Zeal",             desc: "For each Undead in the combat, the Physical Damage inflicted on enemies increase by 2.5%." },
+            { book: 'heroes', order: 15, name: "Adventurer's Luck",         desc: "Increase total damage dealt to enemies at the Sanctum by 10%." },
+            { book: 'heroes', order: 16, name: "Monster Hunter",            desc: "Increase total damage dealt to Cave Boss by 10%." },
+            { book: 'heroes', order: 17, name: "Power of Defense",          desc: "At the start of battle, all heroes' DEF increases by 7%." },
+            { book: 'heroes', order: 18, name: "Power of Destruction",      desc: "At the start of battle, all heroes' ATK increases by 7%." },
+            { book: 'heroes', order: 19, name: "Life Force",                desc: "At the start of battle, increases all heroes' HP by 7%." },
+            { book: 'light',  order: 20, name: "Blessing of Light",         desc: "For each Light in the combat, the critical defense of all allies increases by 5%." },
+            { book: 'light',  order: 21, name: "Rear Guard",                desc: "If there is at least 1 ally on the first row, DEF of all allies on the second and third rows increase by 10%." },
+            { book: 'light',  order: 22, name: "Light Power",               desc: "ATK of Light heroes increases by 14% at the beginning of combat, and decreases by 1% after each round." },
+            { book: 'light',  order: 23, name: "Stealth",                   desc: "Dodge Rate of all heroes in the second row increase by 8%." },
+            { book: 'light',  order: 24, name: "Light Protection",          desc: "For each Light in the combat, the DEF of all allies increase by 6%." },
+            { book: 'light',  order: 25, name: "Fortification",             desc: "For all heroes in the third row, when HP is below 50%, damage received decreases by 10%." },
+            { book: 'light',  order: 26, name: "Harmony of Light",          desc: "Light heroes obtain 10 energy at the beginning of each round." },
+            { book: 'light',  order: 27, name: "Guardian",                  desc: "Reduces damage received by Light and Dark race heroes by 5%." },
+            { book: 'light',  order: 28, name: "Guardian Angel",            desc: "Reduces all heroes' damage taken by 5%" },
+            { book: 'darkness', order: 29, name: "Power of Darkness",       desc: "For each Darkness in the combat, the ATK of all allies increase by 3%." },
+            { book: 'darkness', order: 30, name: "Charge",                  desc: "ATK of all heroes in the first row increase by 3% every 2 rounds." },
+            { book: 'darkness', order: 31, name: "Darkness Abilities",      desc: "Every time an ally or an enemy dies, ATK of Darkness heroes increase by 2.5% (Stacks up to 8 times)" },
+            { book: 'darkness', order: 32, name: "Precision Aim",           desc: "Accuracy of all heroes in the second row increase by 12%." },
+            { book: 'darkness', order: 33, name: "Darkness Destruction",    desc: "For each Darkness hero in the combat, the Crit Damage of all allies increase by 5%." },
+            { book: 'darkness', order: 34, name: "Rear Guard Enhancement",  desc: "Penetration of all heroes in the third row increase by 10%." },
+            { book: 'darkness', order: 35, name: "Darkness Trickery",       desc: "Crit Rate of Darkness heroes increase by 5% at the start of battle." },
+            { book: 'darkness', order: 36, name: "Obliteration",            desc: "At the start of battle, increases the ATK of Light and Dark heroes by 5%." },
+            { book: 'darkness', order: 37, name: "Critical Strike",         desc: "At the start of battle, increases all heroes' Crit Damage by 10%." },
+        ];
+
         let heroesFilterRaces = new Set(), heroesFilterRoles = new Set(), heroesFilterStats = new Set(), heroesSearchQuery = ''; // wielokrotny wybór (pusty zbiór = wszystkie)
         let heroesFilterExclusive = false; // filtr: pokaż tylko bohaterów z uzupełnionym Exclusive Equipment
         let heroCompareMode = false, heroCompareSel = []; // tryb porównywania: wybór 2–3 bohaterów
         let heroesFuzzy = storage.getBool('souls_heroes_fuzzy', false); // tolerancja literówek w wyszukiwarce (przełącznik)
+        let heroesTile = storage.getJson('souls_heroes_tile', 'normal'); // rozmiar kafelków bohaterów/petów: small|normal|large
+        if (!['small', 'normal', 'large'].includes(heroesTile)) heroesTile = 'normal';
+        function setHeroesTile(v) { heroesTile = v; storage.setJson('souls_heroes_tile', v); applyHeroesTile(); }
+        function applyHeroesTile() {
+            ['small', 'normal', 'large'].forEach(s => $('heroes-tile-' + s)?.classList.toggle('active', heroesTile === s));
+            const g = $('heroes-grid'); if (g) g.className = 'heroes-grid tiles-' + heroesTile;
+        }
         const ENGRAVING_TIERS = ['10', '20', '30', '40']; // poziomy grawerunku (na razie wypełniony tylko +40)
         const EXCLUSIVE_TIERS = ['1', '2', '3', '4']; // poziomy ekwipunku ekskluzywnego (1lvl..4lvl)
         // Ikony klas/typów — emoji dobrane pod grę (Dealer=miecze, Tank=tarcza, Healer=serce, Support=iskra;
@@ -5899,6 +6001,299 @@
             renderHeroesHelp();
             renderHeroesSynonyms();
             renderHeroesGrid();
+            applyHeroesTile();
+        }
+
+        // ═══ Pod-widok „Księga" ═══════════════════════════════════
+        // Przełącznik trybu Bohaterowie ↔ Księga (stan w localStorage).
+        function setHeroesMode(mode) {
+            heroesMode = (mode === 'book') ? 'book' : 'heroes';
+            storage.setJson('souls_heroes_mode', heroesMode);
+            applyHeroesMode();
+        }
+        function applyHeroesMode() {
+            const isBook = heroesMode === 'book';
+            const hWrap = $('heroes-mode-heroes'), bWrap = $('heroes-mode-book');
+            if (hWrap) hWrap.style.display = isBook ? 'none' : '';
+            if (bWrap) bWrap.style.display = isBook ? '' : 'none';
+            $('heroes-mode-btn-heroes')?.classList.toggle('active', !isBook);
+            $('heroes-mode-btn-book')?.classList.toggle('active', isBook);
+            if (isBook) renderBookTab(); else renderHeroesTab();
+        }
+
+        // Lista bonusów: z bazy jeśli są, inaczej domyślne (syntetyczne id 'def-N', nieedytowalne do seedu).
+        function getBookBonuses() {
+            if (allBookBonuses.length) return allBookBonuses;
+            return DEFAULT_BOOK_BONUSES.map(b => ({ ...b, id: 'def-' + b.order }));
+        }
+        const bookFromDb = () => allBookBonuses.length > 0;
+
+        // Tokenizer zapytania Księgi (mirror parseHeroQuery: |=OR, -=neg, "fraza", pole:term z BOOK_FIELD_ALIAS,
+        // rozwijanie synonimów). Zwraca płaskie klauzule — dopasowanie w bookMatches (AND w obrębie CAŁEGO bonusu).
+        function parseBookQuery(raw) {
+            const str = String(raw || ''), tokens = [];
+            let i = 0;
+            while (i < str.length) {
+                const c = str[i];
+                if (c === ' ' || c === '\t' || c === '\n') { i++; continue; }
+                if (c === '|') { tokens.push({ or: true }); i++; continue; }
+                let neg = false;
+                if (str[i] === '-' && str[i + 1] && str[i + 1] !== ' ') { neg = true; i++; }
+                let field = null;
+                const fm = /^([a-zżźćńółęąś]+):/i.exec(str.slice(i));
+                if (fm && BOOK_FIELD_ALIAS[fm[1].toLowerCase()]) { field = BOOK_FIELD_ALIAS[fm[1].toLowerCase()]; i += fm[0].length; }
+                let text = '', quoted = false;
+                if (str[i] === '"') { quoted = true; i++; while (i < str.length && str[i] !== '"') text += str[i++]; if (str[i] === '"') i++; }
+                else { while (i < str.length && str[i] !== ' ' && str[i] !== '\t' && str[i] !== '|') text += str[i++]; }
+                text = text.trim();
+                if (text) tokens.push({ neg, field, text: text.toLowerCase(), quoted });
+            }
+            const clauses = [];
+            let pendingOr = false;
+            for (const tk of mergeSynonymPhrases(tokens)) {
+                if (tk.or) { pendingOr = true; continue; }
+                const alt = { field: tk.field, text: tk.text, boundary: tk.quoted };
+                if (pendingOr && clauses.length) clauses[clauses.length - 1].alts.push(alt);
+                else clauses.push({ neg: tk.neg, alts: [alt] });
+                pendingOr = false;
+            }
+            for (const cl of clauses) {
+                const out = [], seen = new Set();
+                for (const a of cl.alts) {
+                    const grp = a.text && findSynonymGroup(a.text);
+                    const list = grp ? grp.map(form => ({ field: a.field, text: form, boundary: a.boundary || (form.length <= 3 && !form.includes(' ')) })) : [a];
+                    for (const x of list) { const k = x.field + ' ' + x.text; if (!seen.has(k)) { seen.add(k); out.push(x); } }
+                }
+                cl.alts = out;
+            }
+            const positives = clauses.filter(c => !c.neg), negatives = clauses.filter(c => c.neg);
+            return { empty: clauses.length === 0, positives, negatives, terms: positives.flatMap(c => c.alts.map(a => a.text)).filter(Boolean) };
+        }
+        // Tekst pól bonusu (name/desc/book + wykryte rasy/rzędy). Cache w _bf (świeży obiekt przy każdym snapshocie).
+        function bookFields(b) {
+            if (b._bf) return b._bf;
+            const name = (b.name || '').toLowerCase();
+            const desc = (b.desc || '').toLowerCase();
+            const bookTxt = (b.book + ' ' + bookMeta(b.book).label).toLowerCase();
+            const race = BOOK_RACE_WORDS.filter(w => desc.includes(w)).join(' ');
+            const row = BOOK_ROW_WORDS.filter(w => desc.includes(w + ' row')).join(' ');
+            return (b._bf = { name, desc, book: bookTxt, race, row, combined: name + ' ' + desc + ' ' + bookTxt });
+        }
+        function bookAltHits(a, f) {
+            if (!a.text) return false;
+            const target = a.field ? (f[a.field] || '') : f.combined;
+            return a.boundary ? wordishHit(target, a.text) : target.includes(a.text);
+        }
+        // Bonus pasuje: każda pozytywna klauzula (OR-grupa) trafia gdzieś w bonusie, żadna negatywna nie trafia.
+        function bookMatches(b, parsed) {
+            const f = bookFields(b);
+            for (const c of parsed.negatives) if (c.alts.some(a => bookAltHits(a, f))) return false;
+            for (const c of parsed.positives) if (!c.alts.some(a => bookAltHits(a, f))) return false;
+            return true;
+        }
+
+        function renderBookTab() { renderBookHelp(); renderHeroesSynonyms(); renderBookFilters(); renderBookGrid(); }
+        function setBookSearch(v) { bookSearchQuery = v; renderBookGrid(); }
+        function setBookExample(q) { bookSearchQuery = q; const inp = $('book-search'); if (inp) inp.value = q; renderBookGrid(); }
+        function toggleBookFilter(key) { bookFilterBooks.has(key) ? bookFilterBooks.delete(key) : bookFilterBooks.add(key); renderBookFilters(); renderBookGrid(); }
+        function clearBookFilters() { bookFilterBooks.clear(); renderBookFilters(); renderBookGrid(); }
+        function toggleBookHelp() { bookHelpOpen = !bookHelpOpen; storage.setBool('souls_book_help', bookHelpOpen); $('book-help-toggle')?.classList.toggle('active', bookHelpOpen); renderBookHelp(); }
+
+        function renderBookHelp() {
+            const el = $('book-search-help');
+            if (!el) return;
+            $('book-help-toggle')?.classList.toggle('active', bookHelpOpen);
+            if (!bookHelpOpen) { el.innerHTML = ''; return; }
+            const rows = BOOK_HELP.map(([q, d]) =>
+                `<div style="display:flex;gap:8px;align-items:baseline;padding:2px 0;">`
+                + `<code onclick="setBookExample('${jsStr(q)}')" style="cursor:pointer;background:var(--bg-input);border:1px solid var(--border);border-radius:5px;padding:1px 6px;color:var(--accent-gold);white-space:nowrap;">${escapeHtml(q)}</code>`
+                + `<span style="color:var(--text-muted);font-size:0.78rem;">${escapeHtml(d)}</span></div>`).join('');
+            el.innerHTML = `<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:8px;">${rows}</div>`;
+        }
+
+        function renderBookFilters() {
+            const wrap = $('book-filter-chips');
+            if (!wrap) return;
+            const counts = {};
+            getBookBonuses().forEach(b => { counts[b.book] = (counts[b.book] || 0) + 1; });
+            // chipy tylko dla ksiąg z ≥1 bonusem (pusta nowa księga pojawi się dopiero gdy dostanie bonus)
+            let html = getBooks().filter(m => counts[m.key]).map(m => `<button class="heroes-chip book-chip${bookFilterBooks.has(m.key) ? ' active' : ''}" onclick="toggleBookFilter('${jsStr(m.key)}')">${m.icon} ${escapeHtml(m.label)} (${counts[m.key]})</button>`).join('');
+            if (bookFilterBooks.size) html += `<button class="heroes-chip heroes-chip-clear" onclick="clearBookFilters()">✕ ${t('heroes.clearFilters')}</button>`;
+            if (isAdmin) {
+                html += `<button class="heroes-chip book-admin-chip" onclick="openBookEdit(null)">➕ ${t('book.addBonus')}</button>`;
+                html += `<button class="heroes-chip book-admin-chip" onclick="openBookMetaModal()">📚 ${t('book.manageBooks')}</button>`;
+                if (!bookFromDb()) html += `<button class="heroes-chip book-admin-chip" onclick="seedDefaultBookBonuses()">💾 ${t('book.seedDefaults')}</button>`;
+            }
+            wrap.innerHTML = html;
+        }
+
+        function bookCardHTML(b, parsed) {
+            const terms = parsed.empty ? [] : parsed.terms;
+            const nameHtml = terms.length ? highlightHTML(b.name, terms) : escSkill(b.name);
+            const descHtml = terms.length ? highlightHTML(b.desc, terms) : escSkill(b.desc);
+            const admin = (isAdmin && bookFromDb())
+                ? `<div class="book-card-actions"><button class="book-card-btn" onclick="openBookEdit('${jsStr(b.id)}')" title="${t('book.editBtn')}">✏️</button><button class="book-card-btn" onclick="deleteBookBonus('${jsStr(b.id)}')" title="${t('book.deleteBtn')}">🗑️</button></div>`
+                : '';
+            return `<div class="book-card" style="border-left-color:${bookMeta(b.book).color}">`
+                + `<div class="book-card-top"><span class="book-card-name">${nameHtml}</span>${admin}</div>`
+                + `<div class="book-card-desc">${descHtml}</div></div>`;
+        }
+
+        function renderBookGrid() {
+            const grid = $('book-grid');
+            if (!grid) return;
+            const parsed = parseBookQuery(bookSearchQuery);
+            let list = getBookBonuses();
+            if (bookFilterBooks.size) list = list.filter(b => bookFilterBooks.has(b.book));
+            if (!parsed.empty) list = list.filter(b => bookMatches(b, parsed));
+            const cnt = $('book-count');
+            if (cnt) cnt.textContent = t('heroes.count', { n: list.length });
+            const groups = {};
+            list.forEach(b => { (groups[b.book] = groups[b.book] || []).push(b); });
+            const section = (label, count, cards) => `<div class="quick-tags-section"><div class="quick-tags-header expanded" onclick="toggleBookSection(this)">`
+                + `<span class="toggle-icon">▶</span>${label} (${count})</div>`
+                + `<div class="quick-tags-content show"><div class="book-cards">${cards}</div></div></div>`;
+            const html = getBooks().filter(m => groups[m.key]).map(m =>
+                section(`${m.icon} ${escapeHtml(m.label)}`, groups[m.key].length,
+                    groups[m.key].sort((a, b) => a.order - b.order).map(b => bookCardHTML(b, parsed)).join(''))).join('');
+            if (!html) { grid.innerHTML = `<div class="heroes-empty">${t('book.none')}</div>`; return; }
+            grid.innerHTML = `<button class="expand-all-btn" onclick="toggleAllBookGroups(this)">▲ ${t('heroes.collapseAll')}</button>` + html;
+            requestAnimationFrame(equalizeBookCards);
+        }
+        // Wyrównaj wysokość WSZYSTKICH kafelków Księgi do najwyższego (widocznego) — CSS grid równa tylko w obrębie
+        // jednej siatki/wiersza, a księgi to osobne sekcje. Mierzymy po layoutcie, resetujemy przed pomiarem.
+        function equalizeBookCards() {
+            const grid = $('book-grid');
+            if (!grid) return;
+            const cards = Array.from(grid.querySelectorAll('.book-card'));
+            cards.forEach(c => { c.style.minHeight = ''; });
+            let max = 0;
+            for (const c of cards) if (c.offsetParent !== null && c.offsetHeight > max) max = c.offsetHeight; // tylko widoczne (rozwinięte sekcje)
+            if (max > 0) cards.forEach(c => { c.style.minHeight = max + 'px'; });
+        }
+        // Zwijanie sekcji/„zwiń wszystkie" w Księdze — jak w Bohaterach, ale z przeliczeniem wyrównania po zmianie widoczności.
+        function toggleBookSection(header) { toggleQuickTagSection(header); requestAnimationFrame(equalizeBookCards); }
+        function toggleAllBookGroups(btn) { toggleAllHeroGroups(btn); requestAnimationFrame(equalizeBookCards); }
+        // Przelicz wyrównanie przy zmianie szerokości okna (zmienia się liczba kolumn → wysokość kafelków).
+        let _bookEqTimer = null;
+        window.addEventListener('resize', () => {
+            if (heroesMode !== 'book' || !$('tab-heroes')?.classList.contains('active')) return;
+            clearTimeout(_bookEqTimer);
+            _bookEqTimer = setTimeout(equalizeBookCards, 150);
+        });
+
+        // ─── Księga: edycja admina (Firebase /bookBonuses) ───
+        function openBookEdit(id) {
+            if (!isAdmin) return;
+            editingBookId = id;
+            const b = id ? getBookBonuses().find(x => x.id === id) : null;
+            $('book-edit-title').textContent = b ? t('book.editTitle') : t('book.addTitle');
+            const sel = $('be-book');
+            sel.innerHTML = getBooks().map(m => `<option value="${escapeHtml(m.key)}">${m.icon} ${escapeHtml(m.label)}</option>`).join('');
+            sel.value = b ? b.book : (getBooks()[0]?.key || 'heroes');
+            $('be-name').value = b ? b.name : '';
+            $('be-desc').value = b ? b.desc : '';
+            $('book-edit-modal').classList.add('show');
+            setTimeout(() => autoSizeTextarea($('be-desc')), 0);
+        }
+        function closeBookEdit() { $('book-edit-modal')?.classList.remove('show'); editingBookId = null; }
+        // Kolejny „order" w danej księdze (auto-append; order to tylko wewnętrzny klucz sortowania, nie pokazujemy go).
+        function nextBookOrder(book) {
+            const orders = getBookBonuses().filter(b => b.book === book).map(b => b.order || 0);
+            return (orders.length ? Math.max(...orders) : 0) + 1;
+        }
+        function saveBookEdit() {
+            if (!isAdmin || !bookBonusesRef) return;
+            const name = $('be-name').value.trim();
+            if (!name) { showToast(t('book.needName'), true); return; }
+            const book = $('be-book').value || 'heroes';
+            const desc = $('be-desc').value.trim();
+            let p;
+            if (editingBookId && !String(editingBookId).startsWith('def-')) {
+                const cur = getBookBonuses().find(x => x.id === editingBookId);
+                // edycja: zachowaj order; zmiana księgi → dołóż na koniec nowej
+                const order = (cur && cur.book === book) ? (cur.order || 0) : nextBookOrder(book);
+                p = bookBonusesRef.child(editingBookId).update({ book, name, desc, order });
+            } else {
+                const ref = bookBonusesRef.push();
+                p = ref.set({ id: ref.key, book, name, desc, order: nextBookOrder(book) });
+            }
+            p.then(() => { closeBookEdit(); showToast(t('book.saved')); }).catch(() => showToast(t('book.saveFail'), true));
+        }
+        function deleteBookBonus(id) {
+            if (!isAdmin || !bookBonusesRef || String(id).startsWith('def-')) return;
+            if (!confirm(t('book.deleteConfirm'))) return;
+            bookBonusesRef.child(id).remove().catch(() => showToast(t('book.saveFail'), true));
+        }
+        // Zapisz domyślne 37 bonusów do bazy (żeby stały się edytowalne) — analogicznie do seedDefaultSynonyms.
+        function seedDefaultBookBonuses() {
+            if (!isAdmin || !bookBonusesRef || bookFromDb()) return;
+            const updates = {};
+            for (const b of DEFAULT_BOOK_BONUSES) {
+                const key = bookBonusesRef.push().key;
+                updates[key] = { ...b, id: key };
+            }
+            bookBonusesRef.update(updates).then(() => showToast(t('book.seeded'))).catch(() => showToast(t('book.saveFail'), true));
+        }
+
+        // ─── Księga: zarządzanie księgami (Firebase /bookMeta) ───
+        function openBookMetaModal() { if (!isAdmin) return; resetBookMetaForm(); renderBookMetaList(); $('book-meta-modal').classList.add('show'); }
+        function closeBookMetaModal() { $('book-meta-modal')?.classList.remove('show'); editingBookMetaKey = null; }
+        function resetBookMetaForm() {
+            editingBookMetaKey = null;
+            const k = $('bm-key'); if (k) { k.value = ''; k.disabled = false; }
+            if ($('bm-icon')) $('bm-icon').value = '📖';
+            if ($('bm-label')) $('bm-label').value = '';
+            if ($('bm-color')) $('bm-color').value = '#d9a441';
+        }
+        function renderBookMetaList() {
+            const el = $('book-meta-list'); if (!el) return;
+            const counts = {};
+            getBookBonuses().forEach(b => { counts[b.book] = (counts[b.book] || 0) + 1; });
+            el.innerHTML = getBooks().map(m => {
+                const n = counts[m.key] || 0;
+                const isDefault = DEFAULT_BOOK_META.some(d => d.key === m.key);
+                const delAttr = n ? `disabled title="${t('book.metaHasBonuses')}"` : (bookMetaRecord(m.key) ? '' : `disabled title="${t('book.metaDefaultOnly')}"`);
+                return `<div class="book-meta-row">
+                    <span class="book-meta-swatch" style="background:${m.color}"></span>
+                    <span class="book-meta-info">${m.icon} <b>${escapeHtml(m.label)}</b> <span style="color:var(--text-muted)">(${escapeHtml(m.key)} · ${n} ${t('book.bonusesShort')}${isDefault ? ' · ' + t('book.defaultTag') : ''})</span></span>
+                    <span class="book-meta-acts">
+                        <button class="book-card-btn" onclick="editBookMetaRow('${jsStr(m.key)}')" title="${t('book.editBtn')}">✏️</button>
+                        <button class="book-card-btn" onclick="deleteBookMeta('${jsStr(m.key)}')" ${delAttr}>🗑️</button>
+                    </span></div>`;
+            }).join('');
+        }
+        function editBookMetaRow(key) {
+            const m = bookMeta(key); if (!m) return;
+            editingBookMetaKey = key;
+            const k = $('bm-key'); if (k) { k.value = m.key; k.disabled = true; }
+            $('bm-icon').value = m.icon || '📖';
+            $('bm-label').value = m.label || '';
+            $('bm-color').value = /^#[0-9a-f]{6}$/i.test(m.color) ? m.color : '#d9a441';
+        }
+        function saveBookMeta() {
+            if (!isAdmin || !bookMetaRef) return;
+            const key = editingBookMetaKey || normalize($('bm-key').value).replace(/[^a-z0-9]+/g, '');
+            if (!key) { showToast(t('book.metaNeedKey'), true); return; }
+            const label = $('bm-label').value.trim();
+            if (!label) { showToast(t('book.metaNeedLabel'), true); return; }
+            // order: przy edycji zachowaj istniejący; nowa księga → na koniec listy
+            const existingMeta = getBooks().find(b => b.key === key);
+            const order = editingBookMetaKey && existingMeta ? (existingMeta.order || 0) : ((Math.max(0, ...getBooks().map(b => b.order || 0))) + 1);
+            const rec = { key, label, icon: ($('bm-icon').value.trim() || '📖'), color: $('bm-color').value || '#d9a441', order };
+            const existing = bookMetaRecord(key);
+            let p;
+            if (existing) { p = bookMetaRef.child(existing.id).update(rec); }
+            else { const ref = bookMetaRef.push(); p = ref.set({ ...rec, id: ref.key }); }
+            p.then(() => { showToast(t('book.metaSaved')); resetBookMetaForm(); }).catch(() => showToast(t('book.saveFail'), true));
+        }
+        function deleteBookMeta(key) {
+            if (!isAdmin || !bookMetaRef) return;
+            if (getBookBonuses().some(b => b.book === key)) { showToast(t('book.metaHasBonuses'), true); return; }
+            const existing = bookMetaRecord(key);
+            if (!existing) { showToast(t('book.metaDefaultOnly'), true); return; } // domyślna bez rekordu — nic do usunięcia
+            if (!confirm(t('book.metaDeleteConfirm'))) return;
+            bookMetaRef.child(existing.id).remove().catch(() => showToast(t('book.saveFail'), true));
         }
 
         // Chipy filtrów: rasy (z /heroes, kolejność RACE_ORDER) + klasy (z /heroSkills) — wielokrotny wybór.
@@ -6023,9 +6418,16 @@
             renderHeroesHelp();
         }
         // Kafelek „Słownik synonimów" obok szukajki — lista grup (klik = szuka). Admin edytuje wiersze (dane w /synonyms).
+        // Panel „Słownik synonimów" — świadomy trybu: renderuje do aktywnego widoku (Bohaterowie LUB Księga),
+        // czyści drugi. Ten sam słownik /synonyms i te same funkcje CRUD; tylko klik-termin szuka w odpowiednim polu.
+        // Jeden panel na raz → inputy edycji (syn-forms/expand-input) nie dublują ID.
         function renderHeroesSynonyms() {
-            const el = $('heroes-synonyms');
+            const book = heroesMode === 'book';
+            const el = $(book ? 'book-synonyms' : 'heroes-synonyms');
+            const other = $(book ? 'heroes-synonyms' : 'book-synonyms');
+            if (other) other.innerHTML = '';
             if (!el) return;
+            const onTerm = book ? 'setBookExample' : 'setHeroesSearchExample';
             const open = storage.getBool('souls_heroes_syn_open', false);
             const groups = getSynonymGroups();
             const dbEmpty = allSynonyms.length === 0;
@@ -6036,7 +6438,7 @@
                     ? `<span class="hero-syn-actions"><button class="hero-syn-act" onclick="editSynonymRow('${jsStr(g.id)}')" title="${escSkill(t('skills.edit'))}">✏️</button>`
                         + `<button class="hero-syn-act" onclick="deleteSynonymRow('${jsStr(g.id)}')" title="${escSkill(t('syn.delete'))}">🗑️</button></span>`
                     : '';
-                return `<div class="hero-syn-row"><button class="hero-syn-term" onclick="setHeroesSearchExample('${on}')">${escSkill(label)}</button>${acts}</div>`;
+                return `<div class="hero-syn-row"><button class="hero-syn-term" onclick="${onTerm}('${on}')">${escSkill(label)}</button>${acts}</div>`;
             }).join('') || `<div class="hero-help-note">—</div>`;
             let adminUI = '';
             if (isAdmin && dbEmpty) {
@@ -6101,6 +6503,7 @@
         function renderHeroesGrid() {
             const grid = $('heroes-grid');
             if (!grid) return;
+            grid.className = 'heroes-grid tiles-' + heroesTile; // rozmiar kafelków (S/M/L)
             const parsed = parseHeroQuery(heroesSearchQuery);
             let list = heroes.slice();
             if (heroesFilterRaces.size) list = list.filter(h => heroesFilterRaces.has(h.race));
@@ -6701,10 +7104,10 @@
             $('defense-add-comment').value = '';
             for (let i = 1; i <= 8; i++) {
                 const el = $(`defense-my${i}`);
-                if (el) { el.value = ''; setValidation(el, null); }
+                if (el) { el.value = ''; setValidation(el, null); updateInputHeroColor(el, false); }
             }
             const petEl = $('defense-myPet');
-            if (petEl) { petEl.value = ''; setValidation(petEl, null); }
+            if (petEl) { petEl.value = ''; setValidation(petEl, null); updateInputHeroColor(petEl, true); }
             $('defense-add-assign-player').value = '';
         }
 
@@ -6720,10 +7123,11 @@
             $('defense-edit-comment').value = f.comment || '';
             for (let i = 1; i <= 8; i++) {
                 const el = $(`defense-edit-my${i}`);
-                if (el) { el.value = f.my[i - 1] || ''; setValidation(el, null); }
+                if (el) { el.value = f.my[i - 1] || ''; setValidation(el, null); updateInputHeroColor(el, false); }
             }
             $('defense-edit-myPet').value = f.myPet || '';
             setValidation($('defense-edit-myPet'), null);
+            updateInputHeroColor($('defense-edit-myPet'), true);
             updateDefenseEditImpact();
             $('defense-edit-modal').classList.remove('hidden');
         }
@@ -7090,10 +7494,49 @@
             renderDefenseFormations();
         }
 
+        // ─── Zaawansowana szukajka Składów obronnych ───────────────
+        // Mini-język (prostszy niż w Bohaterach — bez pól/skilli, tylko obecność):
+        //   spacja = ORAZ (wszystkie muszą trafić), `a|b` = ALBO (grupa alternatyw),
+        //   `-x` = wyklucz, `"fraza"` = nazwa wielowyrazowa.
+        // Każdy term dopasowuje się do bohatera/peta ORAZ nazwy/komentarza składu.
+        function parseDefenseQuery(raw) {
+            const q = (raw || '').toLowerCase().trim();
+            if (!q) return null;
+            const tokens = q.match(/"[^"]*"|\S+/g) || [];
+            const include = []; // grupy OR: [[a,b], [c]] → (a|b) AND (c)
+            const exclude = [];
+            for (let tok of tokens) {
+                let neg = false;
+                if (tok[0] === '-' && tok.length > 1) { neg = true; tok = tok.slice(1); }
+                const alts = tok.split('|').map(s => s.replace(/"/g, '').trim()).filter(Boolean);
+                if (!alts.length) continue;
+                if (neg) exclude.push(...alts);
+                else include.push(alts);
+            }
+            return (include.length || exclude.length) ? { include, exclude } : null;
+        }
+
+        function defenseTermMatch(f, term) {
+            return f.my.some(h => normalize(h).includes(term))
+                || normalize(f.myPet).includes(term)
+                || normalize(f.name).includes(term)
+                || normalize(f.comment).includes(term);
+        }
+
+        function matchDefenseQuery(f, parsed) {
+            for (const group of parsed.include) {
+                if (!group.some(term => defenseTermMatch(f, term))) return false; // AND między grupami, OR w grupie
+            }
+            for (const term of parsed.exclude) {
+                if (defenseTermMatch(f, term)) return false;
+            }
+            return true;
+        }
+
         function renderDefenseFormations() {
             const list = $('defense-formations-list');
             if (!list) return;
-            const query = ($('defense-formation-search')?.value || '').toLowerCase().trim();
+            const parsedQuery = parseDefenseQuery($('defense-formation-search')?.value);
 
             // Liczba aktywnych przypięć dla każdego składu (jednorazowo, żeby sortowanie po users było tanie).
             // Liczymy też "same-set other arrangement" — ile graczy używa innych składów o tym samym secie.
@@ -7121,12 +7564,8 @@
                     a.id - b.id,
             };
             let formations = [...allDefenseFormations].sort(sorters[currentDefenseSort] || sorters['id-desc']);
-            if (query) {
-                formations = formations.filter(f => {
-                    if (f.name.toLowerCase().includes(query)) return true;
-                    if ((f.comment || '').toLowerCase().includes(query)) return true;
-                    return f.my.some(h => (h || '').toLowerCase().includes(query)) || (f.myPet || '').toLowerCase().includes(query);
-                });
+            if (parsedQuery) {
+                formations = formations.filter(f => matchDefenseQuery(f, parsedQuery));
             }
 
             if (formations.length === 0) {
@@ -9449,6 +9888,8 @@
             heroSkillsRef = db.ref('heroSkills');
             petSkillsRef = db.ref('petSkills');
             synonymsRef = db.ref('synonyms');
+            bookBonusesRef = db.ref('bookBonuses');
+            bookMetaRef = db.ref('bookMeta');
 
             formationsRef.on('value', snap => {
                 allFormations = snap.val() ? Object.values(snap.val()).sort((a, b) => a.id - b.id) : [];
@@ -9489,7 +9930,27 @@
                 const v = snap.val();
                 allSynonyms = v ? Object.entries(v).map(([id, g]) => ({ id, forms: (g && g.forms) || [], expand: (g && g.expand) || [] })) : [];
                 rebuildSynonymIndex();
-                if ($('tab-heroes')?.classList.contains('active')) { renderHeroesSynonyms(); renderHeroesGrid(); }
+                if ($('tab-heroes')?.classList.contains('active')) {
+                    renderHeroesSynonyms(); // mode-aware (panel Bohaterów albo Księgi)
+                    if (heroesMode === 'book') renderBookGrid(); else renderHeroesGrid();
+                }
+            }, () => {});
+
+            // ─── Księga bonusów (live; przy pustym /bookBonuses szukajka używa DEFAULT_BOOK_BONUSES) ───
+            // WYMAGA reguły Firebase: "bookBonuses": { ".read": true, ".write": true } — bez niej seed/edycja cicho odpadają.
+            bookBonusesRef.on('value', snap => {
+                const v = snap.val();
+                allBookBonuses = v ? Object.entries(v).map(([id, x]) => ({ ...x, id })) : [];
+                const ord = {}; getBooks().forEach(m => { ord[m.key] = m.order || 0; });
+                allBookBonuses.sort((a, b) => (ord[a.book] ?? 90) - (ord[b.book] ?? 90) || (a.order || 0) - (b.order || 0));
+                if (heroesMode === 'book' && $('tab-heroes')?.classList.contains('active')) renderBookTab();
+            }, () => {});
+            // ─── Definicje ksiąg (live). WYMAGA reguły: "bookMeta": { ".read": true, ".write": true } ───
+            bookMetaRef.on('value', snap => {
+                const v = snap.val();
+                allBookMeta = v ? Object.entries(v).map(([id, x]) => ({ ...x, id })) : [];
+                if (heroesMode === 'book' && $('tab-heroes')?.classList.contains('active')) renderBookTab();
+                if ($('book-meta-modal')?.classList.contains('show')) renderBookMetaList();
             }, () => {});
 
             // ─── Defense (obrona gildii) ───
