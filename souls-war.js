@@ -6290,6 +6290,8 @@
             if (isAdmin) {
                 html += `<button class="heroes-chip book-admin-chip" onclick="openBookEdit(null)">➕ ${t('book.addBonus')}</button>`;
                 html += `<button class="heroes-chip book-admin-chip" onclick="openBookMetaModal()">📚 ${t('book.manageBooks')}</button>`;
+                html += `<button class="heroes-chip book-admin-chip" onclick="exportBookJSON()">⬇️ ${t('book.export')}</button>`;
+                html += `<label class="heroes-chip book-admin-chip" style="cursor:pointer;">⬆️ ${t('book.import')}<input type="file" accept="application/json,.json" style="display:none" onchange="importBookFile(event)"></label>`;
                 if (!bookFromDb()) html += `<button class="heroes-chip book-admin-chip" onclick="seedDefaultBookBonuses()">💾 ${t('book.seedDefaults')}</button>`;
             }
             wrap.innerHTML = html;
@@ -6408,6 +6410,34 @@
                 updates[key] = { ...b, id: key };
             }
             bookBonusesRef.update(updates).then(() => showToast(t('book.seeded'))).catch(() => showToast(t('book.saveFail'), true));
+        }
+        // ─── Eksport/import Księgi (JSON: { meta:[…], bonuses:[…] }) ───
+        function exportBookJSON() {
+            const bonuses = getBookBonuses().map(b => { const o = { book: b.book, order: b.order, name: b.name, desc: b.desc }; if (b.calc) o.calc = b.calc; return o; });
+            const meta = allBookMeta.map(m => ({ key: m.key, label: m.label, icon: m.icon, color: m.color, order: m.order }));
+            downloadJSONFile({ meta, bonuses }, 'bookBonuses.json');
+        }
+        function importBookFile(event) {
+            const file = event.target.files && event.target.files[0];
+            if (!file || !isAdmin || !bookBonusesRef) { if (event.target) event.target.value = ''; return; }
+            const reader = new FileReader();
+            reader.onload = e => {
+                let data;
+                try { data = JSON.parse(e.target.result); } catch (err) { showToast(t('book.importFail'), true); event.target.value = ''; return; }
+                const bonuses = Array.isArray(data.bonuses) ? data.bonuses : (Array.isArray(data) ? data : []);
+                const meta = Array.isArray(data.meta) ? data.meta : [];
+                if (!bonuses.length) { showToast(t('book.importFail'), true); event.target.value = ''; return; }
+                if (!confirm(t('book.importConfirm', { n: bonuses.length }))) { event.target.value = ''; return; }
+                const bObj = {};
+                bonuses.forEach(b => { const k = bookBonusesRef.push().key; bObj[k] = { id: k, book: b.book || 'heroes', order: b.order || 0, name: b.name || '', desc: b.desc || '', ...(b.calc ? { calc: b.calc } : {}) }; });
+                const mObj = {};
+                meta.forEach(m => { if (!m || !m.key) return; const k = bookMetaRef.push().key; mObj[k] = { id: k, key: m.key, label: m.label || m.key, icon: m.icon || '📖', color: m.color || '#d9a441', order: m.order || 0 }; });
+                // pełne nadpisanie (ref.set zastępuje cały nod); /bookMeta ruszamy tylko gdy plik je zawiera
+                Promise.all([bookBonusesRef.set(bObj), meta.length ? bookMetaRef.set(mObj) : Promise.resolve()])
+                    .then(() => showToast(t('book.imported'))).catch(() => showToast(t('book.importFail'), true));
+                event.target.value = '';
+            };
+            reader.readAsText(file);
         }
 
         // ─── Księga: zarządzanie księgami (Firebase /bookMeta) ───
