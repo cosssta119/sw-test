@@ -890,6 +890,19 @@
                 </div>
             </div>
 
+            <!-- Import/eksport Księgi bonusów (JSON) -->
+            <div class="admin-card">
+                <h3 class="admin-card-title clickable" onclick="toggleAdminSection('imp-book')"><span class="admin-toggle-icon" id="imp-book-toggle">▶</span> 📖 <span data-i18n="settings.bookTitle">Księga bonusów — JSON</span></h3>
+                <div id="imp-book-body" style="display:none">
+                    <p class="import-desc" data-i18n="settings.bookDesc">Wczytaj plik bookBonuses.json — zastąpi całą Księgę (bonusy + księgi) zawartością pliku. Eksport do backupu/edycji offline.</p>
+                    <div class="import-pair">
+                        <button class="btn btn-success" onclick="document.getElementById('book-input').click()">📖 <span data-i18n="settings.bookImportBtn">Importuj Księgę (JSON)</span></button>
+                        <button class="btn btn-secondary" onclick="exportBookJSON()">💾 <span data-i18n="settings.bookExportBtn">Eksportuj Księgę (JSON)</span></button>
+                    </div>
+                    <input type="file" id="book-input" accept=".json,application/json" style="display:none" onchange="importBookFile(event)">
+                </div>
+            </div>
+
             <!-- Obrona CSV -->
             <div class="admin-card">
                 <h3 class="admin-card-title clickable" onclick="toggleAdminSection('imp-defcsv')"><span class="admin-toggle-icon" id="imp-defcsv-toggle">▶</span> 🛡️ <span data-i18n="settings.defenseCsvTitle">Obrona — CSV</span></h3>

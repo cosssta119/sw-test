@@ -6290,8 +6290,6 @@
             if (isAdmin) {
                 html += `<button class="heroes-chip book-admin-chip" onclick="openBookEdit(null)">➕ ${t('book.addBonus')}</button>`;
                 html += `<button class="heroes-chip book-admin-chip" onclick="openBookMetaModal()">📚 ${t('book.manageBooks')}</button>`;
-                html += `<button class="heroes-chip book-admin-chip" onclick="exportBookJSON()">⬇️ ${t('book.export')}</button>`;
-                html += `<label class="heroes-chip book-admin-chip" style="cursor:pointer;">⬆️ ${t('book.import')}<input type="file" accept="application/json,.json" style="display:none" onchange="importBookFile(event)"></label>`;
                 if (!bookFromDb()) html += `<button class="heroes-chip book-admin-chip" onclick="seedDefaultBookBonuses()">💾 ${t('book.seedDefaults')}</button>`;
             }
             wrap.innerHTML = html;
