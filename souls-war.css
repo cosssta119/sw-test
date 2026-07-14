@@ -3087,6 +3087,23 @@
 		.book-meta-swatch { width: 14px; height: 14px; border-radius: 3px; flex: 0 0 auto; border: 1px solid var(--border); }
 		.book-meta-info { flex: 1 1 auto; font-size: 0.85rem; }
 		.book-meta-acts { display: flex; gap: 4px; flex: 0 0 auto; }
+		/* Widżet „Aktywne bonusy Księgi" (Księga ↔ realny skład) — zwijany, pod każdym składem */
+		.book-bonus-widget { margin: 8px 0 2px; text-align: left; }
+		.bkw-chip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 14px; color: var(--text-light); font-size: 0.74rem; font-family: inherit; cursor: pointer; transition: all 0.15s; }
+		.bkw-chip:hover, .bkw-chip.open { border-color: var(--accent-gold); }
+		.bkw-body { display: none; margin-top: 6px; padding: 6px 10px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; }
+		.bkw-body.open { display: block; }
+		.bkw-group { padding: 4px 0; }
+		.bkw-who { display: block; font-weight: 700; font-size: 0.68rem; color: var(--accent-gold); text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 2px; }
+		.bkw-who span { text-transform: none; letter-spacing: 0; font-size: 0.76rem; } /* nazwy bohaterów: normalna wielkość + kolor rasy */
+		.bkw-stats { font-size: 0.8rem; color: var(--text-light); }
+		.bkw-stat { padding: 1px 0 1px 10px; }
+		.bkw-note { color: var(--text-muted); font-size: 0.72rem; }
+		.bkw-divider { margin: 7px 0 3px; padding-top: 6px; border-top: 1px dashed var(--border); font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.3px; }
+		.bkw-actions { margin-top: 9px; }
+		.bkw-open { padding: 4px 11px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; color: var(--text-light); font-size: 0.72rem; font-family: inherit; cursor: pointer; transition: all 0.15s; }
+		.bkw-open:hover { border-color: var(--accent-gold); }
+		.book-only-banner { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 12px; margin-bottom: 10px; background: var(--bg-input); border: 1px solid var(--accent-gold); border-radius: 8px; font-size: 0.82rem; color: var(--text-light); }
 		.hero-tile.selected { box-shadow: 0 0 0 2px var(--accent-gold) inset; border-color: var(--accent-gold); }
 		.heroes-compare-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; margin-bottom: 12px; background: var(--bg-input); border: 1px solid var(--accent-gold); border-radius: 10px; position: sticky; top: 0; z-index: 5; }
 		.hcb-label { font-weight: 700; color: var(--accent-gold); font-size: 0.8rem; }

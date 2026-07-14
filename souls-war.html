@@ -787,6 +787,7 @@
             <div id="heroes-mode-book" style="display: none;">
                 <div class="heroes-toolbar">
                     <input type="text" id="book-search" class="heroes-search" data-i18n-placeholder="book.searchPlaceholder" placeholder="🔍 Szukaj: Elf Undead · crit|dodge · book:light · race:elf" oninput="setBookSearch(this.value)">
+                    <button id="book-clear" class="heroes-help-toggle" onclick="clearBookSearch()" data-i18n-title="book.clearSearch" title="Wyczyść" style="display:none;">✕</button>
                     <button id="book-help-toggle" class="heroes-help-toggle" onclick="toggleBookHelp()" data-i18n-title="book.helpHint" title="Zaawansowane wyszukiwanie">❔</button>
                 </div>
                 <div id="book-search-help"></div>

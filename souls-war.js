@@ -2363,13 +2363,13 @@
 					<div class="battle-row">${slot(5)}${slot(6)}${slot(7)}</div>
 					<div class="battle-row">${slot(3)}${slot(4)}</div>
 					<div class="battle-row">${slot(0)}${slot(1)}${slot(2)}</div>
-				</div>`;
+				</div>` + bookBonusWidget(arr);
 			} else {
 				return `<div class="battle-grid">
 					<div class="battle-row">${slot(0)}${slot(1)}${slot(2)}</div>
 					<div class="battle-row">${slot(3)}${slot(4)}</div>
 					<div class="battle-row">${slot(5)}${slot(6)}${slot(7)}</div>
-				</div>`;
+				</div>` + bookBonusWidget(arr);
 			}
 		}
 
@@ -2709,8 +2709,9 @@
                 return `<div class="battle-slot filled ${rc} slot-clickable" onclick="event.stopPropagation();showHeroSkills('${jsStr(name)}')"><span class="hero-name">${name}</span></div>`;
             };
             
-            return isEnemy ? `<div class="battle-grid"><div class="battle-row">${slot(5)}${slot(6)}${slot(7)}</div><div class="battle-row">${slot(3)}${slot(4)}</div><div class="battle-row">${slot(0)}${slot(1)}${slot(2)}</div></div>` :
+            const grid = isEnemy ? `<div class="battle-grid"><div class="battle-row">${slot(5)}${slot(6)}${slot(7)}</div><div class="battle-row">${slot(3)}${slot(4)}</div><div class="battle-row">${slot(0)}${slot(1)}${slot(2)}</div></div>` :
                 `<div class="battle-grid"><div class="battle-row">${slot(0)}${slot(1)}${slot(2)}</div><div class="battle-row">${slot(3)}${slot(4)}</div><div class="battle-row">${slot(5)}${slot(6)}${slot(7)}</div></div>`;
+            return grid + bookBonusWidget(arr);
         }
 
         function renderBattlePet(name) {
@@ -4974,7 +4975,7 @@
 					<div class="war-your-team-row">${slot(0)}${slot(1)}${slot(2)}</div>
 					<div class="war-your-team-row">${slot(3)}${slot(4)}</div>
 					<div class="war-your-team-row">${slot(5)}${slot(6)}${slot(7)}</div>
-				</div>
+				</div>${bookBonusWidget(heroesArr)}
 			`;
 		}
 
@@ -5585,6 +5586,8 @@
         let heroesMode = storage.getJson('souls_heroes_mode', 'heroes'); // 'heroes' | 'book'
         if (heroesMode !== 'book') heroesMode = 'heroes';
         let bookSearchQuery = '', bookFilterBooks = new Set(); // filtr ksiąg (pusty = wszystkie)
+        let bookOnlySet = null; // Set kluczy bonusów z „Pokaż w Księdze" (null = brak; pokazuje tylko te bonusy)
+        let bookOnlyReturnTab = null; // zakładka, z której przyszliśmy (do przycisku „← Wróć do składu")
         let bookHelpOpen = storage.getBool('souls_book_help', false);
 
         // Domyślne 3 księgi (fallback). Nowe księgi / zmiany admin robi w UI → Firebase /bookMeta.
@@ -5605,6 +5608,169 @@
         }
         function bookMeta(key) { return getBooks().find(b => b.key === key) || { key, label: key || '', icon: '📖', color: 'var(--border)', order: 99 }; }
         function bookMetaRecord(key) { return allBookMeta.find(b => b.key === key) || null; } // rekord w /bookMeta (do edycji/usuwania; null = tylko domyślna)
+
+        // ═══ Aktywne bonusy Księgi dla składu (Księga ↔ realny skład) ═══
+        // Dane obliczeniowe per bonus (klucz = numer w DEFAULT). Dopasowanie do żywego rekordu PO TREŚCI opisu
+        // (opis unikalny, nawet dwa „Horde's Agility" różnią się), więc działa też dla rekordów zaseedowanych bez tych pól.
+        // UWAGA rasy: w danych „Horde" = klucz 'Fire', „Darkness" = 'Dark'. trigger vs scope to DWIE różne rzeczy:
+        //   kind='perRace'  → licznik rasy skaluje siłę, buff dla CAŁEJ drużyny
+        //   kind='always'   → zawsze aktywny, cała drużyna
+        //   kind='raceOwn'  → buff tylko dla bohaterów danej rasy (często dynamiczny/stackujący w walce)
+        //   kind='row'      → buff tylko dla danego rzędu (rząd 1=sloty 0-2, 2=3-4, 3=5-7)
+        const BOOK_CALC_BY_ORDER = {
+            1:  { kind: 'perRace', race: 'Human',  stat: 'Physical Resistance', value: 2 },
+            2:  { kind: 'perRace', race: 'Fire',   stat: 'Crit Rate',           value: 2.5 },
+            3:  { kind: 'perRace', race: 'Elf',    stat: 'Magic Resistance',    value: 2.5 },
+            4:  { kind: 'perRace', race: 'Undead', stat: 'Lifesteal Rate',      value: 2.5 },
+            5:  { pve: true }, 6: { pve: true },
+            7:  { kind: 'raceOwn', race: 'Undead', stat: 'ATK', value: 3.5, dynamic: true, stackMax: 4, when: 'combat', trig: 'bookcalc.trigEnemyDeath' },
+            8:  { kind: 'raceOwn', race: 'Elf',    stat: 'ATK', value: 2.5, dynamic: true, stackMax: 4, when: 'combat', trig: 'bookcalc.trigActive' },
+            9:  { kind: 'raceOwn', race: 'Fire',   stat: 'ATK', value: 3.5, dynamic: true, stackMax: 4, when: 'combat', trig: 'bookcalc.trigAllyDeath' },
+            10: { kind: 'raceOwn', race: 'Human',  stat: 'ATK', value: 1.5, dynamic: true, stackMax: 8, when: 'combat', trig: 'bookcalc.trigRound' },
+            11: { kind: 'perRace', race: 'Human',  stat: 'Accuracy',        value: 3.5 },
+            12: { kind: 'perRace', race: 'Fire',   stat: 'Dodge Rate',      value: 2.5 },
+            13: { kind: 'perRace', race: 'Elf',    stat: 'Magic Damage',    value: 3 },
+            14: { kind: 'perRace', race: 'Undead', stat: 'Physical Damage', value: 2.5 },
+            15: { pve: true }, 16: { pve: true },
+            17: { kind: 'always', stat: 'DEF', value: 7, when: 'start' },
+            18: { kind: 'always', stat: 'ATK', value: 7, when: 'start' },
+            19: { kind: 'always', stat: 'HP',  value: 7, when: 'start' },
+            20: { kind: 'perRace', race: 'Light', stat: 'Critical Defense', value: 5 },
+            21: { kind: 'row', needRow1: true, stat: 'DEF', value: 10 },
+            22: { kind: 'raceOwn', race: 'Light', stat: 'ATK', value: 14, dynamic: true, when: 'start', trig: 'bookcalc.trigDecay' },
+            23: { kind: 'row', row: 2, stat: 'Dodge Rate', value: 8 },
+            24: { kind: 'perRace', race: 'Light', stat: 'DEF', value: 6 },
+            25: { kind: 'row', row: 3, stat: 'obrażeń otrzymywanych', value: -10, dynamic: true, trig: 'bookcalc.trigHp50' },
+            26: { kind: 'raceOwn', race: 'Light', stat: 'energii/rundę', value: 10, flat: true, dynamic: true, when: 'combat' },
+            27: { kind: 'raceOwn', race: ['Light', 'Dark'], stat: 'obrażeń otrzymywanych', value: -5 },
+            28: { kind: 'always', stat: 'obrażeń otrzymywanych', value: -5 },
+            29: { kind: 'perRace', race: 'Dark', stat: 'ATK', value: 3 },
+            30: { kind: 'row', row: 1, stat: 'ATK', value: 3, dynamic: true, trig: 'bookcalc.trig2Rounds' },
+            31: { kind: 'raceOwn', race: 'Dark', stat: 'ATK', value: 2.5, dynamic: true, stackMax: 8, when: 'combat', trig: 'bookcalc.trigAnyDeath' },
+            32: { kind: 'row', row: 2, stat: 'Accuracy', value: 12 },
+            33: { kind: 'perRace', race: 'Dark', stat: 'Crit Damage', value: 5 },
+            34: { kind: 'row', row: 3, stat: 'Penetration', value: 10 },
+            35: { kind: 'raceOwn', race: 'Dark', stat: 'Crit Rate', value: 5, when: 'start' },
+            36: { kind: 'raceOwn', race: ['Light', 'Dark'], stat: 'ATK', value: 5, when: 'start' },
+            37: { kind: 'always', stat: 'Crit Damage', value: 10, when: 'start' },
+        };
+        let _bookCalcByDesc = null;
+        function bookCalcFor(b) {
+            if (b && b.calc && typeof b.calc === 'object') return b.calc; // własne pole (nowe/edytowane bonusy)
+            if (!_bookCalcByDesc) {
+                _bookCalcByDesc = new Map();
+                for (const d of DEFAULT_BOOK_BONUSES) { const c = BOOK_CALC_BY_ORDER[d.order]; if (c) _bookCalcByDesc.set(normalize(d.desc), c); }
+            }
+            return _bookCalcByDesc.get(normalize(b.desc)) || null;
+        }
+        const bookSlotRow = i => (i < 3 ? 1 : (i < 5 ? 2 : 3)); // 0-2=rząd1(przód), 3-4=rząd2, 5-7=rząd3
+        const bookNumFmt = v => (currentLang === 'pl' ? String(v).replace('.', ',') : String(v));
+        function bookValStr(v, flat) { return (v > 0 ? '+' : (v < 0 ? '−' : '')) + bookNumFmt(Math.abs(v)) + (flat ? '' : '%'); }
+
+        // Tożsamość bonusu (do filtra-zbioru „pokaż w Księdze"): id z bazy albo znormalizowany opis (unikalny).
+        const bookKey = b => b && (b.id || normalize(b.desc || ''));
+        // Zwraca płaskie „itemy" aktywnych bonusów: { icon, name, key, who, whoLabel, stat, value, flat, dynamic, stackMax }.
+        function computeActiveBookBonuses(team) {
+            const members = []; // { name(display), race, row }
+            (team || []).forEach((name, i) => {
+                if (!name) return;
+                const h = findHero(name);
+                members.push({ name: h ? h.name : name, race: h ? h.race : null, row: bookSlotRow(i) });
+            });
+            if (!members.length) return [];
+            const rc = {}, row = { 1: 0, 2: 0, 3: 0 };
+            members.forEach(m => { if (m.race) rc[m.race] = (rc[m.race] || 0) + 1; row[m.row]++; });
+            const out = [];
+            for (const b of getBookBonuses()) {
+                const c = bookCalcFor(b);
+                if (!c || c.pve) continue;
+                const it = evalBookBonus(c, rc, row, members);
+                if (it) { it.icon = bookMeta(b.book).icon; it.name = b.name; it.key = bookKey(b); out.push(it); }
+            }
+            return out;
+        }
+        function evalBookBonus(c, rc, row, members) {
+            if (c.kind === 'perRace') {
+                const n = rc[c.race] || 0; if (!n) return null;
+                return { who: 'all', whoLabel: t('bookcalc.whoAll'), stat: c.stat, value: Math.round(n * c.value * 100) / 100, flat: c.flat, dynamic: false };
+            }
+            if (c.kind === 'always') {
+                return { who: 'all', whoLabel: t('bookcalc.whoAll'), stat: c.stat, value: c.value, flat: c.flat, dynamic: false };
+            }
+            // nazwy bohaterów kolorowane rasą (klasa race-*); tylko nazwy escapowane, reszta etykiety to stałe/i18n
+            const names = mem => '(' + mem.map(m => `<span class="race-${(m.race || '').toLowerCase()}">${escapeHtml(m.name)}</span>`).join(', ') + ')';
+            if (c.kind === 'raceOwn') {
+                const races = Array.isArray(c.race) ? c.race : [c.race];
+                const mem = members.filter(m => races.includes(m.race)); if (!mem.length) return null;
+                return { who: 'race:' + races.join('+'), whoLabel: `${races.map(raceLabel).join(' i ')} ${names(mem)}`, stat: c.stat, value: c.value, flat: c.flat, dynamic: !!c.dynamic, stackMax: c.stackMax, note: c.trig ? t(c.trig) : undefined };
+            }
+            if (c.kind === 'row') {
+                if (c.needRow1) {
+                    if (!row[1]) return null;
+                    const mem = members.filter(m => m.row === 2 || m.row === 3); if (!mem.length) return null;
+                    return { who: 'rows23', whoLabel: `${t('bookcalc.rows23')} ${names(mem)}`, stat: c.stat, value: c.value, flat: c.flat, dynamic: !!c.dynamic, note: c.trig ? t(c.trig) : undefined };
+                }
+                const mem = members.filter(m => m.row === c.row); if (!mem.length) return null;
+                return { who: 'row:' + c.row, whoLabel: `${t('bookcalc.onlyRow', { n: c.row })} ${names(mem)}`, stat: c.stat, value: c.value, flat: c.flat, dynamic: !!c.dynamic, stackMax: c.stackMax, note: c.trig ? t(c.trig) : undefined };
+            }
+            return null;
+        }
+        // Kolejność grup: cała drużyna → rzędy → rasy.
+        function bookWhoOrder(who) {
+            if (who === 'all') return 0;
+            if (who === 'rows23') return 1;
+            if (who.startsWith('row:')) return 1 + Number(who.slice(4));
+            return 10;
+        }
+        // Widżet: grupowanie po „komu" + sumowanie statów (gwarantowane) osobno od „w walce/warunkowe".
+        // Stan otwarcia GLOBALNY (souls_book_bonus_open). Przycisk „🔎 Pokaż w Księdze" filtruje Księgę do tych bonusów.
+        function bookBonusWidget(team) {
+            const items = computeActiveBookBonuses(team);
+            if (!items.length) return '';
+            const open = storage.getBool('souls_book_bonus_open', false);
+            const staticG = new Map(), dynG = new Map();
+            for (const it of items) {
+                const target = it.dynamic ? dynG : staticG;
+                let g = target.get(it.who);
+                if (!g) { g = { label: it.whoLabel, order: bookWhoOrder(it.who), stats: new Map(), list: [] }; target.set(it.who, g); }
+                if (it.dynamic) g.list.push(it);
+                else g.stats.set(it.stat, (g.stats.get(it.stat) || 0) + it.value); // sumujemy ten sam stat w tej samej grupie
+            }
+            const sortG = m => [...m.values()].sort((a, b) => a.order - b.order);
+            const statLine = g => Array.from(g.stats.entries()).map(([s, v]) => `<div class="bkw-stat">${bookValStr(v, false)} ${escSkill(s)}</div>`).join('');
+            const dynLine = g => g.list.map(it => `<div class="bkw-stat">${bookValStr(it.value, it.flat)} ${escSkill(it.stat)}${it.stackMax ? ` (${t('bookcalc.upTo')} ${it.stackMax}×)` : ''}${it.note ? ` <span class="bkw-note">· ${escSkill(it.note)}</span>` : ''}</div>`).join('');
+            const grpHtml = (g, line) => `<div class="bkw-group"><span class="bkw-who">${g.label}</span><div class="bkw-stats">${line(g)}</div></div>`;
+            let body = sortG(staticG).map(g => grpHtml(g, statLine)).join('');
+            const dg = sortG(dynG);
+            if (dg.length) body += `<div class="bkw-divider">${t('bookcalc.dynamicDivider')}</div>` + dg.map(g => grpHtml(g, dynLine)).join('');
+            const keys = escapeHtml(JSON.stringify(Array.from(new Set(items.map(i => i.key)))));
+            const openBtn = `<button class="bkw-open" data-keys="${keys}" onclick="openBookInSearch(this)">🔎 ${t('bookcalc.openInBook')}</button>`;
+            return `<div class="book-bonus-widget" onclick="event.stopPropagation()">`
+                + `<button class="bkw-chip${open ? ' open' : ''}" onclick="toggleBookBonusWidget(this)">🎁 ${t('bookcalc.title')} · ${items.length}</button>`
+                + `<div class="bkw-body${open ? ' open' : ''}">${body}<div class="bkw-actions">${openBtn}</div></div></div>`;
+        }
+        function toggleBookBonusWidget() {
+            const open = !storage.getBool('souls_book_bonus_open', false);
+            storage.setBool('souls_book_bonus_open', open);
+            document.querySelectorAll('.book-bonus-widget').forEach(w => {
+                w.querySelector('.bkw-chip')?.classList.toggle('open', open);
+                w.querySelector('.bkw-body')?.classList.toggle('open', open);
+            });
+        }
+        // „Pokaż w Księdze" — ustaw filtr-zbiór na te bonusy i przejdź do Księgi.
+        function openBookInSearch(btn) {
+            let keys = [];
+            try { keys = JSON.parse(btn.dataset.keys || '[]'); } catch (e) {}
+            bookOnlySet = new Set(keys);
+            const cur = document.querySelector('.tab-content.active')?.id?.replace('tab-', '');
+            bookOnlyReturnTab = (cur && cur !== 'heroes') ? cur : null; // skąd przyszliśmy (do „← Wróć")
+            bookSearchQuery = ''; const inp = $('book-search'); if (inp) inp.value = '';
+            bookFilterBooks.clear();
+            heroesMode = 'book'; storage.setJson('souls_heroes_mode', 'book');
+            switchTab('heroes'); // applyHeroesMode → renderBookTab (uwzględni bookOnlySet)
+        }
+        function clearBookOnly() { bookOnlySet = null; bookOnlyReturnTab = null; renderBookGrid(); }
+        function bookReturnToTeam() { const tab = bookOnlyReturnTab; bookOnlySet = null; bookOnlyReturnTab = null; renderBookGrid(); if (tab) switchTab(tab); }
         // Aliasy pól scope'owanych w szukajce Księgi (pole:term)
         const BOOK_FIELD_ALIAS = {
             book: 'book', ks: 'book', ksiega: 'book', 'księga': 'book',
@@ -6092,9 +6258,11 @@
             return true;
         }
 
-        function renderBookTab() { renderBookHelp(); renderHeroesSynonyms(); renderBookFilters(); renderBookGrid(); }
-        function setBookSearch(v) { bookSearchQuery = v; renderBookGrid(); }
-        function setBookExample(q) { bookSearchQuery = q; const inp = $('book-search'); if (inp) inp.value = q; renderBookGrid(); }
+        function renderBookTab() { renderBookHelp(); renderHeroesSynonyms(); renderBookFilters(); renderBookGrid(); syncBookClearBtn(); }
+        function syncBookClearBtn() { const c = $('book-clear'); if (c) c.style.display = bookSearchQuery ? '' : 'none'; }
+        function setBookSearch(v) { bookSearchQuery = v; syncBookClearBtn(); renderBookGrid(); }
+        function setBookExample(q) { const inp = $('book-search'); if (inp) inp.value = q; setBookSearch(q); }
+        function clearBookSearch() { const inp = $('book-search'); if (inp) inp.value = ''; setBookSearch(''); inp?.focus(); }
         function toggleBookFilter(key) { bookFilterBooks.has(key) ? bookFilterBooks.delete(key) : bookFilterBooks.add(key); renderBookFilters(); renderBookGrid(); }
         function clearBookFilters() { bookFilterBooks.clear(); renderBookFilters(); renderBookGrid(); }
         function toggleBookHelp() { bookHelpOpen = !bookHelpOpen; storage.setBool('souls_book_help', bookHelpOpen); $('book-help-toggle')?.classList.toggle('active', bookHelpOpen); renderBookHelp(); }
@@ -6144,10 +6312,16 @@
             if (!grid) return;
             const parsed = parseBookQuery(bookSearchQuery);
             let list = getBookBonuses();
+            if (bookOnlySet) list = list.filter(b => bookOnlySet.has(bookKey(b))); // filtr-zbiór z „Pokaż w Księdze"
             if (bookFilterBooks.size) list = list.filter(b => bookFilterBooks.has(b.book));
             if (!parsed.empty) list = list.filter(b => bookMatches(b, parsed));
             const cnt = $('book-count');
             if (cnt) cnt.textContent = t('book.count', { n: list.length });
+            const banner = bookOnlySet
+                ? `<div class="book-only-banner">🎁 ${t('bookcalc.onlyBanner', { n: bookOnlySet.size })} `
+                    + (bookOnlyReturnTab ? `<button class="btn btn-small btn-secondary" onclick="bookReturnToTeam()">← ${t('bookcalc.backToTeam')}</button> ` : '')
+                    + `<button class="btn btn-small btn-secondary" onclick="clearBookOnly()">✕ ${t('bookcalc.showAll')}</button></div>`
+                : '';
             const groups = {};
             list.forEach(b => { (groups[b.book] = groups[b.book] || []).push(b); });
             const section = (label, count, cards) => `<div class="quick-tags-section"><div class="quick-tags-header expanded" onclick="toggleBookSection(this)">`
@@ -6156,8 +6330,8 @@
             const html = getBooks().filter(m => groups[m.key]).map(m =>
                 section(`${m.icon} ${escapeHtml(m.label)}`, groups[m.key].length,
                     groups[m.key].sort((a, b) => a.order - b.order).map(b => bookCardHTML(b, parsed)).join(''))).join('');
-            if (!html) { grid.innerHTML = `<div class="heroes-empty">${t('book.none')}</div>`; return; }
-            grid.innerHTML = `<button class="expand-all-btn" onclick="toggleAllBookGroups(this)">▲ ${t('heroes.collapseAll')}</button>` + html;
+            if (!html) { grid.innerHTML = banner + `<div class="heroes-empty">${t('book.none')}</div>`; return; }
+            grid.innerHTML = banner + `<button class="expand-all-btn" onclick="toggleAllBookGroups(this)">▲ ${t('heroes.collapseAll')}</button>` + html;
             requestAnimationFrame(equalizeBookCards);
         }
         // Wyrównaj wysokość WSZYSTKICH kafelków Księgi do najwyższego (widocznego) — CSS grid równa tylko w obrębie
@@ -7856,7 +8030,7 @@
                     <div class="defense-mini-row">${slot(3)}${slot(4)}</div>
                     <div class="defense-mini-row">${slot(5)}${slot(6)}${slot(7)}</div>
                     ${petHtml}
-                </div>`;
+                </div>${bookBonusWidget(my)}`;
         }
 
         // Pełny rerender po jakimkolwiek update — tanio, bo dane gildii są małe.
