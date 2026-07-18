@@ -16,7 +16,8 @@
         const storage = {
             getJson: (key, fallback = null) => {
                 const raw = localStorage.getItem(key);
-                return raw === null ? fallback : JSON.parse(raw);
+                if (raw === null) return fallback;
+                try { return JSON.parse(raw); } catch (e) { return fallback; }
             },
             setJson: (key, val) => localStorage.setItem(key, JSON.stringify(val)),
             getBool: (key, fallback = false) => {
@@ -81,6 +82,7 @@
         let headerClickCount = 0, headerClickTimer = null;
         let favorites = storage.getJson('souls_favorites', []);
         let currentLang = localStorage.getItem('souls_lang') || 'pl';
+        document.documentElement.lang = currentLang; // zsynchronizuj <html lang> z zapamiętanym językiem
         let currentDbFilter = 'all';
 		let currentDbSort = 'id-desc';
 		// Globalna konfiguracja gildii (Firebase /config/settings) — wspólna dla wszystkich graczy.
@@ -173,8 +175,11 @@
         const normalize = str => (str || '').trim().toLowerCase();
         // Wyszukanie bohatera po nazwie (case-insensitive, BEZ trim — zgodnie z dotychczasowym dopasowaniem)
         const findHero = name => heroes.find(h => h.name.toLowerCase() === name.toLowerCase());
-        // Escape stringa do wstawienia w atrybut onclick="fn('...')"
-        const jsStr = s => String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        // Escape stringa do wstawienia w atrybut onclick="fn('...')":
+        // najpierw escape JS (\ i '), potem HTML-encode (& " < >) — parser HTML
+        // odkoduje encje zanim JS zobaczy string, a " nie rozerwie atrybutu.
+        const jsStr = s => String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'")
+            .replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         const getPetName = p => typeof p === 'string' ? p : p.name;
 
         // Helpery menedżerów wykluczeń (search / war / kreator)
@@ -497,6 +502,7 @@
         function setLanguage(lang) {
             currentLang = lang;
             localStorage.setItem('souls_lang', lang);
+            document.documentElement.lang = lang; // czytniki ekranu / tłumacze przeglądarek
             document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
             document.querySelector(`.lang-btn[onclick="setLanguage('${lang}')"]`).classList.add('active');
             applyTranslations();
@@ -1656,8 +1662,8 @@
 			
 			container.innerHTML = excludedHeroes.map(hero => `
 				<div class="excluded-chip">
-					<span>${hero}</span>
-					<button class="excluded-chip-remove" onclick="removeExcludedHero('${hero}')" title="${t('common.delete')}">✕</button>
+					<span>${escapeHtml(hero)}</span>
+					<button class="excluded-chip-remove" onclick="removeExcludedHero('${jsStr(hero)}')" title="${t('common.delete')}">✕</button>
 				</div>
 			`).join('');
 		}
@@ -1915,7 +1921,7 @@
 			searchHistory.splice(idx, 1);
 			storage.setJson('souls_search_history', searchHistory);
 			renderSearchHistory();
-			showToast(t('common.formationDeleted'));
+			showToast(t('common.historyEntryRemoved'));
 		}
 
 		function clearSearchHistory() {
@@ -2018,7 +2024,7 @@
                     }
                 } else {
                     // at-least: enumerate all sizes from minSize to hs.length
-                    for (let k = minSize; k <= hs.length; k++) {
+                    for (let k = minSize; k <= Math.min(hs.length, 5); k++) {
                         enumerateSubsets(hs, k, subset => {
                             const key = subset.join('|');
                             counts.set(key, (counts.get(key) || 0) + 1);
@@ -2581,8 +2587,8 @@
 			}
 			
 			container.innerHTML = recentlyViewed.map(item => `
-				<div class="recently-viewed-item" onclick="showFormation(${item.id})" title="${item.name}">
-					<span class="rv-id">#${item.id}</span>${item.name.substring(0, 15)}${item.name.length > 15 ? '..' : ''}
+				<div class="recently-viewed-item" onclick="showFormation(${Number(item.id) || 0})" title="${escapeHtml(item.name)}">
+					<span class="rv-id">#${item.id}</span>${escapeHtml(item.name.substring(0, 15))}${item.name.length > 15 ? '..' : ''}
 				</div>
 			`).join('');
 			
@@ -3481,8 +3487,8 @@
 
 			container.innerHTML = warExcludedHeroes.map(hero => `
 				<span class="excluded-chip" style="display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; background: rgba(244, 67, 54, 0.2); border: 1px solid rgba(244, 67, 54, 0.4); border-radius: 12px; font-size: 0.75rem; color: #f44336;">
-					${hero}
-					<button onclick="removeWarExcludedHero('${hero.replace(/'/g, "\\'")}')" style="background: none; border: none; color: #f44336; cursor: pointer; font-size: 0.8rem; padding: 0 2px; opacity: 0.7;" title="${t('common.remove')}">✕</button>
+					${escapeHtml(hero)}
+					<button onclick="removeWarExcludedHero('${jsStr(hero)}')" style="background: none; border: none; color: #f44336; cursor: pointer; font-size: 0.8rem; padding: 0 2px; opacity: 0.7;" title="${t('common.remove')}">✕</button>
 				</span>
 			`).join('');
 		}
@@ -3956,10 +3962,10 @@
 													const isConflict = conflictHeroes.has(normalize(h));
 													const heroData = heroes.find(hr => normalize(hr.name) === normalize(h));
 													const raceClass = heroData?.race ? `hero-${heroData.race.toLowerCase()}` : '';
-													return isConflict 
-														? `<span class="hero-conflict">${h}</span>` 
-														: `<span class="${raceClass}">${h}</span>`;
-												}).join(', ') || '—'}${myHeroes.length > 5 ? '...' : ''}${f.myPet ? ` <span class="pet-inline">+ 🐾 <span class="hero-pet">${f.myPet}</span></span>` : ''}
+													return isConflict
+														? `<span class="hero-conflict">${escapeHtml(h)}</span>`
+														: `<span class="${raceClass}">${escapeHtml(h)}</span>`;
+												}).join(', ') || '—'}${myHeroes.length > 5 ? '...' : ''}${f.myPet ? ` <span class="pet-inline">+ 🐾 <span class="hero-pet">${escapeHtml(f.myPet)}</span></span>` : ''}
 											</div>
 										</div>
 										<div class="war-formation-section">
@@ -3968,8 +3974,8 @@
 												${f.enemy.filter(h => h).slice(0, 5).map(h => {
 													const heroData = heroes.find(hr => normalize(hr.name) === normalize(h));
 													const raceClass = heroData?.race ? `hero-${heroData.race.toLowerCase()}` : '';
-													return `<span class="${raceClass}">${h}</span>`;
-												}).join(', ') || '—'}${f.enemy.filter(h => h).length > 5 ? '...' : ''}${f.enemyPet ? ` <span class="pet-inline">+ 🐾 <span class="hero-pet">${f.enemyPet}</span></span>` : ''}
+													return `<span class="${raceClass}">${escapeHtml(h)}</span>`;
+												}).join(', ') || '—'}${f.enemy.filter(h => h).length > 5 ? '...' : ''}${f.enemyPet ? ` <span class="pet-inline">+ 🐾 <span class="hero-pet">${escapeHtml(f.enemyPet)}</span></span>` : ''}
 											</div>
 										</div>
 										<div class="war-vs-enemy">
@@ -3983,13 +3989,13 @@
 						</div>
 						${combo.conflictDetails.length ? `
 							<div class="war-conflicts-summary">
-								⚠️ <strong>Konflikty:</strong> ${combo.conflictDetails.map(c => 
-									`<span class="conflict-hero">${c.display || c.hero}</span>`
+								⚠️ <strong>Konflikty:</strong> ${combo.conflictDetails.map(c =>
+									`<span class="conflict-hero">${escapeHtml(c.display || c.hero)}</span>`
 								).join(', ')}
 							</div>` : ''}
 						${hasExcluded ? `
 							<div class="war-excluded-summary" style="margin-top: 8px; padding: 6px 10px; background: rgba(244, 67, 54, 0.1); border: 1px solid rgba(244, 67, 54, 0.3); border-radius: 6px; font-size: 0.75rem; color: #f44336;">
-								🚫 <strong>Wykluczone:</strong> ${excludedInCombo.join(', ')}
+								🚫 <strong>Wykluczone:</strong> ${excludedInCombo.map(escapeHtml).join(', ')}
 							</div>` : ''}
 					</div>`;
 			});
@@ -4086,7 +4092,7 @@
 			updateKreatorTagsSelection();
 			
 			// Przełącz na zakładkę Kreator
-			showTab('tab-kreator');
+			switchTab('kreator');
 			
 			showToast('📝 Skład przeniesiony do Kreatora!');
 		}
@@ -4147,7 +4153,7 @@
 			});
 			
 			updateKreatorTagsSelection();
-			showTab('tab-kreator');
+			switchTab('kreator');
 			showToast('📝 Skład przeniesiony do Kreatora!');
 		}
 
@@ -4234,7 +4240,7 @@
 				return `
 					<div class="pinned-combo-card">
 						<div class="pinned-combo-header">
-							<span class="pinned-combo-name">📌 ${pinned.name}</span>
+							<span class="pinned-combo-name">📌 ${escapeHtml(pinned.name)}</span>
 							<span class="pinned-combo-time">${timeAgo}</span>
 						</div>
 						<div class="pinned-combo-stats">
@@ -4247,7 +4253,7 @@
 							${pinned.formations.map((f, i) => `
 								<div class="pinned-formation">
 									<strong>Walka ${i+1}</strong> (#${f.formationId}): 
-									${f.my.filter(h => h).slice(0, 4).join(', ')}${f.my.filter(h => h).length > 4 ? '...' : ''}
+									${f.my.filter(h => h).slice(0, 4).map(escapeHtml).join(', ')}${f.my.filter(h => h).length > 4 ? '...' : ''}
 								</div>
 							`).join('')}
 						</div>
@@ -4567,7 +4573,7 @@
 			warSearchHistory.splice(idx, 1);
 			storage.setJson('souls_war_history', warSearchHistory);
 			renderWarHistory();
-			showToast(t('common.formationDeleted'));
+			showToast(t('common.historyEntryRemoved'));
 		}
 
 		function clearWarHistory() {
@@ -4680,7 +4686,8 @@
 			// Karty porównania dla każdej walki
 			combo.formations.forEach((match, idx) => {
 				const f = match.formation;
-				const searchedEnemy = combo.enemies[idx];
+				// Stare pinezki (localStorage sprzed dodania pola enemies) mogą nie mieć wpisu — nie wysypuj podglądu
+				const searchedEnemy = combo.enemies[idx] || { heroesRaw: [], petRaw: '' };
 				
 				// Analiza dopasowania
 				const analysis = analyzeWarMatch(searchedEnemy, f);
@@ -4910,7 +4917,7 @@
 				// Kapitalizuj nazwę (pierwsza duża)
 				const displayName = hero ? hero.name : (name.charAt(0).toUpperCase() + name.slice(1).toLowerCase());
 
-				return `<div class="${classes} slot-clickable" onclick="event.stopPropagation();showHeroSkills('${jsStr(hero ? hero.name : name)}')">${displayName}</div>`;
+				return `<div class="${classes} slot-clickable" onclick="event.stopPropagation();showHeroSkills('${jsStr(hero ? hero.name : name)}')">${escapeHtml(displayName)}</div>`;
 			};
 			
 			return `
@@ -4941,9 +4948,9 @@
 				if (isMatched && !samePos) classes += ' war-moved';
 				if (isExtra) classes += ' war-extra';
 
-				return `<div class="${classes} slot-clickable" onclick="event.stopPropagation();showHeroSkills('${jsStr(name)}')">${name}</div>`;
+				return `<div class="${classes} slot-clickable" onclick="event.stopPropagation();showHeroSkills('${jsStr(name)}')">${escapeHtml(name)}</div>`;
 			};
-			
+
 			return `
 				<div class="compact-row">${slot(5)}${slot(6)}${slot(7)}</div>
 				<div class="compact-row">${slot(3)}${slot(4)}</div>
@@ -4967,9 +4974,9 @@
 				if (race) classes += ` race-${race}`;
 				if (isConflict) classes += ' conflict';
 
-				return `<div class="${classes} slot-clickable" onclick="event.stopPropagation();showHeroSkills('${jsStr(name)}')">${name}</div>`;
+				return `<div class="${classes} slot-clickable" onclick="event.stopPropagation();showHeroSkills('${jsStr(name)}')">${escapeHtml(name)}</div>`;
 			};
-			
+
 			return `
 				<div class="war-your-team-grid">
 					<div class="war-your-team-row">${slot(0)}${slot(1)}${slot(2)}</div>
@@ -4986,7 +4993,7 @@
 			}
 			const isConflict = conflictPets && conflictPets.has(normalize(petName));
 			const conflictClass = isConflict ? ' conflict' : '';
-			return `<div class="war-your-team-pet${conflictClass} slot-clickable" onclick="event.stopPropagation();showPetSkills('${jsStr(petName)}')">🐾 ${petName}</div>`;
+			return `<div class="war-your-team-pet${conflictClass} slot-clickable" onclick="event.stopPropagation();showPetSkills('${jsStr(petName)}')">🐾 ${escapeHtml(petName)}</div>`;
 		}
 
 		// Renderuj porównanie petów - z oryginalnymi nazwami
@@ -5012,7 +5019,7 @@
 				petClass += ' war-extra';         // pet w bazie, inny/brak u szukanego
 			}
 			
-			return `<div class="compact-pet ${petClass} slot-clickable" onclick="event.stopPropagation();showPetSkills('${jsStr(petData || petName)}')">🐾 ${displayName}</div>`;
+			return `<div class="compact-pet ${petClass} slot-clickable" onclick="event.stopPropagation();showPetSkills('${jsStr(petData || petName)}')">🐾 ${escapeHtml(displayName)}</div>`;
 		}
 
 		// Kopiuj skład do schowka
@@ -5171,8 +5178,8 @@
 
 			container.innerHTML = kreatorExcludedHeroes.map(hero => `
 				<span class="excluded-chip" style="display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; background: rgba(244, 67, 54, 0.2); border: 1px solid rgba(244, 67, 54, 0.4); border-radius: 12px; font-size: 0.75rem; color: #f44336;">
-					${hero}
-					<button onclick="removeKreatorExcludedHero('${hero.replace(/'/g, "\\'")}')" style="background: none; border: none; color: #f44336; cursor: pointer; font-size: 0.8rem; padding: 0 2px; opacity: 0.7;" title="${t('common.remove')}">✕</button>
+					${escapeHtml(hero)}
+					<button onclick="removeKreatorExcludedHero('${jsStr(hero)}')" style="background: none; border: none; color: #f44336; cursor: pointer; font-size: 0.8rem; padding: 0 2px; opacity: 0.7;" title="${t('common.remove')}">✕</button>
 				</span>
 			`).join('');
 		}
@@ -6020,7 +6027,7 @@
                     const grp = a.text && findSynonymGroup(a.text);
                     // krótkie skróty (≤3 znaki) = całe słowo (żeby „cc" nie łapało „accuracy"); pełne formy podłańcuchem (łapią odmianę)
                     const list = grp ? grp.map(form => ({ field: a.field, text: form, boundary: a.boundary || (form.length <= 3 && !form.includes(' ')) })) : [a];
-                    for (const x of list) { const k = x.field + ' ' + x.text; if (!seen.has(k)) { seen.add(k); out.push(x); } }
+                    for (const x of list) { const k = x.field + '|' + x.text; if (!seen.has(k)) { seen.add(k); out.push(x); } }
                 }
                 cl.alts = out;
             }
@@ -7217,6 +7224,7 @@
             if (!isAdmin || !currentDefensePlayerId) return;
             const player = getDefensePlayer(currentDefensePlayerId);
             if (!player) return;
+            if (!defensePlayersRef) { showToast('❌ ' + t('common.noConnection'), true); return; }
             const msg = t('defense.confirmDeletePlayer').replace('{name}', player.name);
             if (!confirm(msg)) return;
 
@@ -7619,7 +7627,7 @@
             const select = $('defense-assign-player-select');
             const livePlayers = allDefensePlayers.filter(p => !p.deletedAt);
             select.innerHTML = livePlayers.length
-                ? livePlayers.map(p => `<option value="${p.id}">${p.name}</option>`).join('')
+                ? livePlayers.map(p => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('')
                 : `<option value="" disabled>${t('defense.noPlayers')}</option>`;
             $('defense-assign-modal').classList.remove('hidden');
         }
@@ -7704,7 +7712,7 @@
         function parseDefenseQuery(raw) {
             const q = (raw || '').toLowerCase().trim();
             if (!q) return null;
-            const tokens = q.match(/"[^"]*"|\S+/g) || [];
+            const tokens = q.match(/-?"[^"]*"|\S+/g) || []; // -? przed cudzysłowem: -"fraza" to jeden token
             const include = []; // grupy OR: [[a,b], [c]] → (a|b) AND (c)
             const exclude = [];
             for (let tok of tokens) {
@@ -8980,14 +8988,14 @@
 		function renderDuplicateGroups(groups, type) {
 			return groups.map((group, groupIndex) => {
 				const first = group.formations[0];
-				const enemyList = first.enemy.filter(h => h).join(', ') || '—';
-				const myList = first.my.filter(h => h).join(', ') || '—';
-				
+				const enemyList = first.enemy.filter(h => h).map(escapeHtml).join(', ') || '—';
+				const myList = first.my.filter(h => h).map(escapeHtml).join(', ') || '—';
+
 				return `
 					<div class="duplicate-group ${type}">
 						<div class="duplicate-group-header">
-							<strong>👹 ${t('duplicates.enemy')}:</strong> ${enemyList} ${first.enemyPet ? '+ ' + first.enemyPet : ''}<br>
-							<strong>⚔️ ${t('duplicates.counter')}:</strong> ${myList} ${first.myPet ? '+ ' + first.myPet : ''}
+							<strong>👹 ${t('duplicates.enemy')}:</strong> ${enemyList} ${first.enemyPet ? '+ ' + escapeHtml(first.enemyPet) : ''}<br>
+							<strong>⚔️ ${t('duplicates.counter')}:</strong> ${myList} ${first.myPet ? '+ ' + escapeHtml(first.myPet) : ''}
 						</div>
 						${group.formations.map(f => `
 							<div class="duplicate-item">
@@ -10093,8 +10101,39 @@
             bookBonusesRef = db.ref('bookBonuses');
             bookMetaRef = db.ref('bookMeta');
 
+            // Sanityzacja rekordu z /formations — baza ma .write:true, więc rekord może być
+            // dowolnie uszkodzony (brak my/enemy; sparse-tablica wraca z RTDB jako obiekt
+            // {0:'A',5:'B'} bez .filter/.map). Wymuszamy 8-slotowe tablice stringów, bo jeden
+            // zły rekord wywracał updateUI w listenerze i apka wisiała na „Ładowanie" u wszystkich.
+            const toSlots8 = v => {
+                const out = new Array(8).fill('');
+                if (Array.isArray(v)) {
+                    v.slice(0, 8).forEach((h, i) => { if (typeof h === 'string') out[i] = h; });
+                } else if (v && typeof v === 'object') {
+                    Object.keys(v).forEach(k => {
+                        const i = Number(k);
+                        if (Number.isInteger(i) && i >= 0 && i < 8 && typeof v[k] === 'string') out[i] = v[k];
+                    });
+                }
+                return out;
+            };
+            const sanitizeFormation = f => {
+                if (!f || typeof f !== 'object') return null;
+                return {
+                    ...f,
+                    id: Number(f.id) || 0,
+                    my: toSlots8(f.my),
+                    enemy: toSlots8(f.enemy),
+                    myPet: typeof f.myPet === 'string' ? f.myPet : '',
+                    enemyPet: typeof f.enemyPet === 'string' ? f.enemyPet : '',
+                    name: typeof f.name === 'string' ? f.name : '',
+                };
+            };
+
             formationsRef.on('value', snap => {
-                allFormations = snap.val() ? Object.values(snap.val()).sort((a, b) => a.id - b.id) : [];
+                allFormations = snap.val()
+                    ? Object.values(snap.val()).map(sanitizeFormation).filter(Boolean).sort((a, b) => a.id - b.id)
+                    : [];
                 updateUI();
                 $('loading').classList.add('hidden');
                 setOnlineStatus(true);

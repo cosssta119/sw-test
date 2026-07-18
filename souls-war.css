@@ -1442,6 +1442,18 @@
 		
 		.modal-content h2 { text-align: center; margin-bottom: 20px; }
 
+		/* Przycisk × w rogu modala (duplikaty, edycja/przypięcie Obrony, porównywarka, dup-preview) */
+		.close-btn {
+			float: right;
+			font-size: 1.4rem;
+			line-height: 1;
+			color: var(--text-muted);
+			cursor: pointer;
+			user-select: none;
+			padding: 0 4px;
+		}
+		.close-btn:hover { color: var(--accent-gold); }
+
 		#duplicates-modal .modal-content { max-width: 95vw !important; width: 1400px !important; max-height: 90vh !important; overflow-y: auto !important; }
 		#duplicate-preview-modal .modal-content { max-width: 700px !important; width: 95vw !important; }
 		.compare-modal-content { max-width: 98vw !important; width: 1400px !important; max-height: 90vh !important; overflow-y: auto !important; }
