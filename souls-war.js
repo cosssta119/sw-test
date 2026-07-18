@@ -2392,13 +2392,13 @@
 							<div class="battle-section enemy">
 								<div class="battle-title enemy-title"><span class="title-icon">👹</span>${t('preview.enemy')}</div>
 								<div style="text-align:center">${renderComparePet(f.enemyPet, 'enemy', fIdx, allHeroesPerFormation)}</div>
-								${renderCompareBattleGrid(f.enemy, true, 'enemy', fIdx, allHeroesPerFormation)}
+								${renderCompareBattleGrid(f.enemy, true, 'enemy', fIdx, allHeroesPerFormation, f.enemyArtifacts)}
 							</div>
 							
 							<div class="vs-separator"><span class="vs-badge">VS</span></div>
 							
 							<div class="battle-section player">
-								${renderCompareBattleGrid(f.my, false, 'my', fIdx, allHeroesPerFormation)}
+								${renderCompareBattleGrid(f.my, false, 'my', fIdx, allHeroesPerFormation, f.myArtifacts)}
 								<div style="text-align:center">${renderComparePet(f.myPet, 'my', fIdx, allHeroesPerFormation)}</div>
 								<div class="battle-title player-title"><span class="title-icon">⚔️</span>${t('preview.yourTeam')}</div>
 							</div>
@@ -2414,21 +2414,21 @@
 			$('compare-content').innerHTML = html;
 		}
 
-		function renderCompareBattleGrid(arr, isEnemy, type, formationIdx, allData) {
+		function renderCompareBattleGrid(arr, isEnemy, type, formationIdx, allData, arts) {
 			const slot = (pos) => {
 				const name = arr[pos] || '';
-				
+
 				if (!name) {
 					return `<div class="battle-slot empty"></div>`;
 				}
-				
+
 				const normalizedName = normalize(name);
 				const diffClass = getHeroDiffClass(normalizedName, pos, type, formationIdx, allData);
-				
+
 				const hero = findHero(name);
 				const rc = hero ? `race-${hero.race.toLowerCase()}` : '';
 
-				return `<div class="battle-slot filled ${rc} ${diffClass} slot-clickable" onclick="event.stopPropagation();showHeroSkills('${jsStr(name)}')"><span class="hero-name">${name}</span></div>`;
+				return `<div class="battle-slot filled ${rc} ${diffClass} slot-clickable" onclick="event.stopPropagation();showHeroSkills('${jsStr(name)}')"><span class="hero-name">${escapeHtml(name)}</span>${artifactSlotBadge(arts && arts[pos])}</div>`;
 			};
 			
 			if (isEnemy) {
@@ -2614,13 +2614,13 @@
 					<div class="battle-section enemy">
 						<div class="battle-title enemy-title"><span class="title-icon">👹</span>${t('preview.enemy')}</div>
 						<div style="text-align:center">${renderBattlePet(f.enemyPet)}</div>
-						${renderBattleGrid(f.enemy, true)}
+						${renderBattleGrid(f.enemy, true, f.enemyArtifacts)}
 						<div class="battle-arrows animated"><div class="battle-arrow down"></div></div>
 					</div>
 					<div class="vs-separator"><span class="vs-badge">VS</span></div>
 					<div class="battle-section player">
 						<div class="battle-arrows animated"><div class="battle-arrow up"></div></div>
-						${renderBattleGrid(f.my, false)}
+						${renderBattleGrid(f.my, false, f.myArtifacts)}
 						<div style="text-align:center">${renderBattlePet(f.myPet)}</div>
 						<div class="battle-title player-title"><span class="title-icon">⚔️</span>${t('preview.yourTeam')}</div>
 					</div>
@@ -2781,13 +2781,13 @@
         // Przechowuj aktualne wyniki wojny
         let currentWarResults = null;
 
-        function renderBattleGrid(arr, isEnemy) {
+        function renderBattleGrid(arr, isEnemy, arts) {
             const slot = i => {
                 const name = arr[i] || '';
                 if (!name) return `<div class="battle-slot empty"></div>`;
                 const hero = findHero(name);
                 const rc = hero ? `race-${hero.race.toLowerCase()}` : '';
-                return `<div class="battle-slot filled ${rc} slot-clickable" onclick="event.stopPropagation();showHeroSkills('${jsStr(name)}')"><span class="hero-name">${name}</span></div>`;
+                return `<div class="battle-slot filled ${rc} slot-clickable" onclick="event.stopPropagation();showHeroSkills('${jsStr(name)}')"><span class="hero-name">${escapeHtml(name)}</span>${artifactSlotBadge(arts && arts[i])}</div>`;
             };
             
             const grid = isEnemy ? `<div class="battle-grid"><div class="battle-row">${slot(5)}${slot(6)}${slot(7)}</div><div class="battle-row">${slot(3)}${slot(4)}</div><div class="battle-row">${slot(0)}${slot(1)}${slot(2)}</div></div>` :
@@ -2875,13 +2875,24 @@
 				if (el) el.value = f.enemy[i - 1] || '';
 			}
 			$('edit-enemyPet').value = f.enemyPet || '';
-			
+
+			// Artefakty per slot → stan kwadracików edycji
+			clearFormArtifacts('edit-');
+			for (let i = 1; i <= 8; i++) {
+				const ma = (f.myArtifacts || [])[i - 1];
+				if (ma) formArtifacts['edit-my' + i] = ma;
+				const ea = (f.enemyArtifacts || [])[i - 1];
+				if (ea) formArtifacts['edit-enemy' + i] = ea;
+			}
+			syncAllArtifactSlotBtns('edit-');
+
 			$('edit-modal').classList.remove('hidden');
 		}
 
 		function closeEditModal() {
 			$('edit-modal').classList.add('hidden');
 			editingFormationId = null;
+			clearFormArtifacts('edit-');
 		}
 
 		async function saveEditFormation() {
@@ -2914,6 +2925,8 @@
 			if (!v.ok) { showToast(v.error, true); return; }
 			const { my, enemy, myPet, enemyPet } = v;
 			const comment = $('edit-comment').value.trim();
+			const myArts = collectFormArtifacts('edit-my', my);
+			const enemyArts = collectFormArtifacts('edit-enemy', enemy);
 			
 			// Checkbox isBase
 			const isBase = $('edit-isBase')?.checked || false;
@@ -2927,6 +2940,8 @@
 					enemyPet,
 					comment,
 					isBase,
+					myArtifacts: myArts.some(x => x) ? myArts : null, // null = usuń pole gdy wyczyszczono
+					enemyArtifacts: enemyArts.some(x => x) ? enemyArts : null,
 					lastEdited: new Date().toISOString()
 				});
 				
@@ -3240,6 +3255,11 @@
 				isBase: isBase,
 				dateAdded: new Date().toISOString()
 			};
+			// Artefakty per slot (opcjonalne) — z kwadracików formularza; pola tylko gdy jest ≥1 artefakt
+			const myArts = collectFormArtifacts('add-my', my);
+			const enemyArts = collectFormArtifacts('add-enemy', enemy);
+			if (myArts.some(x => x)) record.myArtifacts = myArts;
+			if (enemyArts.some(x => x)) record.enemyArtifacts = enemyArts;
 
 			try {
 				// Transakcja na pierwszym wolnym ID — samo max+1 i set() cicho nadpisywało
@@ -3345,6 +3365,7 @@
 			// Reset checkbox
 			const isBaseCheckbox = $('add-isBase');
 			if (isBaseCheckbox) isBaseCheckbox.checked = false;
+			clearFormArtifacts('add-');
 			updateAddFormTagsSelection();
 		}
 
@@ -6853,10 +6874,11 @@
                 ? `<img class="artifact-ico" src="${escapeHtml(a.iconUrl)}" alt="" loading="lazy">`
                 : `<span class="artifact-ico artifact-ico-ph">${ARTIFACT_CLASS_ICON[a.klass] || '🗡️'}</span>`;
         }
-        function artifactCardHTML(a, parsed) {
+        function artifactCardHTML(a, parsed, usage) {
             const terms = parsed.empty ? [] : parsed.terms;
             const hl = s => terms.length ? highlightHTML(s, terms) : escSkill(s);
             const slug = artifactSlug(a.name);
+            const used = usage ? (usage.get(normalize(a.name)) || 0) : 0;
             const galleryBtn = (canSeeGallery() && artifactFolder(slug))
                 ? `<button class="book-card-btn" onclick="openArtifactGalleryFolder('${jsStr(slug)}')" title="${t('artifacts.galleryBtn')}">🖼️</button>` : '';
             const admin = (isAdmin && artifactsFromDb())
@@ -6865,7 +6887,7 @@
             return `<div class="artifact-card">`
                 + `<div class="artifact-card-top">${artifactIconHTML(a)}`
                 + `<div class="artifact-card-head"><span class="book-card-name">${hl(a.name)}</span>`
-                + `<div class="artifact-card-meta"><span class="artifact-class-chip">${artifactClassLabel(a.klass)}</span>${a.rarity ? `<span class="artifact-rarity">${escSkill(a.rarity)}</span>` : ''}</div></div>`
+                + `<div class="artifact-card-meta"><span class="artifact-class-chip">${artifactClassLabel(a.klass)}</span>${a.rarity ? `<span class="artifact-rarity">${escSkill(a.rarity)}</span>` : ''}${used ? `<span class="artifact-class-chip" title="${escSkill(t('artifacts.usedIn', { n: used }))}">📊 ${used}×</span>` : ''}</div></div>`
                 + `<div class="book-card-actions">${galleryBtn}${admin}</div></div>`
                 + (bonuses ? `<div class="artifact-bonuses">${bonuses}</div>` : '')
                 + (a.skill ? `<div class="book-card-desc">${hl(a.skill)}</div>` : '')
@@ -6881,6 +6903,7 @@
             if (!parsed.empty) list = list.filter(a => artifactMatches(a, parsed));
             const cnt = $('artifacts-count');
             if (cnt) cnt.textContent = t('artifacts.count', { n: list.length });
+            const usage = artifactUsageMap();
             const groups = {};
             list.forEach(a => { (groups[a.klass] = groups[a.klass] || []).push(a); });
             const section = (label, count, cards) => `<div class="quick-tags-section"><div class="quick-tags-header expanded" onclick="toggleQuickTagSection(this)">`
@@ -6888,7 +6911,7 @@
                 + `<div class="quick-tags-content show"><div class="artifact-cards">${cards}</div></div></div>`;
             const html = ARTIFACT_CLASSES.filter(k => groups[k]).map(k =>
                 section(artifactClassLabel(k), groups[k].length,
-                    groups[k].sort((a, b) => (a.order || 0) - (b.order || 0)).map(a => artifactCardHTML(a, parsed)).join(''))).join('');
+                    groups[k].sort((a, b) => (a.order || 0) - (b.order || 0)).map(a => artifactCardHTML(a, parsed, usage)).join(''))).join('');
             if (!html) { grid.innerHTML = `<div class="heroes-empty">${t('artifacts.none')}</div>`; return; }
             grid.innerHTML = `<button class="expand-all-btn" onclick="toggleAllHeroGroups(this)">▲ ${t('heroes.collapseAll')}</button>` + html;
         }
@@ -7028,6 +7051,151 @@
                 if (noIcon.length) showToast('⚠️ ' + t('artifacts.seedNoIcon', { list: noIcon.slice(0, 5).join(', ') }) + (noIcon.length > 5 ? ` (+${noIcon.length - 5})` : ''), true);
             } catch (e) { showToast(t('common.error') + ': ' + e.message, true); }
             renderArtifactsTab();
+        }
+
+        // ─── Artefakt przy bohaterze w składzie (Dodaj/Edycja) ───
+        // Stan przypisań formularzy: id inputa bohatera → nazwa artefaktu (max 5 realnych, pet bez artefaktów).
+        // Zapis do formations/{id}.myArtifacts[8]/enemyArtifacts[8] — tablice wyrównane indeksami do slotów
+        // (wzorzec speeds z Obrony); pola dodawane tylko gdy jest ≥1 artefakt. Fingerprint/duplikaty ich NIE liczą.
+        let formArtifacts = {};
+        let artifactPickerTarget = null; // id inputa, dla którego otwarto picker
+        const ARTIFACT_FORM_PREFIXES = [['add-my', 8], ['add-enemy', 8], ['edit-my', 8], ['edit-enemy', 8]];
+
+        // Wstrzykuje przycisk-kwadracik do wrappera każdego pola bohatera (wariant „w inpucie" — zero zmian layoutu).
+        function initArtifactSlotButtons() {
+            for (const [prefix, n] of ARTIFACT_FORM_PREFIXES) {
+                for (let i = 1; i <= n; i++) {
+                    const input = $(prefix + i);
+                    if (!input || $(prefix + i + '-art')) continue;
+                    const wrap = input.closest('.autocomplete-wrapper') || input.parentElement;
+                    if (!wrap) continue;
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.id = prefix + i + '-art';
+                    btn.className = 'art-slot-btn';
+                    btn.style.display = 'none';
+                    btn.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); openArtifactPicker(prefix + i); });
+                    input.classList.add('has-art-btn'); // padding-right pod dokowany kwadracik
+                    wrap.appendChild(btn);
+                    input.addEventListener('input', () => syncArtifactSlotBtn(prefix + i));
+                    syncArtifactSlotBtn(prefix + i);
+                }
+            }
+        }
+        // Kwadracik widoczny tylko przy poprawnym bohaterze; przypisanie trzyma się SLOTU (zmiana bohatera go nie kasuje —
+        // przy zapisie artefakt idzie na wypełniony slot; klasy pilnuje picker, nie zapis).
+        function syncArtifactSlotBtn(inputId) {
+            const input = $(inputId), btn = $(inputId + '-art');
+            if (!input || !btn) return;
+            const heroName = (input.value || '').trim();
+            const valid = heroName && findHero(heroName);
+            if (!valid) { btn.style.display = 'none'; return; }
+            const art = formArtifacts[inputId] ? findArtifact(formArtifacts[inputId]) : null;
+            btn.style.display = '';
+            btn.classList.toggle('set', !!art);
+            btn.title = art ? art.name : t('artifacts.assignTitle');
+            btn.innerHTML = art
+                ? (art.iconUrl ? `<img src="${escapeHtml(art.iconUrl)}" alt="">` : (ARTIFACT_CLASS_ICON[art.klass] || '🗡️'))
+                : '+';
+        }
+        function syncAllArtifactSlotBtns(prefixFilter) {
+            for (const [prefix, n] of ARTIFACT_FORM_PREFIXES) {
+                if (prefixFilter && !prefix.startsWith(prefixFilter)) continue;
+                for (let i = 1; i <= n; i++) syncArtifactSlotBtn(prefix + i);
+            }
+        }
+        function clearFormArtifacts(prefixFilter) {
+            Object.keys(formArtifacts).forEach(k => { if (!prefixFilter || k.startsWith(prefixFilter)) delete formArtifacts[k]; });
+            syncAllArtifactSlotBtns(prefixFilter);
+        }
+
+        // Picker: artefakty klasy bohatera (rola z /heroSkills) + uniwersalne; bez roli — wszystkie z dopiskiem.
+        async function openArtifactPicker(inputId) {
+            const input = $(inputId);
+            const heroName = (input?.value || '').trim();
+            const hero = heroName ? findHero(heroName) : null;
+            if (!hero) return;
+            artifactPickerTarget = inputId;
+            const modal = $('artifact-picker-modal');
+            $('artifact-picker-for').textContent = t('artifacts.pickerFor', { hero: hero.name });
+            $('artifact-picker-body').innerHTML = `<div class="heroes-empty">${t('heroes.loading')}</div>`;
+            modal.classList.add('show');
+            if (!heroSkillsLoaded) { try { await loadHeroSkills(); } catch (e) {} }
+            if (artifactPickerTarget !== inputId || !modal.classList.contains('show')) return; // zamknięty w międzyczasie
+            renderArtifactPicker(hero.name);
+        }
+        function renderArtifactPicker(heroName) {
+            const body = $('artifact-picker-body');
+            if (!body) return;
+            const role = (getHeroSkills(heroName) || {}).role || null;
+            const list = getArtifacts().filter(a => !role || a.klass === role || a.klass === 'any')
+                .slice().sort((a, b) => (a.klass === 'any') - (b.klass === 'any') || (a.order || 0) - (b.order || 0));
+            const current = formArtifacts[artifactPickerTarget] ? normalize(formArtifacts[artifactPickerTarget]) : '';
+            const note = role
+                ? `<div class="hero-help-note">${escSkill(t('artifacts.pickerRole', { role: t('role.' + role) }))}</div>`
+                : `<div class="hero-help-note">⚠️ ${escSkill(t('artifacts.pickerNoRole'))}</div>`;
+            const tiles = list.map(a => `<div class="artifact-pick-tile${normalize(a.name) === current ? ' selected' : ''}" onclick="pickArtifact('${jsStr(a.name)}')" title="${escapeHtml(a.name)}">`
+                + artifactIconHTML(a)
+                + `<div class="artifact-pick-name">${escSkill(a.name)}</div>`
+                + `<div class="artifact-pick-class">${artifactClassLabel(a.klass)}</div></div>`).join('');
+            body.innerHTML = note
+                + `<div class="artifact-pick-grid">${tiles || `<div class="heroes-empty">${t('artifacts.none')}</div>`}</div>`
+                + `<div class="hse-actions">`
+                + (current ? `<button class="btn btn-danger btn-small" onclick="pickArtifact(null)">${t('artifacts.pickerRemove')}</button>` : '')
+                + `<button class="btn btn-secondary btn-small" onclick="closeArtifactPicker()">${t('common.cancel')}</button></div>`;
+        }
+        function pickArtifact(name) {
+            if (artifactPickerTarget) {
+                if (name) formArtifacts[artifactPickerTarget] = name;
+                else delete formArtifacts[artifactPickerTarget];
+                syncArtifactSlotBtn(artifactPickerTarget);
+            }
+            closeArtifactPicker();
+        }
+        function closeArtifactPicker() { $('artifact-picker-modal')?.classList.remove('show'); artifactPickerTarget = null; }
+
+        // Zbiera tablicę artefaktów [8] dla prefiksu formularza — tylko wypełnione sloty, nazwy kanoniczne.
+        function collectFormArtifacts(prefix, heroArr) {
+            const out = new Array(8).fill('');
+            for (let i = 1; i <= 8; i++) {
+                const nm = formArtifacts[prefix + i];
+                if (!nm) continue;
+                const art = findArtifact(nm);
+                if (art && (heroArr[i - 1] || '').trim()) out[i - 1] = art.name;
+            }
+            return out;
+        }
+
+        // Badge artefaktu w rogu slotu siatki 3-2-3 (klik → info-modal; stopPropagation, bo slot otwiera skille bohatera).
+        function artifactSlotBadge(name) {
+            if (!name) return '';
+            const a = findArtifact(name);
+            const inner = (a && a.iconUrl) ? `<img src="${escapeHtml(a.iconUrl)}" alt="">` : (ARTIFACT_CLASS_ICON[a?.klass] || '🗡️');
+            const display = a ? a.name : name;
+            return `<span class="slot-badges"><span class="slot-badge" title="${escapeHtml(display)}" onclick="event.stopPropagation();showArtifactInfo('${jsStr(display)}')">${inner}</span></span>`;
+        }
+        // Mini-modal z pełnym opisem artefaktu (z badge'a i skądkolwiek).
+        function showArtifactInfo(name) {
+            const a = findArtifact(name);
+            if (!a) return;
+            $('artifact-info-body').innerHTML = `<div class="artifact-card-top">${artifactIconHTML(a)}`
+                + `<div class="artifact-card-head"><span class="book-card-name">${escSkill(a.name)}</span>`
+                + `<div class="artifact-card-meta"><span class="artifact-class-chip">${artifactClassLabel(a.klass)}</span>${a.rarity ? `<span class="artifact-rarity">${escSkill(a.rarity)}</span>` : ''}</div></div></div>`
+                + ((a.bonuses || []).length ? `<div class="artifact-bonuses">${a.bonuses.map(b => `<div class="artifact-bonus">${escSkill(b)}</div>`).join('')}</div>` : '')
+                + (a.skill ? `<div class="book-card-desc">${escSkill(a.skill)}</div>` : '');
+            $('artifact-info-modal').classList.add('show');
+        }
+        function closeArtifactInfo() { $('artifact-info-modal')?.classList.remove('show'); }
+
+        // Ile formacji używa artefaktu (my+enemy, po znormalizowanej nazwie) — licznik na kartach Kompendium.
+        function artifactUsageMap() {
+            const map = new Map();
+            const add = nm => { const k = normalize(nm); if (k) map.set(k, (map.get(k) || 0) + 1); };
+            allFormations.forEach(f => {
+                (f.myArtifacts || []).forEach(x => x && add(x));
+                (f.enemyArtifacts || []).forEach(x => x && add(x));
+            });
+            return map;
         }
 
         function renderHeroesSynonyms() {
@@ -9441,13 +9609,13 @@
 					<div class="battle-section enemy">
 						<div class="battle-title enemy-title"><span class="title-icon">👹</span>${t('preview.enemy')}</div>
 						<div style="text-align:center">${renderBattlePet(f.enemyPet)}</div>
-						${renderBattleGrid(f.enemy, true)}
+						${renderBattleGrid(f.enemy, true, f.enemyArtifacts)}
 					</div>
 					
 					<div class="vs-separator"><span class="vs-badge">VS</span></div>
 					
 					<div class="battle-section player">
-						${renderBattleGrid(f.my, false)}
+						${renderBattleGrid(f.my, false, f.myArtifacts)}
 						<div style="text-align:center">${renderBattlePet(f.myPet)}</div>
 						<div class="battle-title player-title"><span class="title-icon">⚔️</span>${t('preview.yourTeam')}</div>
 					</div>
@@ -10597,6 +10765,8 @@
                     myPet: typeof f.myPet === 'string' ? f.myPet : '',
                     enemyPet: typeof f.enemyPet === 'string' ? f.enemyPet : '',
                     name: typeof f.name === 'string' ? f.name : '',
+                    myArtifacts: toSlots8(f.myArtifacts),
+                    enemyArtifacts: toSlots8(f.enemyArtifacts),
                 };
             };
 
@@ -10826,6 +10996,8 @@
 						['pet-skills-edit-modal', 'show', closePetSkillsEdit],
 						['book-edit-modal', 'show', closeBookEdit],
 						['book-meta-modal', 'show', closeBookMetaModal],
+						['artifact-picker-modal', 'show', closeArtifactPicker],
+						['artifact-info-modal', 'show', closeArtifactInfo],
 						['artifact-edit-modal', 'show', closeArtifactEdit],
 						['skills-import-modal', 'show', closeSkillsImport],
 						['restore-diff-modal', 'show', closeRestoreDiff],
@@ -10849,6 +11021,9 @@
 
 			// Defense: Enter w polu nazwy gracza = dodaj
 			$('defense-new-player-name')?.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addDefensePlayer(); } });
+
+			// Kwadraciki artefaktów przy polach bohaterów (Dodaj + Edycja, obie strony)
+			initArtifactSlotButtons();
 
 			// Defense edit modal: live impact preview na zmianę któregokolwiek pola
 			['defense-edit-name', 'defense-edit-comment', 'defense-edit-myPet',

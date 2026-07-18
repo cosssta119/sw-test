@@ -1387,6 +1387,23 @@
         </div>
     </div>
 
+    <!-- Modal: wybór artefaktu dla bohatera (kwadracik w Dodaj/Edycji) -->
+    <div class="hsk-modal-bg" id="artifact-picker-modal" onclick="if(event.target===this) closeArtifactPicker()">
+        <div class="hsk-modal" style="max-width: 560px;">
+            <button class="hsk-close" onclick="closeArtifactPicker()" aria-label="close">×</button>
+            <h3 class="hsk-title"><span class="hsk-name">🗡️ <span data-i18n="artifacts.pickerTitle">Wybierz artefakt</span></span> <span class="hsk-meta" id="artifact-picker-for"></span></h3>
+            <div id="artifact-picker-body"></div>
+        </div>
+    </div>
+
+    <!-- Modal: podgląd artefaktu (klik badge'a w siatce) -->
+    <div class="hsk-modal-bg" id="artifact-info-modal" onclick="if(event.target===this) closeArtifactInfo()">
+        <div class="hsk-modal" style="max-width: 460px;">
+            <button class="hsk-close" onclick="closeArtifactInfo()" aria-label="close">×</button>
+            <div id="artifact-info-body"></div>
+        </div>
+    </div>
+
     <!-- Modal: podgląd importu skilli (nowe + różnice) -->
     <div class="hsk-modal-bg" id="skills-import-modal" onclick="if(event.target===this) closeSkillsImport()">
         <div class="hsk-modal">
