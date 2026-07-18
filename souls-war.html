@@ -764,6 +764,7 @@
             <div class="heroes-mode-switch">
                 <button id="heroes-mode-btn-heroes" class="heroes-mode-btn active" onclick="setHeroesMode('heroes')">🦸 <span data-i18n="heroes.modeHeroes">Bohaterowie</span></button>
                 <button id="heroes-mode-btn-book" class="heroes-mode-btn" onclick="setHeroesMode('book')">📖 <span data-i18n="heroes.modeBook">Księga</span></button>
+                <button id="heroes-mode-btn-artifacts" class="heroes-mode-btn" onclick="setHeroesMode('artifacts')">🗡️ <span data-i18n="heroes.modeArtifacts">Artefakty</span></button>
             </div>
             <div id="heroes-mode-heroes">
                 <div class="heroes-toolbar">
@@ -798,6 +799,19 @@
                 <div class="heroes-chips" id="book-filter-chips"></div>
                 <div class="heroes-count" id="book-count"></div>
                 <div class="heroes-grid" id="book-grid"></div>
+            </div>
+            <div id="heroes-mode-artifacts" style="display: none;">
+                <div class="heroes-toolbar">
+                    <input type="text" id="artifacts-search" class="heroes-search" data-i18n-placeholder="artifacts.searchPlaceholder" placeholder="🔍 Szukaj: stun · klasa:tank · skill:energy · -dot" oninput="setArtifactsSearch(this.value)">
+                    <button id="artifacts-clear" class="heroes-help-toggle" onclick="clearArtifactsSearch()" data-i18n-title="book.clearSearch" title="Wyczyść" style="display:none;">✕</button>
+                    <button id="artifacts-help-toggle" class="heroes-help-toggle" onclick="toggleArtifactsHelp()" data-i18n-title="book.helpHint" title="Zaawansowane wyszukiwanie">❔</button>
+                </div>
+                <div id="artifacts-search-help"></div>
+                <div class="heroes-synonyms" id="artifacts-synonyms"></div>
+                <div class="heroes-chips" id="artifacts-filter-chips"></div>
+                <div class="heroes-count" id="artifacts-count"></div>
+                <div class="heroes-grid" id="artifacts-grid"></div>
+                <input type="file" id="artifacts-seed-input" accept="image/*" multiple style="display:none" onchange="seedArtifacts(event)">
             </div>
         </div>
     </div>
@@ -1344,6 +1358,31 @@
             <div class="hse-actions">
                 <button class="btn btn-secondary" onclick="resetBookMetaForm()" data-i18n="book.metaNew">Wyczyść</button>
                 <button class="btn btn-success" onclick="saveBookMeta()" data-i18n="book.metaSave">Zapisz księgę</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: dodawanie/edycja artefaktu (admin) -->
+    <div class="hsk-modal-bg" id="artifact-edit-modal" onclick="if(event.target===this) closeArtifactEdit()">
+        <div class="hsk-modal">
+            <button class="hsk-close" onclick="closeArtifactEdit()" aria-label="close">×</button>
+            <h3 class="hsk-title"><span class="hsk-name" id="artifact-edit-title"></span></h3>
+            <div class="hse-form">
+                <div class="hse-row2">
+                    <label class="hse-field"><span data-i18n="artifacts.fName">Nazwa</span><input id="ae-name" class="hse-input"></label>
+                    <label class="hse-field"><span data-i18n="artifacts.fClass">Klasa</span><select id="ae-klass" class="hse-input"></select></label>
+                </div>
+                <div class="hse-row2">
+                    <label class="hse-field"><span data-i18n="artifacts.fRarity">Rzadkość</span><input id="ae-rarity" class="hse-input" value="Mythic"></label>
+                    <label class="hse-field"><span data-i18n="artifacts.fIcon">Ikonka (obrazek)</span><input id="ae-icon" class="hse-input" type="file" accept="image/*"></label>
+                </div>
+                <div id="ae-icon-preview" style="text-align:center;"></div>
+                <label class="hse-field"><span data-i18n="artifacts.fBonuses">Bonusy (jeden na linię)</span><textarea id="ae-bonuses" class="hse-textarea" rows="5"></textarea></label>
+                <label class="hse-field"><span data-i18n="artifacts.fSkill">Skill (opis)</span><textarea id="ae-skill" class="hse-textarea" rows="5"></textarea></label>
+            </div>
+            <div class="hse-actions">
+                <button class="btn btn-secondary" onclick="closeArtifactEdit()" data-i18n="common.cancel">Anuluj</button>
+                <button class="btn btn-success" onclick="saveArtifactEdit()" data-i18n="common.save">Zapisz</button>
             </div>
         </div>
     </div>
