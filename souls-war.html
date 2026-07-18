@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Souls Online - Wyszukiwarka kontr-formacji na wojnach</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚔️</text></svg>">
+    <!-- Fonty przez <link> (nie @import w CSS) — @import blokował render o dodatkowy RTT -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Nunito:wght@400;600;700&display=swap">
 	<link rel="stylesheet" href="souls-war.css">
 	
 	<!-- Google Analytics -->
@@ -16,8 +20,6 @@
 	  gtag('config', 'G-XX1PXS6V13');
 	</script>
 	
-	<!-- html2canvas do eksportu obrazków -->
-	<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
 	<div class="modal" id="guild-password-modal">
@@ -209,7 +211,7 @@
 				<button class="filter-btn" data-filter="user" onclick="setDbFilter('user')" data-i18n="database.filterUser">Dodane</button>
 				<button class="filter-btn" data-filter="favorites" onclick="setDbFilter('favorites')">⭐ <span data-i18n="database.filterFavorites">Ulubione</span></button>
 				<button class="filter-btn" data-filter="packages" onclick="setDbFilter('packages')">🧩 <span data-i18n="database.filterPackages">Pakiety</span></button>
-				<input type="text" class="search-input" id="db-search" data-i18n-placeholder="database.searchPlaceholder" placeholder="🔍 Szukaj..." oninput="filterDatabase()">
+				<input type="text" class="search-input" id="db-search" data-i18n-placeholder="database.searchPlaceholder" placeholder="🔍 Szukaj..." oninput="debouncedFilterDatabase()">
 			</div>
 
 			<!-- Config bar dla widoku Pakiety (ukryty domyślnie, pokazuje się przy filter=packages) -->

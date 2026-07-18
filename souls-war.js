@@ -85,6 +85,9 @@
         document.documentElement.lang = currentLang; // zsynchronizuj <html lang> z zapamiętanym językiem
         let currentDbFilter = 'all';
 		let currentDbSort = 'id-desc';
+		const DB_PAGE = 200; // paginacja listy Bazy i wyników Szukajki (wzorzec z Galerii)
+		let dbRenderLimit = DB_PAGE, dbViewSig = '';
+		let searchRenderLimit = DB_PAGE;
 		// Globalna konfiguracja gildii (Firebase /config/settings) — wspólna dla wszystkich graczy.
 		// DEFAULT_CONFIG = bezpieczny backup, gdy node nie istnieje lub ma złe wartości.
 		const DEFAULT_CONFIG = {
@@ -495,7 +498,7 @@
 			if (icon) {
 				icon.textContent = theme === 'light' ? '☀️' : '🌙';
 			}
-			btn.title = theme === 'light' ? 'Przełącz na tryb nocny' : 'Przełącz na tryb dzienny';
+			btn.title = theme === 'light' ? t('theme.toDark') : t('theme.toLight');
 		}
 
         // TŁUMACZENIA
@@ -587,7 +590,7 @@
 			if (name === 'defense') switchDefenseView(currentDefenseView);
 			if (name === 'settings') renderImportStats();
 			if (name === 'heroes') applyHeroesMode(); // Bohaterowie albo Księga (wg zapisanego trybu)
-			if (name === 'screens') renderScreensTab();
+			if (name === 'screens') { ensureScreensLoaded(); renderScreensTab(); } // lazy pierwsze załadowanie metadanych galerii
 
 		}
 
@@ -749,11 +752,11 @@
 			const now = new Date();
 			const diff = Math.floor((now - date) / 1000); // sekundy
 			
-			if (diff < 60) return 'przed chwilą';
-			if (diff < 3600) return `${Math.floor(diff / 60)} min temu`;
-			if (diff < 86400) return `${Math.floor(diff / 3600)} godz. temu`;
-			if (diff < 604800) return `${Math.floor(diff / 86400)} dni temu`;
-			return date.toLocaleDateString('pl-PL');
+			if (diff < 60) return t('time.justNow');
+			if (diff < 3600) return t('time.minAgo', { n: Math.floor(diff / 60) });
+			if (diff < 86400) return t('time.hoursAgo', { n: Math.floor(diff / 3600) });
+			if (diff < 604800) return t('time.daysAgo', { n: Math.floor(diff / 86400) });
+			return date.toLocaleDateString(currentLang === 'en' ? 'en-GB' : 'pl-PL');
 		}
 
 		// Czy formacja jest "nowa" (dodana w ostatnich N dniach wg dateAdded; N = globalny appConfig.newFormationDays).
@@ -1193,7 +1196,7 @@
             RACE_ORDER = [...DEFAULT_RACE_ORDER];
             saveRaceOrder();
             refreshAllTags();
-            showToast('Przywrócono domyślną kolejność');
+            showToast(t('race.orderReset'));
         }
 
         function saveRaceOrder() {
@@ -1270,7 +1273,7 @@
 				</div>
 			`).join('') + `
 				<div style="margin-top: 8px; text-align: center;">
-					<button class="btn btn-small btn-secondary" onclick="resetRaceOrder()">↺ Domyślna kolejność</button>
+					<button class="btn btn-small btn-secondary" onclick="resetRaceOrder()">${t('race.orderResetBtn')}</button>
 				</div>
 			`;
 		}
@@ -1528,6 +1531,7 @@
 					: null;
 			}).filter(Boolean);
 
+			searchRenderLimit = DB_PAGE; // nowe wyszukiwanie = od pierwszej strony
 			displayResults(results, searchHeroes);
 		}
 
@@ -1618,7 +1622,10 @@
 				return;
 			}
 			
-			html += displayedResults.map(r => {
+			// Paginacja — popularny bohater potrafi trafić w tysiące formacji, a innerHTML
+			// z tyloma kartami mrozi mobile. searchRenderLimit resetuje searchFormations().
+			const searchMoreCount = displayedResults.length - searchRenderLimit;
+			html += displayedResults.slice(0, searchRenderLimit).map(r => {
 				const f = r.formation;
 				const enemyDisplay = f.enemy.filter(h => h).map(h => r.matchedHeroes.some(mh => normalize(h) === mh || normalize(h).startsWith(mh)) ? `<span class="matched-hero">${h}</span>` : h).join(', ');
 				const petDisplay = r.petMatched ? `<span class="matched-hero">${f.enemyPet}</span>` : (f.enemyPet || '—');
@@ -1647,9 +1654,15 @@
 						</div>
 					</div>`;
 			}).join('');
-			
+			if (searchMoreCount > 0) html += `<button class="screens-show-more" onclick="searchShowMore()">${t('common.showMore', { n: searchMoreCount })}</button>`;
+
 			$('results-section').innerHTML = html;
 			updateCompareButton();
+		}
+
+		function searchShowMore() {
+			searchRenderLimit += DB_PAGE;
+			if (lastSearch) displayResults(lastSearch.results, lastSearch.searchHeroes);
 		}
 
         function clearSearch() {
@@ -2133,7 +2146,7 @@
 
             // Limit do 100 najczęstszych — przy większych ilościach scroll się nie skończy
             const shown = packages.slice(0, 100);
-            const moreInfo = packages.length > 100 ? `<div style="text-align: center; color: var(--text-muted); font-size: 0.75rem; padding: 10px;">... (${packages.length - 100} kolejnych pakietów)</div>` : '';
+            const moreInfo = packages.length > 100 ? `<div style="text-align: center; color: var(--text-muted); font-size: 0.75rem; padding: 10px;">${t('packages.moreCount', { n: packages.length - 100 })}</div>` : '';
 
             listEl.innerHTML = shown.map(p => {
                 const emoji = packageDominantEmoji(p.heroes);
@@ -2221,14 +2234,21 @@
 			
 			// Sortowanie
 			formations = sortFormations(formations);
-			
+
+			// Paginacja (wzorzec z Galerii) — innerHTML z tysiącami kart mroził UI na mobile.
+			// Reset limitu przy każdej zmianie widoku (filtr/sort/szukajka/wykluczeni).
+			const viewSig = `${currentDbFilter}|${currentDbSort}|${searchTerm}|${hideExcludedResults}`;
+			if (viewSig !== dbViewSig) { dbViewSig = viewSig; dbRenderLimit = DB_PAGE; }
+			const dbMoreCount = formations.length - dbRenderLimit;
+			const visibleFormations = formations.slice(0, dbRenderLimit);
+
 			// Pokaż info o ukrytych
 			let headerInfo = '';
 			if (hiddenCount > 0) {
 				headerInfo = `<div style="text-align:center;font-size:0.75rem;color:#f44336;margin-bottom:10px;">🚫 ${hiddenCount} ${t('excluded.hiddenCountLabel')}</div>`;
 			}
-			
-			$('database-list').innerHTML = headerInfo + (formations.length ? formations.map(f => {
+
+			$('database-list').innerHTML = headerInfo + (formations.length ? visibleFormations.map(f => {
 				const exclusionCheck = isFormationExcluded(f);
 				const hasExcluded = !hideExcludedResults && exclusionCheck.excluded;
 				
@@ -2249,8 +2269,14 @@
 						${isAdmin ? `<button class="btn btn-small btn-danger" onclick="event.stopPropagation(); deleteFormation(${f.id})">🗑️</button>` : ''}
 					</div>
 				</div>`
-			}).join('') : `<div class="empty-state"><p>${t('database.noFormations')}</p></div>`);
+			}).join('') + (dbMoreCount > 0 ? `<button class="screens-show-more" onclick="dbShowMore()">${t('common.showMore', { n: dbMoreCount })}</button>` : '')
+			: `<div class="empty-state"><p>${t('database.noFormations')}</p></div>`);
 		}
+
+		function dbShowMore() { dbRenderLimit += DB_PAGE; filterDatabase(); }
+
+		// Debounce dla szukajki Bazy (oninput w HTML) — pełny re-render na każdy klawisz mroził wpisywanie
+		const debouncedFilterDatabase = debounce(filterDatabase, 200);
 
         // =====================================================
         // ULUBIONE
@@ -2573,8 +2599,8 @@
 					<div class="preview-header">
 						<div class="preview-title"><span class="preview-id">#${f.id}</span>${escapeHtml(f.name)}<span class="formation-type-badge ${f.isBase ? 'base' : 'user'}">${t(f.isBase ? 'badge.base' : 'badge.user')}</span></div>
 						<div class="preview-actions">
-							<button class="btn btn-small btn-secondary" onclick="exportSingleFormationAsText()">📋 Kopiuj skład tekstowo</button>
-							<button class="btn btn-small btn-secondary" onclick="copyFormationLink(${id})" title="Kopiuj link">🔗</button>
+							<button class="btn btn-small btn-secondary" onclick="exportSingleFormationAsText()">${t('preview.copyTeamText')}</button>
+							<button class="btn btn-small btn-secondary" onclick="copyFormationLink(${id})" title="${t('preview.copyLink')}">🔗</button>
 							${isAdmin ? `<button class="btn btn-small btn-admin" onclick="openEditModal(${id})">✏️</button>` : ''}
 							<button class="btn btn-small ${isFav ? 'btn-favorite-active' : 'btn-secondary'}" onclick="toggleFavoritePreview(${id})">${isFav ? '⭐' : '☆'}</button>
 						</div>
@@ -2791,18 +2817,18 @@
 		function exportSingleFormationAsText() {
 			const f = currentFormation;
 			if (!f) {
-				showToast('Najpierw wybierz formację', true);
+				showToast(t('preview.selectFirst'), true);
 				return;
 			}
 			
 			const myHeroes = f.my || [];
 			const myPet = f.myPet || '';
 			
-			let text = `Skład #${f.id}\n`;
+			let text = t('war.comboDefaultName', { n: f.id }) + '\n';
 			text += formatFormationAsText(myHeroes, myPet);
 			
 			navigator.clipboard.writeText(text.trim()).then(() => {
-				showToast('📋 Skład skopiowany!');
+				showToast(t('preview.teamCopied'));
 			}).catch(() => {
 				const textarea = document.createElement('textarea');
 				textarea.value = text.trim();
@@ -2810,7 +2836,7 @@
 				textarea.select();
 				document.execCommand('copy');
 				document.body.removeChild(textarea);
-				showToast('📋 Skład skopiowany!');
+				showToast(t('preview.teamCopied'));
 			});
 		}
 
@@ -3861,11 +3887,17 @@
             displayWarResults(top, [enemy1, enemy2, enemy3]);
         }
 
+		// Odmiana "N konfliktów" zależna od języka (pl: konflikt/konflikty/konfliktów)
+		function conflictCountLabel(n) {
+			if (currentLang === 'en') return `${n} ${n === 1 ? 'conflict' : 'conflicts'}`;
+			return `${n} konflikt${n === 1 ? '' : n < 5 ? 'y' : 'ów'}`;
+		}
+
 		function displayWarResults(results, enemies) {
 			if (!results.length) {
 				$('war-results-section').innerHTML = `
 					<div class="empty-state">
-						<p>❌ Nie znaleziono żadnych kombinacji.</p>
+						<p>${t('war.noCombos')}</p>
 					</div>`;
 				return;
 			}
@@ -3893,10 +3925,10 @@
 			if (!displayedResults.length) {
 				$('war-results-section').innerHTML = `
 					<div class="empty-state">
-						<p>❌ Nie znaleziono kombinacji bez wykluczonych bohaterów.</p>
+						<p>${t('war.noCombosExcluded')}</p>
 						<p style="font-size:0.8rem;color:var(--text-muted);margin-top:10px;">
-							${hiddenCount} kombinacji ukrytych z powodu wykluczonych bohaterów.<br>
-							Odznacz "Ukryj formacje z wykluczonymi" aby je zobaczyć.
+							${t('war.hiddenCombos', { n: hiddenCount })}<br>
+							${t('war.hiddenCombosHint')}
 						</p>
 					</div>`;
 				return;
@@ -3912,29 +3944,29 @@
 			
 			let html = `
 				<div class="war-summary-box">
-					<h3>🎯 Propozycje składów</h3>
+					<h3>🎯 ${t('war.proposals')}</h3>
 					<div class="war-summary-stats">
 						<div class="war-stat">
 							<span class="war-stat-value">${displayedResults.length}${hiddenCount > 0 ? ` <span style="font-size:0.7rem;color:#f44336;">(+${hiddenCount} 🚫)</span>` : ''}</span>
-							<span class="war-stat-label">kombinacji</span>
+							<span class="war-stat-label">${t('war.statCombos')}</span>
 						</div>
 						<div class="war-stat">
 							<span class="war-stat-value ${perfectCount > 0 ? 'green' : 'orange'}">${perfectCount}</span>
-							<span class="war-stat-label">idealnych</span>
+							<span class="war-stat-label">${t('war.statPerfect')}</span>
 						</div>
 						<div class="war-stat">
 							<span class="war-stat-value">${avgScore}/${maxPossibleScore}</span>
-							<span class="war-stat-label">śr. trafień</span>
+							<span class="war-stat-label">${t('war.statAvg')}</span>
 						</div>
 					</div>
 					<div class="war-legend">
-						<span class="legend-item"><span class="dot green"></span> Idealne (0 konfliktów)</span>
-						<span class="legend-item"><span class="dot yellow"></span> Dobre (1-2 konflikty)</span>
-						<span class="legend-item"><span class="dot orange"></span> Do rozważenia (3+ konfliktów)</span>
+						<span class="legend-item"><span class="dot green"></span> ${t('war.legendPerfect')}</span>
+						<span class="legend-item"><span class="dot yellow"></span> ${t('war.legendGood')}</span>
+						<span class="legend-item"><span class="dot orange"></span> ${t('war.legendConsider')}</span>
 					</div>
 				</div>
 				<p style="font-size:0.75rem;color:var(--text-muted);margin:15px 0;text-align:center;">
-					Kliknij w propozycję aby zobaczyć szczegółowy podgląd
+					${t('war.clickHint')}
 				</p>`;
 			
 			displayedResults.forEach((combo, idx) => {
@@ -3954,7 +3986,7 @@
 				
 				const cardClass = combo.conflicts === 0 ? 'perfect' : combo.conflicts <= 2 ? 'good' : 'conflicts';
 				const badgeClass = combo.conflicts === 0 ? 'perfect' : combo.conflicts <= 2 ? 'good' : 'bad';
-				const badgeText = combo.conflicts === 0 ? '✓ IDEALNE' : `${combo.conflicts} konflikt${combo.conflicts === 1 ? '' : combo.conflicts < 5 ? 'y' : 'ów'}`;
+				const badgeText = combo.conflicts === 0 ? t('war.perfectBadge') : conflictCountLabel(combo.conflicts);
 				
 				// Zbierz wszystkie konfliktowe bohaterów
 				const conflictHeroes = new Set();
@@ -3971,15 +4003,15 @@
 						<div class="war-result-header">
 							<div class="war-result-header-left">
 								<span class="war-result-rank">#${idx + 1}</span>
-								<button class="btn-pin" onclick="event.stopPropagation(); pinWarCombo(${idx})" title="Przypnij ten skład">
+								<button class="btn-pin" onclick="event.stopPropagation(); pinWarCombo(${idx})" title="${t('war.pinTitle')}">
 									📌
 								</button>
-								<button class="btn-pin" onclick="event.stopPropagation(); copyWarComboToKreator(${idx})" title="Przenieś do Kreatora" style="background: rgba(76, 175, 80, 0.2); border-color: rgba(76, 175, 80, 0.5);">
+								<button class="btn-pin" onclick="event.stopPropagation(); copyWarComboToKreator(${idx})" title="${t('war.toKreatorTitle')}" style="background: rgba(76, 175, 80, 0.2); border-color: rgba(76, 175, 80, 0.5);">
 									📝
 								</button>
 							</div>
 							<div class="war-result-badges">
-								<span class="war-score-badge ${scoreClass}">${scorePercent}% trafień</span>
+								<span class="war-score-badge ${scoreClass}">${scorePercent}% ${t('war.match')}</span>
 								<span class="war-conflict-badge ${badgeClass}">${badgeText}</span>
 							</div>
 						</div>
@@ -3995,11 +4027,11 @@
 								return `
 									<div class="war-formation-box">
 										<h4>
-											⚔️ Walka ${i + 1}
+											⚔️ ${t('war.battle')} ${i + 1}
 											<span class="formation-id">#${f.id}</span>
 										</h4>
 										<div class="war-formation-section">
-											<span class="war-section-label">Twój skład:</span>
+											<span class="war-section-label">${t('war.yourTeam')}:</span>
 											<div class="heroes-list">
 												${myHeroes.slice(0, 5).map(h => {
 													const isConflict = conflictHeroes.has(normalize(h));
@@ -4012,7 +4044,7 @@
 											</div>
 										</div>
 										<div class="war-formation-section">
-											<span class="war-section-label">Wróg z bazy:</span>
+											<span class="war-section-label">${t('war.databaseEnemy')}:</span>
 											<div class="heroes-list enemy-heroes">
 												${f.enemy.filter(h => h).slice(0, 5).map(h => {
 													const heroData = heroes.find(hr => normalize(hr.name) === normalize(h));
@@ -4032,13 +4064,13 @@
 						</div>
 						${combo.conflictDetails.length ? `
 							<div class="war-conflicts-summary">
-								⚠️ <strong>Konflikty:</strong> ${combo.conflictDetails.map(c =>
+								⚠️ <strong>${t('war.conflicts')}:</strong> ${combo.conflictDetails.map(c =>
 									`<span class="conflict-hero">${escapeHtml(c.display || c.hero)}</span>`
 								).join(', ')}
 							</div>` : ''}
 						${hasExcluded ? `
 							<div class="war-excluded-summary" style="margin-top: 8px; padding: 6px 10px; background: rgba(244, 67, 54, 0.1); border: 1px solid rgba(244, 67, 54, 0.3); border-radius: 6px; font-size: 0.75rem; color: #f44336;">
-								🚫 <strong>Wykluczone:</strong> ${excludedInCombo.map(escapeHtml).join(', ')}
+								🚫 <strong>${t('war.excludedLabel')}:</strong> ${excludedInCombo.map(escapeHtml).join(', ')}
 							</div>` : ''}
 					</div>`;
 			});
@@ -4050,8 +4082,8 @@
 			const combo = window.warResults?.[comboIndex];
 			if (!combo) return;
 			
-			const defaultName = `Skład #${pinnedCombos.length + 1}`;
-			const name = prompt('Nazwa dla tego składu:', defaultName);
+			const defaultName = t('war.comboDefaultName', { n: pinnedCombos.length + 1 });
+			const name = prompt(t('war.pinPromptName'), defaultName);
 			if (name === null) return; // anulowano
 			
 			const pinned = {
@@ -4081,7 +4113,7 @@
 			storage.setJson('souls_pinned_combos', pinnedCombos);
 			
 			renderPinnedCombos();
-			showToast('📌 Skład przypięty!');
+			showToast(t('war.pinned'));
 		}
 
 		// Przenieś wynik z Wojny do Kreatora
@@ -4137,7 +4169,7 @@
 			// Przełącz na zakładkę Kreator
 			switchTab('kreator');
 			
-			showToast('📝 Skład przeniesiony do Kreatora!');
+			showToast(t('war.movedToKreator'));
 		}
 
 		// Przenieś aktualnie oglądany skład do Kreatora (z podglądu wojny)
@@ -4197,7 +4229,7 @@
 			
 			updateKreatorTagsSelection();
 			switchTab('kreator');
-			showToast('📝 Skład przeniesiony do Kreatora!');
+			showToast(t('war.movedToKreator'));
 		}
 
 		// Przypnij aktualnie oglądany skład (z podglądu wojny)
@@ -4211,12 +4243,12 @@
 			// W przeciwnym razie (np. z przypiętego składu) - stwórz nowy pin z currentWarCombo
 			const combo = window.currentWarCombo;
 			if (!combo) {
-				showToast('Brak składu do przypięcia', true);
+				showToast(t('war.noComboToPin'), true);
 				return;
 			}
 			
-			const defaultName = `Skład #${pinnedCombos.length + 1}`;
-			const name = prompt('Nazwa dla tego składu:', defaultName);
+			const defaultName = t('war.comboDefaultName', { n: pinnedCombos.length + 1 });
+			const name = prompt(t('war.pinPromptName'), defaultName);
 			if (name === null) return;
 			
 			const pinned = {
@@ -4246,17 +4278,17 @@
 			storage.setJson('souls_pinned_combos', pinnedCombos);
 			
 			renderPinnedCombos();
-			showToast('📌 Skład przypięty!');
+			showToast(t('war.pinned'));
 		}
 
 		function unpinCombo(id) {
-			if (!confirm('Czy na pewno chcesz odpiąć ten skład?')) return;
-			
+			if (!confirm(t('war.unpinConfirm'))) return;
+
 			pinnedCombos = pinnedCombos.filter(p => p.id !== id);
 			storage.setJson('souls_pinned_combos', pinnedCombos);
-			
+
 			renderPinnedCombos();
-			showToast('Skład odpięty');
+			showToast(t('war.unpinned'));
 		}
 
 		function renderPinnedCombos() {
@@ -4288,24 +4320,24 @@
 						</div>
 						<div class="pinned-combo-stats">
 							<span class="pinned-stat ${conflictClass}">
-								${pinned.conflicts === 0 ? '✓ Idealne' : `${pinned.conflicts} konflikt${pinned.conflicts === 1 ? '' : pinned.conflicts < 5 ? 'y' : 'ów'}`}
+								${pinned.conflicts === 0 ? t('war.perfectShort') : conflictCountLabel(pinned.conflicts)}
 							</span>
-							<span class="pinned-stat">${percent}% trafień</span>
+							<span class="pinned-stat">${percent}% ${t('war.match')}</span>
 						</div>
 						<div class="pinned-combo-formations">
 							${pinned.formations.map((f, i) => `
 								<div class="pinned-formation">
-									<strong>Walka ${i+1}</strong> (#${f.formationId}): 
+									<strong>${t('war.battle')} ${i+1}</strong> (#${f.formationId}):
 									${f.my.filter(h => h).slice(0, 4).map(escapeHtml).join(', ')}${f.my.filter(h => h).length > 4 ? '...' : ''}
 								</div>
 							`).join('')}
 						</div>
 						<div class="pinned-combo-actions">
 							<button class="btn btn-small btn-secondary" onclick="loadPinnedCombo(${pinned.id})">
-								👁️ Podgląd
+								${t('war.pinnedPreview')}
 							</button>
 							<button class="btn btn-small btn-danger" onclick="unpinCombo(${pinned.id})">
-								✕ Odepnij
+								${t('war.unpin')}
 							</button>
 						</div>
 					</div>
@@ -6914,6 +6946,7 @@
         function showHeroSkills(name, hl) {
             const modal = $('hero-skills-modal');
             if (!modal) return;
+            if (canSeeGallery()) ensureScreensLoaded(); // liczniki paska „🦸 Galeria" — po syncu odświeży je refreshOpenHeroGalleryBar
             if (!heroSkillsLoaded) {
                 const titleEl = $('hero-skills-title'), body = $('hero-skills-body');
                 if (titleEl) titleEl.textContent = name;
@@ -8081,7 +8114,7 @@
             return `
                 <div id="speed-display-${assignmentId}" class="defense-speed-display">${timelineHtml}</div>
                 <div id="speed-editor-${assignmentId}" class="defense-speed-editor" style="display: none;">
-                    <div style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 6px;">⚡ ${t('defense.speedTitle')} (pet pominięty)</div>
+                    <div style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 6px;">⚡ ${t('defense.speedTitle')} ${t('defense.speedPetSkipped')}</div>
                     ${editorRows}
                     <div style="display: flex; gap: 4px; margin-top: 6px;">
                         <button class="btn btn-tiny btn-success" onclick="saveSpeedEditor(${assignmentId})">💾 ${t('defense.speedSave')}</button>
@@ -9134,6 +9167,30 @@
         const SCREENS_PAGE = 200, SCREENS_UPLOAD_CONCURRENCY = 3; // paginacja siatki + ile plików wgrywamy równolegle
         let lbScale = 1, lbTx = 0, lbTy = 0; // stan zoom/pan lightboxa
 
+        // ── Lazy-attach listenerów galerii (pierwsze wejście na Screeny / modal bohatera / seed folderów) ──
+        // id ZAWSZE z klucza Firebase (nie z pola) — odporne na rozjazd zapisanego 'id' vs klucza.
+        // Inkrementalnie (child_*): przy zmianie leci tylko delta, nie cały zrzut. Bursty (start, seed ~300 folderów)
+        // scalane debounce'em w jeden rebuild, żeby uniknąć O(n²) przy setkach eventów na starcie.
+        // Zwraca Promise pierwszego pełnego syncu (once('value') odpala się PO child_added istniejących dzieci),
+        // z natychmiastowym applyScreensCache — caller może od razu czytać allScreenFolders/allScreenshots.
+        let screensInitialLoad = null;
+        function ensureScreensLoaded() {
+            if (!screenFoldersRef || !screenshotsRef) return Promise.resolve();
+            if (!screensInitialLoad) {
+                screenFoldersRef.on('child_added', s => { screenFoldersById.set(s.key, { ...s.val(), id: s.key }); scheduleScreensCache('folders'); });
+                screenFoldersRef.on('child_changed', s => { screenFoldersById.set(s.key, { ...s.val(), id: s.key }); scheduleScreensCache('folders'); });
+                screenFoldersRef.on('child_removed', s => { screenFoldersById.delete(s.key); scheduleScreensCache('folders'); });
+                screenshotsRef.on('child_added', s => { screenshotsById.set(s.key, { ...s.val(), id: s.key }); scheduleScreensCache('shots'); });
+                screenshotsRef.on('child_changed', s => { screenshotsById.set(s.key, { ...s.val(), id: s.key }); scheduleScreensCache('shots'); });
+                screenshotsRef.on('child_removed', s => { screenshotsById.delete(s.key); scheduleScreensCache('shots'); });
+                screensInitialLoad = Promise.all([
+                    screenFoldersRef.once('value'),
+                    screenshotsRef.once('value'),
+                ]).then(() => applyScreensCache());
+            }
+            return screensInitialLoad;
+        }
+
         // ── Rebuild cache z Map (debounce; scala bursty child_* w jeden przebieg) ──
         function scheduleScreensCache(kind) {
             screensDirty[kind] = true;
@@ -9171,6 +9228,7 @@
         // (przy dodaniu bohatera podajemy [{name}] zanim cache się odświeży, żeby nie było wyścigu).
         async function ensureHeroFoldersImpl(announce, heroList) {
             if (!isAdmin || !screenFoldersRef) return;
+            await ensureScreensLoaded(); // MUSI mieć pełny cache — na pustym utworzyłoby duplikaty wszystkich folderów
             const list = heroList || heroes;
             const updates = {}, now = new Date().toISOString();
             const gen = () => screenFoldersRef.push().key;
@@ -10271,15 +10329,10 @@
             try { if (firebase.storage) screensStorageRef = firebase.storage().ref(); }
             catch (e) { console.error('Storage init error:', e); }
 
-            // id ZAWSZE z klucza Firebase (nie z pola) — odporne na rozjazd zapisanego 'id' vs klucza.
-            // Inkrementalnie (child_*): przy zmianie leci tylko delta, nie cały zrzut. Bursty (start, seed ~300 folderów)
-            // scalane debounce'em w jeden rebuild, żeby uniknąć O(n²) przy setkach eventów na starcie.
-            screenFoldersRef.on('child_added', s => { screenFoldersById.set(s.key, { ...s.val(), id: s.key }); scheduleScreensCache('folders'); });
-            screenFoldersRef.on('child_changed', s => { screenFoldersById.set(s.key, { ...s.val(), id: s.key }); scheduleScreensCache('folders'); });
-            screenFoldersRef.on('child_removed', s => { screenFoldersById.delete(s.key); scheduleScreensCache('folders'); });
-            screenshotsRef.on('child_added', s => { screenshotsById.set(s.key, { ...s.val(), id: s.key }); scheduleScreensCache('shots'); });
-            screenshotsRef.on('child_changed', s => { screenshotsById.set(s.key, { ...s.val(), id: s.key }); scheduleScreensCache('shots'); });
-            screenshotsRef.on('child_removed', s => { screenshotsById.delete(s.key); scheduleScreensCache('shots'); });
+            // Listenery attachowane LENIWIE (ensureScreensLoaded) przy pierwszym wejściu na zakładkę /
+            // otwarciu podglądu bohatera / seedzie folderów — nie na starcie. Metadane galerii (długie URL-e,
+            // ~1 KB/rekord) kosztowały setki KB transferu na każdą wizytę każdego gracza, także tych,
+            // którzy Galerii nigdy nie otwierają (domyślnie admin-only). Wzorzec jak loadHeroSkills.
 
             // ─── Globalna konfiguracja gildii ───
             // Pod-węzeł 'config/settings' (a nie całe /config), bo reguły Firebase trzymają
@@ -10393,10 +10446,32 @@
 			$('defense-edit-modal')?.addEventListener('click', e => { if (e.target === $('defense-edit-modal')) closeDefenseEditModal(); });
 			document.addEventListener('keydown', e => {
 				if (e.key === 'Escape') {
-					if (!$('quick-select-modal').classList.contains('hidden')) closeQuickSelect();
-					if (!$('edit-modal').classList.contains('hidden')) closeEditModal();
-					if (!$('defense-assign-modal').classList.contains('hidden')) closeDefenseAssignModal();
-					if (!$('defense-edit-modal').classList.contains('hidden')) closeDefenseEditModal();
+					// Wszystkie modale (poza bramką hasła gildii — ta musi zostać). Zamykamy TYLKO pierwszy
+					// otwarty wg kolejności wierzchni→spodni (modal skilli bywa POD modalem edycji skilli).
+					// Wzorzec .modal: otwarty = brak 'hidden'; wzorzec .hsk-modal-bg/.diff-modal-bg: otwarty = 'show'.
+					const openModals = [
+						['quick-select-modal', 'hidden', closeQuickSelect],
+						['hero-skills-edit-modal', 'show', closeHeroSkillsEdit],
+						['pet-skills-edit-modal', 'show', closePetSkillsEdit],
+						['book-edit-modal', 'show', closeBookEdit],
+						['book-meta-modal', 'show', closeBookMetaModal],
+						['skills-import-modal', 'show', closeSkillsImport],
+						['restore-diff-modal', 'show', closeRestoreDiff],
+						['screens-move-modal', 'hidden', closeScreenMove],
+						['defense-assign-modal', 'hidden', closeDefenseAssignModal],
+						['defense-edit-modal', 'hidden', closeDefenseEditModal],
+						['edit-modal', 'hidden', closeEditModal],
+						['duplicate-preview-modal', 'hidden', closeDuplicatePreviewModal],
+						['compare-modal', 'hidden', closeCompareModal],
+						['duplicates-modal', 'hidden', closeDuplicatesModal],
+						['admin-modal', 'hidden', closeAdminModal],
+						['hero-skills-modal', 'show', closeHeroSkills],
+					];
+					for (const [id, mode, close] of openModals) {
+						const m = $(id);
+						const isOpen = m && (mode === 'hidden' ? !m.classList.contains('hidden') : m.classList.contains('show'));
+						if (isOpen) { close(); break; }
+					}
 				}
 			});
 

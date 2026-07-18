@@ -1,34 +1,24 @@
-		@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Nunito:wght@400;600;700&display=swap');
+		/* Fonty ładowane w <head> souls-war.html (<link rel="preconnect"> + <link rel="stylesheet">) — @import tutaj blokował render */
 
 		/* ═══════════════════════════════════════════════════════════════
-		   SPIS TREŚCI
+		   SPIS TREŚCI — nazwy = dokładne nagłówki sekcji w pliku (Ctrl+F po nazwie)
 		   ─────────────────────────────────────────────────────────────
-		    1. TOKENS            — zmienne kolorów, :root
-		    2. BASE              — reset, body, typography
-		    3. HEADER + NAV      — pasek górny, nawigacja dolna
-		    4. LAYOUT            — kontenery sekcji
-		    5. FORM PRIMITIVES   — inputy, autocomplete
-		    6. KOLORY RAS        — uniwersalne klasy
-		    7. GRID / SEARCH GRID
-		    8. HISTORIA (search + war)
-		    9. PRZYCISKI / FILTRY / WYNIKI
-		   10. QUICK TAGS / RACE ORDER
-		   11. QUICK SELECT MODAL
-		   12. PODGLĄD FORMACJI + NAWIGACJA
-		   13. BATTLE GRID + PETS + STRZAŁKI
-		   14. ADD FORM + EDIT MODAL + STATS
-		   15. DATABASE LIST + INFO BOX
-		   16. TOAST / LOADING / MODAL
-		   17. ADMIN PANEL + DUPLIKATY
-		   18. WAR PLANNER / KREATOR / WAR PREVIEW
-		   19. PORÓWNYWARKA
-		   20. WYKLUCZANIE BOHATERÓW
-		   21. MATCH INFO / OSTATNIO / PODOBNE / SEARCH OPTIONS
+		   1. TOKENS — ZMIENNE KOLORÓW
+		   BAZOWE STYLE · HEADER · NAWIGACJA DOLNA · SEKCJE
+		   INPUTY I FORMULARZE · AUTOCOMPLETE · KOLORY RAS - UNIWERSALNE
+		   GRID I LAYOUT · SEARCH FORMATION GRID · HISTORIA WYSZUKIWAŃ
+		   PRZYCISKI · FILTRY I SORTOWANIE · WYNIKI
+		   QUICK TAGS · QUICK SELECT MODAL
+		   PODGLĄD FORMACJI · BATTLE GRID · PETS · BATTLE ARROWS & VS
+		   ADD FORM · EDIT MODAL · STATS · DATABASE LIST · INFO BOX
+		   TOAST · LOADING · MODAL
+		   ADMIN PANEL · Zakładka Import · DUPLIKATY
+		   WAR PLANNER · PORÓWNYWARKA · WYKLUCZANIE BOHATERÓW
+		   OSTATNIO PRZEGLĄDANE · PODOBNE FORMACJE
+		   DEFENSE TAB
 		   21b. HEROES TAB + SKILLS MODAL
-		   22. SCROLLBAR
-		   23. LIGHT THEME — overrides [data-theme="light"]
-		   24. PINEZKI
-		   25. MEDIA QUERIES
+		   21c. SCREENS TAB (Galeria)
+		   SCROLLBAR · LIGHT THEME · PINEZKI · MEDIA QUERIES
 		   ═══════════════════════════════════════════════════════════════ */
 
 		* { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1469,17 +1459,6 @@
 			margin-bottom: 10px;
 		}
 		
-		.entity-item {
-			display: flex;
-			justify-content: space-between;
-			align-items: center;
-			padding: 8px;
-			border-bottom: 1px solid var(--border);
-		}
-		
-		.entity-item:last-child { border-bottom: none; }
-		.entity-name { flex: 1; }
-
 		/* Panel admina — lista bohaterów grupowana po rasach */
 		.admin-race-group { margin-bottom: 14px; }
 		.admin-race-header {
@@ -1491,15 +1470,6 @@
 			padding: 2px 2px 5px;
 			margin-bottom: 8px;
 			border-bottom: 2px solid currentColor;
-		}
-		.admin-race-count {
-			margin-left: auto;
-			font-size: 0.7rem;
-			font-weight: 600;
-			color: var(--text-muted);
-			background: rgba(255, 255, 255, 0.08);
-			padding: 1px 9px;
-			border-radius: 10px;
 		}
 		.admin-tile-grid {
 			display: grid;
@@ -1948,24 +1918,6 @@
 		.war-preview-battle-score { font-size: 0.72rem; color: var(--text-muted); }
 		.war-preview-battle-score strong { color: var(--text-light); }
 
-		.war-preview-legend {
-			display: flex;
-			flex-wrap: wrap;
-			justify-content: center;
-			gap: 15px;
-			padding: 12px 20px;
-			background: var(--bg-input);
-			border-radius: 10px;
-			margin-bottom: 20px;
-		}
-
-		.war-legend-item { display: flex; align-items: center; gap: 6px; font-size: 0.75rem; color: var(--text-muted); }
-		.war-legend-dot { width: 14px; height: 14px; border-radius: 4px; border: 2px solid; }
-		.war-legend-dot.matched { background: rgba(76, 175, 80, 0.3); border-color: #4caf50; }
-		.war-legend-dot.missing { background: rgba(244, 67, 54, 0.3); border-color: #f44336; }
-		.war-legend-dot.extra { background: rgba(255, 152, 0, 0.3); border-color: #ff9800; }
-		.war-legend-dot.conflict { background: rgba(255, 87, 34, 0.3); border-color: #ff5722; animation: pulseConflict 1.5s infinite; }
-
 		/* War Compare Card */
 		.war-compare-card {
 			background: var(--bg-card);
@@ -2081,24 +2033,6 @@
 		.war-comment-label { font-size: 0.7rem; text-transform: uppercase; color: var(--accent-gold); letter-spacing: 1px; margin-bottom: 5px; }
 		.war-comment-text { font-size: 0.85rem; color: var(--text-light); line-height: 1.4; }
 		.war-comment-empty { font-style: italic; color: var(--text-muted); font-size: 0.8rem; }
-
-		.war-match-summary {
-			display: grid;
-			grid-template-columns: repeat(3, 1fr);
-			gap: 8px;
-			margin-top: 15px;
-			padding: 12px;
-			background: rgba(0, 0, 0, 0.2);
-			border-radius: 8px;
-			font-size: 0.75rem;
-		}
-
-		.war-match-item { display: flex; align-items: center; gap: 6px; }
-		.war-match-item-icon { font-size: 0.9rem; }
-		.war-match-item-list { color: var(--text-light); word-break: break-word; }
-		.war-match-item.matched .war-match-item-list { color: #4caf50; }
-		.war-match-item.missing .war-match-item-list { color: #f44336; }
-		.war-match-item.extra .war-match-item-list { color: #ff9800; }
 
 		.war-card-actions {
 			display: flex;
@@ -2971,14 +2905,6 @@
 
 		/* lista pogrupowana po rasie */
 		.heroes-grid { display: flex; flex-direction: column; gap: 16px; }
-		.heroes-race-head { font-family: 'Cinzel', serif; font-size: 0.92rem; font-weight: 600; color: var(--text-light); padding: 4px 0 8px 10px; margin-bottom: 10px; border-left: 4px solid var(--border); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
-		.heroes-race-head.race-dark { border-left-color: var(--race-dark); }
-		.heroes-race-head.race-light { border-left-color: var(--race-light); }
-		.heroes-race-head.race-undead { border-left-color: var(--race-undead); }
-		.heroes-race-head.race-elf { border-left-color: var(--race-elf); }
-		.heroes-race-head.race-fire { border-left-color: var(--race-fire); }
-		.heroes-race-head.race-human { border-left-color: var(--race-human); }
-		.heroes-race-count { color: var(--text-muted); font-size: 0.72rem; font-weight: 400; }
 		.heroes-race-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
 		/* Rozmiar kafelków (przełącznik S/M/L; normal = domyślny wyżej) */
 		.heroes-grid.tiles-small .heroes-race-tiles { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 7px; }
@@ -3555,7 +3481,6 @@
 		[data-theme="light"] .war-history-enemy { background: rgba(0, 0, 0, 0.05); }
 		[data-theme="light"] .war-preview-summary { background: linear-gradient(135deg, #ffffff, #f8f5f0); }
 		[data-theme="light"] .war-preview-stat { background: rgba(0, 0, 0, 0.04); }
-		[data-theme="light"] .war-preview-legend,
 		[data-theme="light"] .compare-legend { background: #f0ebe3; }
 
 		[data-theme="light"] .compact-slot.filled { background: #ffffff; }
@@ -3568,7 +3493,6 @@
 		[data-theme="light"] .info-box { background: #f8f5f0; border-left-color: #996515; }
 		[data-theme="light"] .info-box.admin { background: rgba(178, 42, 42, 0.06); border-left-color: var(--admin-frame); }
 		[data-theme="light"] .entity-list { background: #f8f5f0; }
-		[data-theme="light"] .entity-item { border-bottom-color: #d4cfc7; }
 
 		[data-theme="light"] .filter-btn { background: #f0ebe3; border-color: #d4cfc7; color: #6b6560; }
 		[data-theme="light"] .filter-btn:hover, [data-theme="light"] .filter-btn.active { background: #ffffff; border-color: #996515; color: #996515; }
