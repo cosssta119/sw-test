@@ -649,6 +649,40 @@
             setValidation(input, isValid);
         }
 
+        // Wspólna walidacja + kanonizacja danych formacji (Dodaj / Edycja / import CSV).
+        // Zwraca { ok:false, error } albo { ok:true, my, enemy, myPet, enemyPet } z nazwami
+        // w pisowni z bazy — bez kanonizacji "benzel" i "Benzel" liczyły się osobno
+        // w pakietach i quick-tagach (walidacja była case-insensitive, zapis surowy).
+        function validateFormationData(my, enemy, myPet, enemyPet) {
+            my = (my || []).map(h => (h || '').trim());
+            enemy = (enemy || []).map(h => (h || '').trim());
+            myPet = (myPet || '').trim();
+            enemyPet = (enemyPet || '').trim();
+
+            if (!my.filter(h => h).length && !enemy.filter(h => h).length)
+                return { ok: false, error: t('add.addAtLeastOne') };
+            if (my.filter(h => h).length > 5 || enemy.filter(h => h).length > 5)
+                return { ok: false, error: t('add.tooManyHeroes') };
+
+            const allHeroNames = heroes.map(h => h.name.toLowerCase());
+            const invalidHeroes = [...my, ...enemy].filter(h => h && !allHeroNames.includes(h.toLowerCase()));
+            if (invalidHeroes.length)
+                return { ok: false, error: `${t('add.unknownHeroes')}: ${invalidHeroes.slice(0, 3).join(', ')}` };
+
+            const allPetNames = pets.map(p => getPetName(p).toLowerCase());
+            const invalidPets = [myPet, enemyPet].filter(p => p && !allPetNames.includes(p.toLowerCase()));
+            if (invalidPets.length)
+                return { ok: false, error: `${t('add.unknownPets')}: ${invalidPets.join(', ')}` };
+
+            const canonHero = h => h ? (findHero(h)?.name || h) : '';
+            const canonPet = p => {
+                if (!p) return '';
+                const found = pets.find(x => getPetName(x).toLowerCase() === p.toLowerCase());
+                return found ? getPetName(found) : p;
+            };
+            return { ok: true, my: my.map(canonHero), enemy: enemy.map(canonHero), myPet: canonPet(myPet), enemyPet: canonPet(enemyPet) };
+        }
+
         // Funkcja pomocnicza do matchowania bohaterów z wagą
         function heroMatchScore(search, target) {
             if (!search || !target) return 0;
@@ -1623,7 +1657,8 @@
             $('search-pet').value = '';
             lastSearch = null;
             renderSearchEmptyState();
-            document.querySelectorAll('.quick-tag.selected').forEach(t => t.classList.remove('selected'));
+            // Tylko tagi Szukajki — globalny selektor rozjeżdżał podświetlenie w Dodaj/Wojnie/Kreatorze
+            document.querySelectorAll('#tab-search .quick-tag.selected').forEach(t => t.classList.remove('selected'));
             $('search-counter')?.remove();
         }
 
@@ -1688,6 +1723,7 @@
 			if (input) input.value = '';
 
 			filterDatabase();
+			if (lastSearch) displayResults(lastSearch.results, lastSearch.searchHeroes); // odśwież widoczne wyniki Szukajki
 		}
 
 		function removeExcludedHero(name) {
@@ -1699,6 +1735,7 @@
 			showToast(`✅ ${t('excluded.removed')}: ${name}`);
 
 			filterDatabase();
+			if (lastSearch) displayResults(lastSearch.results, lastSearch.searchHeroes);
 		}
 
 		function clearExcludedHeroes() {
@@ -1713,14 +1750,16 @@
 			showToast(t('excluded.cleared'));
 
 			filterDatabase();
+			if (lastSearch) displayResults(lastSearch.results, lastSearch.searchHeroes);
 		}
 
 		function onExcludeSettingChange() {
 			hideExcludedResults = $('exclude-hide-results').checked;
 			storage.setBool('souls_hide_excluded', hideExcludedResults);
-			
-			// Odśwież aktywną zakładkę
+
+			// Odśwież aktywną zakładkę + widoczne wyniki Szukajki
 			filterDatabase();
+			if (lastSearch) displayResults(lastSearch.results, lastSearch.searchHeroes);
 		}
 
 		function isFormationExcluded(formation) {
@@ -2472,7 +2511,13 @@
         }
 
         function selectQuickItem(value) {
-            if (quickSelectTarget) $(quickSelectTarget).value = value;
+            if (quickSelectTarget) {
+                const input = $(quickSelectTarget);
+                input.value = value;
+                // Odśwież stan zależny od wartości pola (ramka walidacji, kolor rasy, tagi, licznik) —
+                // samo ustawienie .value nie odpala listenerów input
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+            }
             closeQuickSelect();
         }
 
@@ -2495,12 +2540,14 @@
 		function showFormation(id) {
 			const f = allFormations.find(x => x.id === id);
 			currentFormation = f;
+			switchTab('view'); // też przy braku — komunikat „nie znaleziono" musi być widoczny (deep-link ?formation=N)
 			if (!f) {
 				$('formation-display').innerHTML = `<div class="empty-state"><p>${t('preview.notFound')} #${id}</p></div>`;
+				navFormationIds = allFormations.map(x => x.id).sort((a, b) => a - b);
+				navCurrentIndex = -1;
+				updateFormationNav(id); // wyłącza strzałki i czyści licznik (idx === -1)
 				return;
 			}
-			
-			switchTab('view');
 			
 			// Aktualizuj pole input
 			const lookupInput = $('lookup-id');
@@ -2824,18 +2871,20 @@
 			}
 			
 			// Pobierz dane z formularza
-			const my = [];
+			const rawMy = [];
 			for (let i = 1; i <= 8; i++) {
-				my.push($(`edit-my${i}`)?.value.trim() || '');
+				rawMy.push($(`edit-my${i}`)?.value.trim() || '');
 			}
-			
-			const enemy = [];
+
+			const rawEnemy = [];
 			for (let i = 1; i <= 8; i++) {
-				enemy.push($(`edit-enemy${i}`)?.value.trim() || '');
+				rawEnemy.push($(`edit-enemy${i}`)?.value.trim() || '');
 			}
-			
-			const myPet = $('edit-myPet').value.trim();
-			const enemyPet = $('edit-enemyPet').value.trim();
+
+			// Ta sama walidacja co przy Dodaj (≤5, znane nazwy, kanonizacja) — edycja jej wcześniej nie miała
+			const v = validateFormationData(rawMy, rawEnemy, $('edit-myPet').value, $('edit-enemyPet').value);
+			if (!v.ok) { showToast(v.error, true); return; }
+			const { my, enemy, myPet, enemyPet } = v;
 			const comment = $('edit-comment').value.trim();
 			
 			// Checkbox isBase
@@ -3118,32 +3167,16 @@
 			if (!isOnline) { showToast(t('common.noConnection'), true); return; }
 			
 			let name = $('add-name').value.trim();
-			
-			const my = getFieldValues('add-my', 8);
-			const enemy = getFieldValues('add-enemy', 8);
-			const myPet = $('add-myPet').value.trim();
-			const enemyPet = $('add-enemyPet').value.trim();
-			
-			if (!my.filter(h => h).length && !enemy.filter(h => h).length) { 
-				showToast(t('add.addAtLeastOne'), true); 
-				return; 
-			}
-			
-			if (my.filter(h => h).length > 5 || enemy.filter(h => h).length > 5) { showToast(t('add.tooManyHeroes'), true); return; }
-			const allHeroNames = heroes.map(h => h.name.toLowerCase());
-			const invalidHeroes = [...my, ...enemy].filter(h => h && !allHeroNames.includes(h.toLowerCase()));
-			if (invalidHeroes.length) { 
-				showToast(`${t('add.unknownHeroes')}: ${invalidHeroes.slice(0, 3).join(', ')}`, true); 
-				return; 
-			}
-			
-			const allPetNames = pets.map(p => getPetName(p).toLowerCase());
-			const invalidPets = [myPet, enemyPet].filter(p => p && !allPetNames.includes(p.toLowerCase()));
-			if (invalidPets.length) { 
-				showToast(`${t('add.unknownPets')}: ${invalidPets.join(', ')}`, true); 
-				return; 
-			}
-			
+
+			const v = validateFormationData(
+				getFieldValues('add-my', 8),
+				getFieldValues('add-enemy', 8),
+				$('add-myPet').value,
+				$('add-enemyPet').value
+			);
+			if (!v.ok) { showToast(v.error, true); return; }
+			const { my, enemy, myPet, enemyPet } = v; // nazwy w pisowni kanonicznej z bazy
+
 			// 🔍 SPRAWDŹ DUPLIKATY
 			const existingDuplicate = checkForExactDuplicate(my, myPet, enemy, enemyPet);
 			if (existingDuplicate) {
@@ -3168,26 +3201,36 @@
 				}).replace(',', '');
 			}
 			
-			const newId = allFormations.length ? Math.max(...allFormations.map(f => f.id)) + 1 : 1;
 			const isBase = isAdmin && $('add-isBase')?.checked || false;
-			
+			const record = {
+				name,
+				my,
+				myPet,
+				enemy,
+				enemyPet,
+				comment: $('add-comment').value.trim(),
+				isBase: isBase,
+				dateAdded: new Date().toISOString()
+			};
+
 			try {
-				await formationsRef.child(String(newId)).set({
-					id: newId, 
-					name, 
-					my, 
-					myPet, 
-					enemy, 
-					enemyPet,
-					comment: $('add-comment').value.trim(),
-					isBase: isBase,
-					dateAdded: new Date().toISOString()
-				});
+				// Transakcja na pierwszym wolnym ID — samo max+1 i set() cicho nadpisywało
+				// rekord, gdy dwie osoby zapisywały w tym samym momencie (obie widziały ten sam max).
+				const startId = allFormations.length ? Math.max(...allFormations.map(f => f.id)) + 1 : 1;
+				let newId = null;
+				for (let attempt = 0; attempt < 20; attempt++) {
+					const candidate = startId + attempt;
+					const res = await formationsRef.child(String(candidate)).transaction(cur =>
+						cur === null ? { ...record, id: candidate } : undefined // undefined = abort (ID zajęte)
+					);
+					if (res.committed) { newId = candidate; break; }
+				}
+				if (newId === null) throw new Error('Nie udało się znaleźć wolnego ID (spróbuj ponownie)');
 				showToast(`${t('add.saved')} #${newId}${isBase ? ' (BAZA)' : ''}!`);
 				clearAddForm();
 				hideDuplicateWarning();
-			} catch (e) { 
-				showToast(`${t('common.error')}: ${e.message}`, true); 
+			} catch (e) {
+				showToast(`${t('common.error')}: ${e.message}`, true);
 			}
 		}
 
@@ -7374,7 +7417,13 @@
                 ? t('defense.editImpactActionReuse').replace('{id}', existing.id)
                 : t('defense.editImpactActionNew');
             const activeCount = getActiveAssignmentsForFormation(old.id).length;
-            el.textContent = '⚠️ ' + t('defense.editImpactSlots').replace('{action}', action).replace('{n}', activeCount);
+            let msg = '⚠️ ' + t('defense.editImpactSlots').replace('{action}', action).replace('{n}', activeCount);
+            // CASE B (reuse): rekord docelowy zachowuje SWOJE name/comment — ostrzeż, że wpisane pola przepadną
+            if (existing) {
+                const metaTyped = (newName && newName !== (existing.name || '')) || (newComment && newComment !== (existing.comment || ''));
+                if (metaTyped) msg += ' ' + t('defense.editImpactMetaLost');
+            }
+            el.textContent = msg;
         }
 
         async function saveDefenseEditModal() {
@@ -8186,7 +8235,11 @@
                     const validKey = k => k && !/[.#$\[\]\/]/.test(String(k)); // klucze Firebase nie mogą mieć . # $ [ ] /
                     const newH = H.filter(h => h && validKey(h.name) && !hNames.has(String(h.name).toLowerCase()));
                     const newP = P.filter(p => { const n = typeof p === 'string' ? p : (p && p.name); return validKey(n) && !pNames.has(String(n).toLowerCase()); });
-                    const newDF = DF.filter(x => x && x.id != null && !dfIds.has(x.id));
+                    // Dedup Obrony też po fingerprincie (nie tylko id) — fingerprint = tożsamość składu;
+                    // restore z innego środowiska nie może utworzyć drugiego rekordu o tym samym fingerprincie
+                    const dfFps = new Set(allDefenseFormations.map(x => x.fingerprint || defenseFingerprint(x.my, x.myPet)));
+                    const newDF = DF.filter(x => x && x.id != null && !dfIds.has(x.id)
+                        && !dfFps.has(x.fingerprint || defenseFingerprint(x.my, x.myPet)));
                     const newDP = DP.filter(x => x && x.id != null && !dpIds.has(x.id));
                     const newDA = DA.filter(x => x && x.id != null && !daIds.has(x.id));
                     const total = newF.length + newH.length + newP.length + newDF.length + newDP.length + newDA.length;
@@ -8403,8 +8456,10 @@
                         const v = rows[i];
                         if (v.length < 11) { skipped++; continue; }
                         const b = (v[0] || '').match(/^\d+$/) ? 1 : 0;
-                        const my = v.slice(b + 1, b + 9).map(cleanVal);
-                        const myPet = cleanVal(v[b + 9]);
+                        // Walidacja jak przy zapisie z UI (≤5, znane nazwy, kanonizacja) — import ją omijał
+                        const vRow = validateFormationData(v.slice(b + 1, b + 9).map(cleanVal), [], cleanVal(v[b + 9]), '');
+                        if (!vRow.ok) { console.warn(`Import Obrony CSV: pominięto wiersz ${i + 1} — ${vRow.error}`); skipped++; continue; }
+                        const { my, myPet } = vRow;
                         const comment = cleanVal(v[b + 10]);
                         const fp = defenseFingerprint(my, myPet);
                         if (seen.has(fp)) { dupes++; continue; }
@@ -8476,11 +8531,16 @@
 						while (existingIds.includes(++maxId));
 						existingIds.push(maxId);
 						
-						// Parsuj pola
-						const myHeroes = vals.slice(startIdx + 1, startIdx + 9).map(cleanVal);
-						const myPet = cleanVal(vals[startIdx + 9]);
-						const enemyHeroes = vals.slice(startIdx + 10, startIdx + 18).map(cleanVal);
-						const enemyPet = cleanVal(vals[startIdx + 18]);
+						// Parsuj pola + ta sama walidacja co przy Dodaj (≤5, znane nazwy, kanonizacja) —
+						// import wcześniej ją omijał i wpuszczał do bazy wiersze łamiące reguły
+						const vRow = validateFormationData(
+							vals.slice(startIdx + 1, startIdx + 9).map(cleanVal),
+							vals.slice(startIdx + 10, startIdx + 18).map(cleanVal),
+							cleanVal(vals[startIdx + 9]),
+							cleanVal(vals[startIdx + 18])
+						);
+						if (!vRow.ok) { console.warn(`Import CSV: pominięto wiersz ${i + 1} — ${vRow.error}`); skipped++; continue; }
+						const { my: myHeroes, myPet, enemy: enemyHeroes, enemyPet } = vRow;
 						const __fp = formationFingerprint(myHeroes, myPet, enemyHeroes, enemyPet);
 						if (seen.has(__fp)) { dupes++; continue; }
 						seen.add(__fp);
@@ -8592,47 +8652,41 @@
         function cancelHeroEdit() { editingHeroName = null; renderHeroesList(); }
 
         // Rename bohatera propagujemy do /formations (my+enemy) i /defenseFormations (my + nowy fingerprint),
-        // żeby nie zostały sieroty referencji. Zwraca liczbę zmienionych rekordów.
+        // żeby nie zostały sieroty referencji.
         // Fingerprint obrony aktualizujemy in-place bezpiecznie: rename to bijekcja nazw (oldName→newName
         // jednolicie), a blokada heroExists gwarantuje że newName nie koliduje z innym bohaterem — więc
         // dwa różne składy nie mogą skleić się w ten sam fingerprint.
-        async function propagateHeroRename(oldName, newName) {
+        // Zwraca { updates, count }: ścieżki względem KORZENIA bazy — caller dokłada zmiany /heroes
+        // i wykonuje JEDEN atomowy db.ref().update(). Wcześniejsza sekwencja osobnych zapisów przy
+        // zerwaniu połączenia zostawiała bazę w stanie połowicznym (formacje z nową nazwą, /heroes ze starą).
+        function propagateHeroRename(oldName, newName) {
             const lo = oldName.toLowerCase();
             let count = 0;
-            const fUpdates = {};
+            const updates = {};
             allFormations.forEach(f => {
                 let changed = false;
                 const my = (f.my || []).map(x => (x && x.toLowerCase() === lo) ? (changed = true, newName) : x);
                 const enemy = (f.enemy || []).map(x => (x && x.toLowerCase() === lo) ? (changed = true, newName) : x);
-                if (changed) { fUpdates[`${f.id}/my`] = my; fUpdates[`${f.id}/enemy`] = enemy; count++; }
+                if (changed) { updates[`formations/${f.id}/my`] = my; updates[`formations/${f.id}/enemy`] = enemy; count++; }
             });
-            if (Object.keys(fUpdates).length) await formationsRef.update(fUpdates);
-
-            if (defenseFormationsRef) {
-                const dUpdates = {};
-                allDefenseFormations.forEach(df => {
-                    let changed = false;
-                    const my = (df.my || []).map(x => (x && x.toLowerCase() === lo) ? (changed = true, newName) : x);
-                    if (changed) {
-                        dUpdates[`${df.id}/my`] = my;
-                        dUpdates[`${df.id}/fingerprint`] = defenseFingerprint(my, df.myPet);
-                        count++;
-                    }
-                });
-                if (Object.keys(dUpdates).length) await defenseFormationsRef.update(dUpdates);
-            }
+            allDefenseFormations.forEach(df => {
+                let changed = false;
+                const my = (df.my || []).map(x => (x && x.toLowerCase() === lo) ? (changed = true, newName) : x);
+                if (changed) {
+                    updates[`defenseFormations/${df.id}/my`] = my;
+                    updates[`defenseFormations/${df.id}/fingerprint`] = defenseFingerprint(my, df.myPet);
+                    count++;
+                }
+            });
             // Foldery galerii bohatera trzymają się przez heroKey — przy rename przepisz heroKey (+ nazwę folderu bohatera).
-            if (screenFoldersRef) {
-                const oldKey = normalize(oldName), newKey = normalize(newName), sUpdates = {};
-                allScreenFolders.forEach(f => {
-                    if (f.heroKey === oldKey && (f.kind === 'hero' || f.kind === 'heroCat')) {
-                        sUpdates[`${f.id}/heroKey`] = newKey;
-                        if (f.kind === 'hero') sUpdates[`${f.id}/name`] = newName;
-                    }
-                });
-                if (Object.keys(sUpdates).length) await screenFoldersRef.update(sUpdates);
-            }
-            return count;
+            const oldKey = normalize(oldName), newKey = normalize(newName);
+            allScreenFolders.forEach(f => {
+                if (f.heroKey === oldKey && (f.kind === 'hero' || f.kind === 'heroCat')) {
+                    updates[`screenFolders/${f.id}/heroKey`] = newKey;
+                    if (f.kind === 'hero') updates[`screenFolders/${f.id}/name`] = newName;
+                }
+            });
+            return { updates, count };
         }
 
         async function saveHeroEdit(oldName) {
@@ -8658,10 +8712,12 @@
                     showToast(`✅ ${t('admin.heroSaved')}`);
                 } else {
                     if (!confirm(t('admin.renameConfirm'))) return;
-                    const affected = await propagateHeroRename(oldName, newName);
-                    await heroesRef.child(newName).set({ name: newName, race: newRace });
-                    await heroesRef.child(oldName).remove();
-                    showToast(`✅ ${t('admin.heroSaved')} (${affected} ${t('status.formations')})`);
+                    // Jeden atomowy multi-path update: propagacja + podmiana klucza w /heroes razem
+                    const { updates, count } = propagateHeroRename(oldName, newName);
+                    updates[`heroes/${newName}`] = { name: newName, race: newRace };
+                    updates[`heroes/${oldName}`] = null;
+                    await db.ref().update(updates);
+                    showToast(`✅ ${t('admin.heroSaved')} (${count} ${t('status.formations')})`);
                 }
                 editingHeroName = null;
             } catch (e) { showToast(`${t('common.error')}: ${e.message}`, true); }
@@ -8701,31 +8757,26 @@
         function cancelPetEdit() { editingPetName = null; renderPetsList(); }
 
         // Rename peta propagujemy do /formations (myPet/enemyPet) i /defenseFormations (myPet + nowy fingerprint).
-        async function propagatePetRename(oldName, newName) {
+        // Jak propagateHeroRename: zwraca { updates, count } ze ścieżkami od korzenia — caller robi jeden atomowy update.
+        function propagatePetRename(oldName, newName) {
             const lo = oldName.toLowerCase();
             let count = 0;
-            const fUpdates = {};
+            const updates = {};
             allFormations.forEach(f => {
                 let changed = false;
                 let myPet = f.myPet, enemyPet = f.enemyPet;
                 if (myPet && myPet.toLowerCase() === lo) { myPet = newName; changed = true; }
                 if (enemyPet && enemyPet.toLowerCase() === lo) { enemyPet = newName; changed = true; }
-                if (changed) { fUpdates[`${f.id}/myPet`] = myPet; fUpdates[`${f.id}/enemyPet`] = enemyPet; count++; }
+                if (changed) { updates[`formations/${f.id}/myPet`] = myPet; updates[`formations/${f.id}/enemyPet`] = enemyPet; count++; }
             });
-            if (Object.keys(fUpdates).length) await formationsRef.update(fUpdates);
-
-            if (defenseFormationsRef) {
-                const dUpdates = {};
-                allDefenseFormations.forEach(df => {
-                    if (df.myPet && df.myPet.toLowerCase() === lo) {
-                        dUpdates[`${df.id}/myPet`] = newName;
-                        dUpdates[`${df.id}/fingerprint`] = defenseFingerprint(df.my, newName);
-                        count++;
-                    }
-                });
-                if (Object.keys(dUpdates).length) await defenseFormationsRef.update(dUpdates);
-            }
-            return count;
+            allDefenseFormations.forEach(df => {
+                if (df.myPet && df.myPet.toLowerCase() === lo) {
+                    updates[`defenseFormations/${df.id}/myPet`] = newName;
+                    updates[`defenseFormations/${df.id}/fingerprint`] = defenseFingerprint(df.my, newName);
+                    count++;
+                }
+            });
+            return { updates, count };
         }
 
         async function savePetEdit(oldName) {
@@ -8742,10 +8793,12 @@
 
             try {
                 if (!confirm(t('admin.renamePetConfirm'))) return;
-                const affected = await propagatePetRename(oldName, newName);
-                await petsRef.child(newName).set({ name: newName });
-                await petsRef.child(oldName).remove();
-                showToast(`✅ ${t('admin.petSaved')} (${affected} ${t('status.formations')})`);
+                // Jeden atomowy multi-path update: propagacja + podmiana klucza w /pets razem
+                const { updates, count } = propagatePetRename(oldName, newName);
+                updates[`pets/${newName}`] = { name: newName };
+                updates[`pets/${oldName}`] = null;
+                await db.ref().update(updates);
+                showToast(`✅ ${t('admin.petSaved')} (${count} ${t('status.formations')})`);
                 editingPetName = null;
             } catch (e) { showToast(`${t('common.error')}: ${e.message}`, true); }
         }
