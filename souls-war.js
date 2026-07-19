@@ -10163,7 +10163,7 @@
             let done = 0;
             for (const id of ids) {
                 const s = findScreenshot(id); if (!s) continue;
-                try { await deleteScreenStorageFiles(s); await screenshotsRef.child(id).remove(); done++; } catch (e) {}
+                try { await deleteScreenStorageFiles(s); await screenshotsRef.child(id).remove(); await clearArtifactIconIfDeleted(s); done++; } catch (e) {}
             }
             screensSelected.clear();
             showToast('🗑️ ' + t('screens.bulkDeleted', { n: done }));
@@ -10547,14 +10547,29 @@
                 if (p) { try { await screensStorageRef.child(p).delete(); } catch (e) {} }
             }
         }
+        // Screen może być IKONKĄ artefaktu (iconPath wskazuje jego pliki) — kasowanie bez sprzątnięcia
+        // zostawiało w /artifacts martwy URL 404 (ikonka znikała z kart/pickera/folderu bez śladu).
+        function artifactUsingScreenshot(s) {
+            if (!s) return null;
+            return getArtifacts().find(a => a.iconPath && (a.iconPath === s.thumbPath || a.iconPath === s.storagePath)) || null;
+        }
+        async function clearArtifactIconIfDeleted(s) {
+            const a = artifactUsingScreenshot(s);
+            if (a && artifactsRef && artifactsFromDb()) {
+                try { await artifactsRef.child(a.id).update({ iconUrl: null, iconPath: null }); } catch (e) {}
+            }
+        }
         async function deleteScreenshot(id) {
             if (!isAdmin) return;
             const s = findScreenshot(id);
             if (!s) return;
-            if (!confirm(t('screens.deleteShotConfirm'))) return;
+            const iconOf = artifactUsingScreenshot(s);
+            const msg = iconOf ? t('screens.deleteIconConfirm', { name: iconOf.name }) : t('screens.deleteShotConfirm');
+            if (!confirm(msg)) return;
             try {
                 await deleteScreenStorageFiles(s);
                 await screenshotsRef.child(id).remove();
+                await clearArtifactIconIfDeleted(s);
                 showToast('🗑️ ' + t('screens.deleted'));
             } catch (e) { showToast(t('common.error') + ': ' + e.message, true); }
         }
