@@ -1077,6 +1077,9 @@
 		}
 
 		.battle-slot { width: 75px; height: 42px; border-radius: 8px; font-size: 0.7rem; padding: 4px; }
+		/* Gdy skład ma artefakty (has-arts): szerokość dopasowana do treści (imię + ikonka tuż obok), bez rozpychania */
+		.battle-grid.has-arts .battle-slot { width: auto; min-width: 75px; max-width: 150px; padding: 4px 6px; gap: 5px; }
+		.battle-grid.has-arts .battle-slot.empty { min-width: 75px; }
 		.compact-slot { width: 72px; min-height: 32px; border-radius: 6px; font-size: 0.7rem; padding: 3px 4px; line-height: 1.1; white-space: normal; word-break: break-word; }
 		.war-your-team-slot { width: 100px; min-height: 42px; border-radius: 9px; font-size: 0.82rem; font-weight: 700; padding: 4px 6px; line-height: 1.15; border: 2px solid var(--border); background: var(--bg-input); white-space: normal; word-break: break-word; }
 
@@ -2624,6 +2627,25 @@
 			font-size: 0.75rem;
 			text-align: right;
 		}
+		/* Artefakty per przypięcie (Obrona) — pasek kwadracików hero + ikonka */
+		.defense-art-section { margin: 6px 0; display: flex; flex-direction: column; gap: 4px; }
+		.defense-art-label { font-size: 0.7rem; color: var(--text-muted); }
+		.defense-art-btns { display: flex; flex-wrap: wrap; gap: 4px; }
+		.defense-art-btn {
+			display: inline-flex; align-items: center; gap: 4px;
+			padding: 2px 4px 2px 6px; background: var(--bg-input);
+			border: 1px solid var(--border); border-radius: 6px; cursor: pointer;
+			font-family: inherit; font-size: 0.68rem; font-weight: 600; line-height: 1;
+		}
+		.defense-art-btn:hover { border-color: var(--accent-gold); }
+		.defense-art-btn.set { border-color: var(--accent-gold); background: rgba(212, 175, 55, 0.12); }
+		.defense-art-ico {
+			width: 18px; height: 18px; border-radius: 4px; overflow: hidden;
+			display: flex; align-items: center; justify-content: center;
+			background: var(--bg-card); border: 1px solid var(--border); font-size: 0.7rem;
+		}
+		.defense-art-btn.set .defense-art-ico { border-color: var(--accent-gold); }
+		.defense-art-ico img { width: 100%; height: 100%; object-fit: cover; }
 		.btn.btn-tiny {
 			padding: 2px 8px;
 			font-size: 0.7rem;
@@ -2777,6 +2799,7 @@
 			width: 100%;
 		}
 		.defense-mini-slot {
+			position: relative;
 			flex: 1;
 			min-width: 0;
 			max-width: 90px;
@@ -3145,16 +3168,24 @@
 		.artifact-pick-name { font-size: 0.66rem; margin-top: 4px; line-height: 1.2; }
 		.artifact-pick-class { font-size: 0.6rem; color: var(--text-muted); margin-top: 2px; }
 
-		/* Badge artefaktu w rogu slotu 3-2-3 (kontener mieści przyszłą drugą ikonkę) */
+		/* Badge artefaktu zadokowany po prawej w ramce kafelka (kontener mieści przyszłą drugą ikonkę — np. runę) */
 		.battle-slot { position: relative; }
-		.slot-badges { position: absolute; top: -7px; right: -5px; display: flex; gap: 2px; z-index: 2; }
+		.slot-badges { display: flex; gap: 2px; flex: none; align-items: center; }
 		.slot-badge {
-			width: 18px; height: 18px; border-radius: 5px; overflow: hidden;
+			width: 28px; height: 28px; border-radius: 7px; overflow: hidden;
 			background: var(--bg-card); border: 1px solid var(--accent-gold);
-			font-size: 0.6rem; display: flex; align-items: center; justify-content: center;
+			font-size: 0.95rem; line-height: 1; display: flex; align-items: center; justify-content: center;
 			cursor: pointer;
 		}
 		.slot-badge img { width: 100%; height: 100%; object-fit: cover; }
+		/* Wariant „corner" — mała ikonka wewnątrz rogu kafelka (gęste siatki: mini-Obrona; bez rozpychania) */
+		.slot-badges.corner { position: absolute; top: 1px; right: 1px; gap: 1px; }
+		.slot-badges.corner .slot-badge { width: 15px; height: 15px; border-radius: 4px; border-width: 1px; font-size: 0.55rem; }
+		/* Wariant „dock" — większa ikonka dokowana po prawej w ramce (Wojna; jak normalny Podgląd, tekst odsunięty klasą .has-art) */
+		.slot-badges.dock { position: absolute; top: 50%; right: 3px; transform: translateY(-50%); }
+		.slot-badges.dock .slot-badge { width: 22px; height: 22px; border-radius: 6px; border-width: 1px; font-size: 0.8rem; }
+		.compact-slot.has-art { padding-right: 27px; }
+		.war-your-team-slot.has-art { padding-right: 30px; }
 
 		/* Rozmiar kafelków Artefaktów (S/M/L jak w Bohaterach) */
 		#artifacts-grid.tiles-small .artifact-cards { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
@@ -3800,6 +3831,8 @@
 
 		@media (max-width: 400px) {
 			.battle-slot { width: 62px; height: 38px; font-size: 0.6rem; }
+			.battle-grid.has-arts .battle-slot { width: auto; min-width: 62px; max-width: 120px; }
+			.slot-badge { width: 22px; height: 22px; border-radius: 6px; }
 			.battle-row { gap: 5px; }
 			.preview-header { flex-direction: column; gap: 10px; }
 			.preview-title { font-size: 0.85rem; }

@@ -2413,6 +2413,7 @@
 			html += `</div>`;
 			
 			$('compare-content').innerHTML = html;
+			requestAnimationFrame(() => equalizeArtSlots($('compare-content')));
 		}
 
 		function renderCompareBattleGrid(arr, isEnemy, type, formationIdx, allData, arts) {
@@ -2432,14 +2433,15 @@
 				return `<div class="battle-slot filled ${rc} ${diffClass} slot-clickable" onclick="event.stopPropagation();showHeroSkills('${jsStr(name)}')"><span class="hero-name">${escapeHtml(name)}</span>${artifactSlotBadge(arts && arts[pos])}</div>`;
 			};
 			
+			const gc = (Array.isArray(arts) && arts.some(a => a)) ? 'battle-grid has-arts' : 'battle-grid';
 			if (isEnemy) {
-				return `<div class="battle-grid">
+				return `<div class="${gc}">
 					<div class="battle-row">${slot(5)}${slot(6)}${slot(7)}</div>
 					<div class="battle-row">${slot(3)}${slot(4)}</div>
 					<div class="battle-row">${slot(0)}${slot(1)}${slot(2)}</div>
 				</div>` + bookBonusWidget(arr);
 			} else {
-				return `<div class="battle-grid">
+				return `<div class="${gc}">
 					<div class="battle-row">${slot(0)}${slot(1)}${slot(2)}</div>
 					<div class="battle-row">${slot(3)}${slot(4)}</div>
 					<div class="battle-row">${slot(5)}${slot(6)}${slot(7)}</div>
@@ -2628,6 +2630,7 @@
 					${f.comment ? `<div class="preview-comment"><span class="comment-icon">💬</span>${escapeHtml(f.comment)}</div>` : ''}
 				</div>
 				${similarHtml}`;
+			requestAnimationFrame(() => equalizeArtSlots($('formation-display')));
 		}
 
         function addToRecentlyViewed(id, name) {
@@ -2791,9 +2794,23 @@
                 return `<div class="battle-slot filled ${rc} slot-clickable" onclick="event.stopPropagation();showHeroSkills('${jsStr(name)}')"><span class="hero-name">${escapeHtml(name)}</span>${artifactSlotBadge(arts && arts[i])}</div>`;
             };
             
-            const grid = isEnemy ? `<div class="battle-grid"><div class="battle-row">${slot(5)}${slot(6)}${slot(7)}</div><div class="battle-row">${slot(3)}${slot(4)}</div><div class="battle-row">${slot(0)}${slot(1)}${slot(2)}</div></div>` :
-                `<div class="battle-grid"><div class="battle-row">${slot(0)}${slot(1)}${slot(2)}</div><div class="battle-row">${slot(3)}${slot(4)}</div><div class="battle-row">${slot(5)}${slot(6)}${slot(7)}</div></div>`;
+            const gc = (Array.isArray(arts) && arts.some(a => a)) ? 'battle-grid has-arts' : 'battle-grid';
+            const grid = isEnemy ? `<div class="${gc}"><div class="battle-row">${slot(5)}${slot(6)}${slot(7)}</div><div class="battle-row">${slot(3)}${slot(4)}</div><div class="battle-row">${slot(0)}${slot(1)}${slot(2)}</div></div>` :
+                `<div class="${gc}"><div class="battle-row">${slot(0)}${slot(1)}${slot(2)}</div><div class="battle-row">${slot(3)}${slot(4)}</div><div class="battle-row">${slot(5)}${slot(6)}${slot(7)}</div></div>`;
             return grid + bookBonusWidget(arr);
+        }
+
+        // Wyrównuje szerokość kafelków w obrębie jednej siatki (składu) do najszerszego — tylko has-arts.
+        // Rzędy 3-2-3 to osobne kontenery flex, więc CSS sam ich nie zrówna; mierzymy i ustawiamy po renderze.
+        function equalizeArtSlots(scope) {
+            (scope || document).querySelectorAll('.battle-grid.has-arts').forEach(grid => {
+                const slots = grid.querySelectorAll('.battle-slot');
+                if (!slots.length) return;
+                slots.forEach(s => { s.style.width = ''; });   // reset do CSS (width:auto) na czas pomiaru
+                let max = 0;
+                slots.forEach(s => { if (s.offsetWidth > max) max = s.offsetWidth; });
+                if (max > 0) slots.forEach(s => { s.style.width = max + 'px'; });
+            });
         }
 
         function renderBattlePet(name) {
@@ -4832,7 +4849,7 @@
 										${renderWarPetComparison(f.enemyPet, searchedEnemy.pet, 'database')}
 									</div>
 									<div class="compact-grid">
-										${renderWarDatabaseGrid(f.enemy, analysis, searchedEnemy.heroesRaw)}
+										${renderWarDatabaseGrid(f.enemy, analysis, searchedEnemy.heroesRaw, f.enemyArtifacts)}
 									</div>
 								</div>
 							</div>
@@ -4845,7 +4862,7 @@
 
 							<!-- Twój skład z konfliktami - ładniejszy -->
 							<div class="war-your-team-section">
-								${renderWarMyTeamGrid(f.my, conflictHeroes)}
+								${renderWarMyTeamGrid(f.my, conflictHeroes, f.myArtifacts)}
 								<div style="text-align: center;">
 									${renderWarMyTeamPet(f.myPet, conflictPets)}
 								</div>
@@ -5030,7 +5047,7 @@
 		}
 
 		// Renderuj siatkę wroga z bazy
-		function renderWarDatabaseGrid(heroesArr, analysis, otherArr) {
+		function renderWarDatabaseGrid(heroesArr, analysis, otherArr, arts) {
 			const slot = (idx) => {
 				const name = heroesArr[idx] || '';
 				if (!name) return `<div class="compact-slot empty">—</div>`;
@@ -5050,7 +5067,8 @@
 				if (isMatched && !samePos) classes += ' war-moved';
 				if (isExtra) classes += ' war-extra';
 
-				return `<div class="${classes} slot-clickable" onclick="event.stopPropagation();showHeroSkills('${jsStr(name)}')">${escapeHtml(name)}</div>`;
+				const artName = arts && arts[idx];
+				return `<div class="${classes}${artName ? ' has-art' : ''} slot-clickable" onclick="event.stopPropagation();showHeroSkills('${jsStr(name)}')">${escapeHtml(name)}${artifactSlotBadge(artName, 'dock')}</div>`;
 			};
 
 			return `
@@ -5061,7 +5079,7 @@
 		}
 
 		// Renderuj siatkę "Twój skład" - większa i z kolorami ras
-		function renderWarMyTeamGrid(heroesArr, conflictSet) {
+		function renderWarMyTeamGrid(heroesArr, conflictSet, arts) {
 			const slot = (idx) => {
 				const name = heroesArr[idx] || '';
 				if (!name) return `<div class="war-your-team-slot empty">—</div>`;
@@ -5076,7 +5094,8 @@
 				if (race) classes += ` race-${race}`;
 				if (isConflict) classes += ' conflict';
 
-				return `<div class="${classes} slot-clickable" onclick="event.stopPropagation();showHeroSkills('${jsStr(name)}')">${escapeHtml(name)}</div>`;
+				const artName = arts && arts[idx];
+			return `<div class="${classes}${artName ? ' has-art' : ''} slot-clickable" onclick="event.stopPropagation();showHeroSkills('${jsStr(name)}')">${escapeHtml(name)}${artifactSlotBadge(artName, 'dock')}</div>`;
 			};
 
 			return `
@@ -7116,7 +7135,7 @@
         // Zapis do formations/{id}.myArtifacts[8]/enemyArtifacts[8] — tablice wyrównane indeksami do slotów
         // (wzorzec speeds z Obrony); pola dodawane tylko gdy jest ≥1 artefakt. Fingerprint/duplikaty ich NIE liczą.
         let formArtifacts = {};
-        let artifactPickerTarget = null; // id inputa, dla którego otwarto picker
+        let artifactPickerCtx = null;    // { heroName, current, onPick(nameOrNull) } — wspólny dla formularzy i Obrony
         const ARTIFACT_FORM_PREFIXES = [['add-my', 8], ['add-enemy', 8], ['edit-my', 8], ['edit-enemy', 8]];
 
         // Wstrzykuje przycisk-kwadracik do wrappera każdego pola bohatera (wariant „w inpucie" — zero zmian layoutu).
@@ -7168,27 +7187,36 @@
         }
 
         // Picker: artefakty klasy bohatera (rola z /heroSkills) + uniwersalne; bez roli — wszystkie z dopiskiem.
-        async function openArtifactPicker(inputId) {
-            const input = $(inputId);
-            const heroName = (input?.value || '').trim();
+        // Generyczny picker: podajesz bohatera, aktualny artefakt i callback zapisu. Używany przez formularze i Obronę.
+        async function openArtifactPickerFor(heroName, current, onPick) {
             const hero = heroName ? findHero(heroName) : null;
             if (!hero) return;
-            artifactPickerTarget = inputId;
+            const ctx = { heroName: hero.name, current: current ? normalize(current) : '', onPick };
+            artifactPickerCtx = ctx;
             const modal = $('artifact-picker-modal');
             $('artifact-picker-for').textContent = t('artifacts.pickerFor', { hero: hero.name });
             $('artifact-picker-body').innerHTML = `<div class="heroes-empty">${t('heroes.loading')}</div>`;
             modal.classList.add('show');
             if (!heroSkillsLoaded) { try { await loadHeroSkills(); } catch (e) {} }
-            if (artifactPickerTarget !== inputId || !modal.classList.contains('show')) return; // zamknięty w międzyczasie
-            renderArtifactPicker(hero.name);
+            if (artifactPickerCtx !== ctx || !modal.classList.contains('show')) return; // zamknięty/zmieniony w międzyczasie
+            renderArtifactPicker();
         }
-        function renderArtifactPicker(heroName) {
+        // Wrapper dla pól formularza (Dodaj/Edycja): cel = input, zapis do formArtifacts[inputId].
+        function openArtifactPicker(inputId) {
+            const input = $(inputId);
+            openArtifactPickerFor((input?.value || '').trim(), formArtifacts[inputId], name => {
+                if (name) formArtifacts[inputId] = name; else delete formArtifacts[inputId];
+                syncArtifactSlotBtn(inputId);
+            });
+        }
+        function renderArtifactPicker() {
+            const ctx = artifactPickerCtx;
             const body = $('artifact-picker-body');
-            if (!body) return;
-            const role = (getHeroSkills(heroName) || {}).role || null;
+            if (!ctx || !body) return;
+            const role = (getHeroSkills(ctx.heroName) || {}).role || null;
             const list = getArtifacts().filter(a => !role || a.klass === role || a.klass === 'any')
                 .slice().sort((a, b) => (a.klass === 'any') - (b.klass === 'any') || (a.order || 0) - (b.order || 0));
-            const current = formArtifacts[artifactPickerTarget] ? normalize(formArtifacts[artifactPickerTarget]) : '';
+            const current = ctx.current;
             const note = role
                 ? `<div class="hero-help-note">${escSkill(t('artifacts.pickerRole', { role: t('role.' + role) }))}</div>`
                 : `<div class="hero-help-note">⚠️ ${escSkill(t('artifacts.pickerNoRole'))}</div>`;
@@ -7203,14 +7231,11 @@
                 + `<button class="btn btn-secondary btn-small" onclick="closeArtifactPicker()">${t('common.cancel')}</button></div>`;
         }
         function pickArtifact(name) {
-            if (artifactPickerTarget) {
-                if (name) formArtifacts[artifactPickerTarget] = name;
-                else delete formArtifacts[artifactPickerTarget];
-                syncArtifactSlotBtn(artifactPickerTarget);
-            }
+            const ctx = artifactPickerCtx;
+            if (ctx && ctx.onPick) ctx.onPick(name || null);
             closeArtifactPicker();
         }
-        function closeArtifactPicker() { $('artifact-picker-modal')?.classList.remove('show'); artifactPickerTarget = null; }
+        function closeArtifactPicker() { $('artifact-picker-modal')?.classList.remove('show'); artifactPickerCtx = null; }
 
         // Zbiera tablicę artefaktów [8] dla prefiksu formularza — tylko wypełnione sloty, nazwy kanoniczne.
         function collectFormArtifacts(prefix, heroArr) {
@@ -7225,12 +7250,13 @@
         }
 
         // Badge artefaktu w rogu slotu siatki 3-2-3 (klik → info-modal; stopPropagation, bo slot otwiera skille bohatera).
-        function artifactSlotBadge(name) {
+        function artifactSlotBadge(name, variant) {
             if (!name) return '';
             const a = findArtifact(name);
             const inner = (a && a.iconUrl) ? `<img src="${escapeHtml(a.iconUrl)}" alt="">` : (ARTIFACT_CLASS_ICON[a?.klass] || '🗡️');
             const display = a ? a.name : name;
-            return `<span class="slot-badges"><span class="slot-badge" title="${escapeHtml(display)}" onclick="event.stopPropagation();showArtifactInfo('${jsStr(display)}')">${inner}</span></span>`;
+            const cls = variant ? 'slot-badges ' + variant : 'slot-badges';
+            return `<span class="${cls}"><span class="slot-badge" title="${escapeHtml(display)}" onclick="event.stopPropagation();showArtifactInfo('${jsStr(display)}')">${inner}</span></span>`;
         }
         // Mini-modal z pełnym opisem artefaktu (z badge'a i skądkolwiek).
         function showArtifactInfo(name) {
@@ -8542,8 +8568,9 @@
                                     <span class="defense-player-slot-title">${t('defense.slot')} ${idx + 1} · #${f.id}</span>
                                 </div>
                                 <div style="font-weight: 600; color: var(--accent-gold); font-size: 0.85rem;">${escapeHtml(f.name)}</div>
-                                ${renderDefenseMiniFormation(f.my, f.myPet)}
+                                ${renderDefenseMiniFormation(f.my, f.myPet, a.artifacts)}
                                 ${renderSpeedSection(a.id, f, a.speeds)}
+                                ${renderDefenseArtifactSection(a.id, f, a.artifacts)}
                                 <div class="defense-player-slot-meta">
                                     📅 ${t('defense.assignedAt')}: ${formatDate(a.assignedAt) || '—'}<br>
                                     🛠️ ${t('defense.formationCreatedAt')}: ${formatDate(f.createdAt) || '—'}
@@ -8679,6 +8706,60 @@
                 </div>`;
         }
 
+        // ─── Artefakty per assignment (analogicznie do speeds — zależą od gracza, nie od składu) ───
+
+        // Zapisuje tablicę artefaktów [8] (nazwy, '' = brak) lub null na assignmencie. Indeks = slot my[0..7], pet pominięty.
+        async function setAssignmentArtifacts(assignmentId, artifacts) {
+            if (!isAdmin) return;
+            const a = allDefenseAssignments.find(x => x.id === assignmentId);
+            if (!a) return;
+            try {
+                await defenseAssignmentsRef.child(String(assignmentId)).update({ artifacts });
+                showToast('🗡️ ' + t('defense.artifactSaved'));
+            } catch (e) {
+                showToast(t('common.error') + ': ' + e.message, true);
+            }
+        }
+
+        // Klik kwadracika w slocie przypięcia → picker filtrowany klasą bohatera; zapis natychmiastowy (listener rerenderuje).
+        function pickDefenseArtifact(assignmentId, slotIndex) {
+            if (!isAdmin) return;
+            const a = allDefenseAssignments.find(x => x.id === assignmentId);
+            if (!a) return;
+            const f = getDefenseFormation(a.formationId);
+            if (!f) return;
+            const hero = f.my[slotIndex];
+            if (!hero) return;
+            const cur = Array.isArray(a.artifacts) ? a.artifacts[slotIndex] : '';
+            openArtifactPickerFor(hero, cur, async name => {
+                // Świeży stan przypięcia (listener mógł zmienić dane) → 8-tablica, pomijamy sloty bez bohatera, podmieniamy wybrany.
+                const cur2 = allDefenseAssignments.find(x => x.id === assignmentId);
+                const src = cur2 && cur2.artifacts;
+                const arr = new Array(8).fill('');
+                for (let i = 0; i < 8; i++) { const v = src && src[i]; if (v && f.my[i]) arr[i] = v; }
+                const art = name ? findArtifact(name) : null;
+                arr[slotIndex] = art ? art.name : '';
+                await setAssignmentArtifacts(assignmentId, arr.every(x => !x) ? null : arr);
+            });
+        }
+
+        // Pasek edycji: dla każdego bohatera składu kwadracik (ikonka artefaktu / „+") otwierający picker.
+        function renderDefenseArtifactSection(assignmentId, formation, artifacts) {
+            const btns = formation.my.map((h, i) => {
+                if (!h) return '';
+                const nm = artifacts && artifacts[i];
+                const art = nm ? findArtifact(nm) : null;
+                const hero = findHero(h);
+                const rc = hero ? `race-${hero.race.toLowerCase()}` : '';
+                const inner = art
+                    ? (art.iconUrl ? `<img src="${escapeHtml(art.iconUrl)}" alt="">` : (ARTIFACT_CLASS_ICON[art.klass] || '🗡️'))
+                    : '+';
+                return `<button type="button" class="defense-art-btn${art ? ' set' : ''}" title="${escapeHtml(h)}${art ? ' — ' + escapeHtml(art.name) : ''}" onclick="pickDefenseArtifact(${assignmentId}, ${i})"><span class="defense-art-hero ${rc}">${escapeHtml(h)}</span><span class="defense-art-ico">${inner}</span></button>`;
+            }).join('');
+            if (!btns) return '';
+            return `<div class="defense-art-section"><span class="defense-art-label">🗡️ ${t('defense.artifactsLabel')}</span><div class="defense-art-btns">${btns}</div></div>`;
+        }
+
 
         // ─── Helpery ─────────────────────────────────────────────
 
@@ -8687,13 +8768,13 @@
         }
 
         // Mini-grid składu obronnego (3-2-3 + pet) — kompaktowa wizualizacja do listy i kafelków gracza.
-        function renderDefenseMiniFormation(my, pet) {
+        function renderDefenseMiniFormation(my, pet, arts) {
             const slot = i => {
                 const name = my[i] || '';
                 if (!name) return `<div class="defense-mini-slot empty"></div>`;
                 const hero = findHero(name);
                 const rc = hero ? `race-${hero.race.toLowerCase()}` : '';
-                return `<div class="defense-mini-slot slot-clickable" onclick="event.stopPropagation();showHeroSkills('${jsStr(name)}')"><span class="${rc}">${escapeHtml(name)}</span></div>`;
+                return `<div class="defense-mini-slot slot-clickable" onclick="event.stopPropagation();showHeroSkills('${jsStr(name)}')"><span class="${rc}">${escapeHtml(name)}</span>${artifactSlotBadge(arts && arts[i], 'corner')}</div>`;
             };
             const petHtml = pet
                 ? `<div class="defense-mini-pet slot-clickable" onclick="event.stopPropagation();showPetSkills('${jsStr(pet)}')">🐾 ${escapeHtml(pet)}</div>`
@@ -9687,6 +9768,7 @@
 				</div>
 			`;
 			
+			requestAnimationFrame(() => equalizeArtSlots($('dup-preview-content')));
 			$('duplicate-preview-modal').classList.remove('hidden');
 		}
 
