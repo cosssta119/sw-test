@@ -3153,6 +3153,18 @@
 		}
 		.slot-badge img { width: 100%; height: 100%; object-fit: cover; }
 
+		/* Rozmiar kafelków Artefaktów (S/M/L jak w Bohaterach) */
+		#artifacts-grid.tiles-small .artifact-cards { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+		#artifacts-grid.tiles-small .artifact-card { padding: 8px; }
+		#artifacts-grid.tiles-small .artifact-ico { width: 30px; height: 30px; flex-basis: 30px; }
+		#artifacts-grid.tiles-small .book-card-desc, #artifacts-grid.tiles-small .artifact-bonuses { font-size: 0.68rem; }
+		#artifacts-grid.tiles-large .artifact-cards { grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 12px; }
+		#artifacts-grid.tiles-large .artifact-ico { width: 64px; height: 64px; flex-basis: 64px; }
+		#artifacts-grid.tiles-large .book-card-desc, #artifacts-grid.tiles-large .artifact-bonuses { font-size: 0.82rem; }
+
+		/* Obrazkowa ikonka folderu artefaktu w Galerii (zamiast emoji) */
+		.screen-folder-ico-img { width: 1.15em; height: 1.15em; object-fit: cover; border-radius: 6px; vertical-align: -0.18em; }
+
 		/* ═══ 21c. SCREENS TAB (Galeria) ═══ */
 		.screens-breadcrumb {
 			display: flex; flex-wrap: wrap; align-items: center; gap: 4px;

@@ -805,6 +805,11 @@
                     <input type="text" id="artifacts-search" class="heroes-search" data-i18n-placeholder="artifacts.searchPlaceholder" placeholder="🔍 Szukaj: stun · klasa:tank · skill:energy · -dot" oninput="setArtifactsSearch(this.value)">
                     <button id="artifacts-clear" class="heroes-help-toggle" onclick="clearArtifactsSearch()" data-i18n-title="book.clearSearch" title="Wyczyść" style="display:none;">✕</button>
                     <button id="artifacts-help-toggle" class="heroes-help-toggle" onclick="toggleArtifactsHelp()" data-i18n-title="book.helpHint" title="Zaawansowane wyszukiwanie">❔</button>
+                    <span class="heroes-tile-switch">
+                        <button id="artifacts-tile-small" class="heroes-tile-btn" onclick="setArtifactsTile('small')" data-i18n-title="heroes.tileSmall" title="Małe kafelki">▪</button>
+                        <button id="artifacts-tile-normal" class="heroes-tile-btn active" onclick="setArtifactsTile('normal')" data-i18n-title="heroes.tileNormal" title="Średnie kafelki">◼</button>
+                        <button id="artifacts-tile-large" class="heroes-tile-btn" onclick="setArtifactsTile('large')" data-i18n-title="heroes.tileLarge" title="Duże kafelki">⬛</button>
+                    </span>
                 </div>
                 <div id="artifacts-search-help"></div>
                 <div class="heroes-synonyms" id="artifacts-synonyms"></div>

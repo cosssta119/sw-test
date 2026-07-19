@@ -853,6 +853,7 @@
 					if (input.id.startsWith('add-') && !['add-name', 'add-comment'].includes(input.id)) {
 						setValidation(input, true);
 					}
+					syncArtifactSlotBtn(input.id); // wybór z autocomplete nie odpala 'input' — kwadracik artefaktu (add/edit)
 					updateAddFormTagsSelection();
 					updateSearchTagsSelection();
 					updateWarTagsSelection();
@@ -3173,8 +3174,11 @@
             document.querySelectorAll('#add-form-tags-container .quick-tag').forEach(tag => {
                 tag.classList.toggle('selected', activeValues.includes(tag.textContent.toLowerCase()));
             });
-            
+
             updateAddFormCounter();
+            // Kwadraciki artefaktów: tagi/autocomplete wpisują .value BEZ eventu 'input',
+            // a ta funkcja jest wołana po każdej takiej zmianie — synchronizujemy tu.
+            syncAllArtifactSlotBtns('add-');
         }
 
         function updateAddFormCounter() {
@@ -5692,6 +5696,7 @@
         let allArtifacts = []; // cache /artifacts (live); pusty = fallback DEFAULT_ARTIFACTS
         let artifactsSearchQuery = '', artifactsFilterClasses = new Set();
         let artifactsHelpOpen = storage.getBool('souls_artifacts_help', false);
+        let artifactsTile = storage.getJson('souls_artifacts_tile', 'normal'); // rozmiar kafelków: small|normal|large
         let editingArtifactId = null; // slug artefaktu w modalu edycji (null = dodawanie)
         if (heroesMode !== 'book') heroesMode = 'heroes';
         let bookSearchQuery = '', bookFilterBooks = new Set(); // filtr ksiąg (pusty = wszystkie)
@@ -5996,15 +6001,20 @@
             name: 'name', nazwa: 'name', role: 'meta', rola: 'meta', stat: 'meta'
         };
         // Rozbij skille bohatera na bloki { field, text } — dopasowanie leci PER BLOK (słowa muszą trafić w JEDEN skill).
+        // ŚWIADOMIE bez NAZW skilli (active/passive/awaken/exclusive) — szukamy w TREŚCI + po nazwie bohatera;
+        // fantazyjne nazwy skilli ("Eternal Pain" itp.) dawały fałszywe trafienia.
         function heroSkillBlocks(name, s) {
             const b = [];
             if (name) b.push({ field: 'name', text: String(name) });
             if (s) {
-                if (s.active) b.push({ field: 'active', text: `${s.active.name || ''} ${s.active.desc || ''}` });
-                (s.passives || []).forEach(x => b.push({ field: 'passive', text: `${x.name || ''} ${x.desc || ''}` }));
-                if (s.awaken) b.push({ field: 'awaken', text: `${s.awaken.name || ''} ${s.awaken.desc || ''}` });
+                if (s.active && s.active.desc) b.push({ field: 'active', text: String(s.active.desc) });
+                (s.passives || []).forEach(x => x.desc && b.push({ field: 'passive', text: String(x.desc) }));
+                if (s.awaken && s.awaken.desc) b.push({ field: 'awaken', text: String(s.awaken.desc) });
                 if (s.engraving) Object.values(s.engraving).forEach(v => v && b.push({ field: 'engraving', text: String(v) }));
-                if (s.exclusive) b.push({ field: 'exclusive', text: `${s.exclusive.name || ''} ${Object.values(exclusiveLevels(s.exclusive)).filter(Boolean).join(' ')}` });
+                if (s.exclusive) {
+                    const lv = Object.values(exclusiveLevels(s.exclusive)).filter(Boolean).join(' ');
+                    if (lv) b.push({ field: 'exclusive', text: lv });
+                }
                 const meta = [s.role, s.stat].filter(Boolean).join(' ');
                 if (meta) b.push({ field: 'meta', text: meta });
             }
@@ -6015,8 +6025,8 @@
             const b = [];
             if (name) b.push({ field: 'name', text: String(name) });
             if (s) {
-                if (s.active) b.push({ field: 'active', text: `${s.active.name || ''} ${s.active.desc || ''}` });
-                if (s.passive) b.push({ field: 'passive', text: `${s.passive.name || ''} ${s.passive.desc || ''}` });
+                if (s.active && s.active.desc) b.push({ field: 'active', text: String(s.active.desc) });
+                if (s.passive && s.passive.desc) b.push({ field: 'passive', text: String(s.passive.desc) });
                 if (s.energy) b.push({ field: 'energy', text: String(s.energy) });
             }
             b.forEach(x => x.lc = x.text.toLowerCase());
@@ -6777,7 +6787,7 @@
             { order: 31, name: 'Gloves of Resonance', klass: 'Support', rarity: 'Mythic', bonuses: ['Defense x 36.0%', 'Attack x 30.0%', 'CC Resistance 24.0%', 'Physical Resistance 18.0%'], skill: 'If the wearer is positioned in the front row, dodge rate and max HP increase by 25%, and when hit by an active or normal attack, all allies except the wearer gain 10 energy.' },
         ];
 
-        const ARTIFACT_CLASSES = ['Tank', 'Dealer', 'Support', 'Healer', 'any'];
+        const ARTIFACT_CLASSES = ['any', 'Tank', 'Dealer', 'Support', 'Healer']; // 'any' pierwsze — Uniwersalne na górze listy
         const ARTIFACT_CLASS_ICON = { Tank: '🛡️', Dealer: '🗡️', Support: '💠', Healer: '➕', any: '🌐' };
         const artifactClassLabel = k => k === 'any'
             ? `${ARTIFACT_CLASS_ICON.any} ${t('artifacts.classAny')}`
@@ -6833,7 +6843,13 @@
             ['skill:dot', 'szukaj tylko w opisie skilla'],
         ];
 
-        function renderArtifactsTab() { renderArtifactsHelp(); renderHeroesSynonyms(); renderArtifactsFilters(); renderArtifactsGrid(); syncArtifactsClearBtn(); }
+        function renderArtifactsTab() { applyArtifactsTile(); renderArtifactsHelp(); renderHeroesSynonyms(); renderArtifactsFilters(); renderArtifactsGrid(); syncArtifactsClearBtn(); }
+        function setArtifactsTile(v) { artifactsTile = v; storage.setJson('souls_artifacts_tile', v); applyArtifactsTile(); }
+        function applyArtifactsTile() {
+            const grid = $('artifacts-grid');
+            if (grid) grid.className = 'heroes-grid tiles-' + artifactsTile;
+            ['small', 'normal', 'large'].forEach(v => $('artifacts-tile-' + v)?.classList.toggle('active', artifactsTile === v));
+        }
         function syncArtifactsClearBtn() { const c = $('artifacts-clear'); if (c) c.style.display = artifactsSearchQuery ? '' : 'none'; }
         function setArtifactsSearch(v) { artifactsSearchQuery = v; syncArtifactsClearBtn(); renderArtifactsGrid(); }
         function setArtifactsExample(q) { const inp = $('artifacts-search'); if (inp) inp.value = q; setArtifactsSearch(q); }
@@ -9936,10 +9952,18 @@
             // ⭐ Ulubione (dla wszystkich, per-user) — ukryte w trybie zaznaczania.
             const favBtn = s => selecting ? '' : (on => `<button class="screen-fav${on ? ' on' : ''}" title="${t('screens.favTitle')}" onclick="event.stopPropagation(); toggleScreenFav('${jsStr(s.id)}')">${on ? '⭐' : '☆'}</button>`)(screenFavorites.includes(s.id));
             // Foldery zarządzane (bohaterów) — inna ikona (🦸 / ikona kategorii), bez drag i bez akcji edycji/usuwania.
-            const folderIcon = f => f.kind === 'heroCat' ? ((HERO_GALLERY_CATEGORIES.find(c => c.key === f.category) || {}).icon || '📁')
-                : (f.kind === 'hero' || f.kind === 'heroesRoot') ? '🦸'
-                : f.kind === 'kompendiumRoot' ? '🏛️'
-                : (f.kind === 'artifactsRoot' || f.kind === 'artifact') ? '🗡️' : '📁';
+            const folderIcon = f => {
+                // Folder artefaktu: prawdziwa ikonka z gry zamiast emoji (analogicznie kiedyś hero, gdy będą grafiki bohaterów)
+                if (f.kind === 'artifact') {
+                    const a = getArtifacts().find(x => artifactSlug(x.name) === f.artifactKey);
+                    if (a && a.iconUrl) return `<img class="screen-folder-ico-img" src="${escapeHtml(a.iconUrl)}" alt="" loading="lazy">`;
+                    return '🗡️';
+                }
+                return f.kind === 'heroCat' ? ((HERO_GALLERY_CATEGORIES.find(c => c.key === f.category) || {}).icon || '📁')
+                    : (f.kind === 'hero' || f.kind === 'heroesRoot') ? '🦸'
+                    : f.kind === 'kompendiumRoot' ? '🏛️'
+                    : f.kind === 'artifactsRoot' ? '🗡️' : '📁';
+            };
             const folderCard = (f, subLabel) => `<div class="screen-folder-card${f.managed ? ' managed' : ''}" data-kind="folder" data-id="${escapeHtml(f.id)}"${f.managed ? '' : dragA} onclick="screenCardClick('folder','${jsStr(f.id)}',event)">
                     ${f.managed ? `<div class="screen-folder-lock" title="${escapeHtml(t('heroGallery.protected'))}">🔒</div>` : actions('folder', f.id)}
                     <div class="screen-folder-icon">${folderIcon(f)}</div>
