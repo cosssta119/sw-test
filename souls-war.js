@@ -6879,8 +6879,10 @@
                 `<button class="heroes-chip${artifactsFilterClasses.has(k) ? ' active' : ''}" onclick="toggleArtifactsClassFilter('${jsStr(k)}')">${artifactClassLabel(k)} (${counts[k]})</button>`).join('');
             if (artifactsFilterClasses.size) html += `<button class="heroes-chip heroes-chip-clear" onclick="clearArtifactsFilters()">✕ ${t('heroes.clearFilters')}</button>`;
             if (isAdmin) {
-                if (artifactsFromDb()) html += `<button class="heroes-chip book-admin-chip" onclick="openArtifactEdit(null)">➕ ${t('artifacts.addBtn')}</button>`;
-                else html += `<button class="heroes-chip book-admin-chip" onclick="openArtifactsSeed()">🏛️ ${t('artifacts.seedBtn')}</button>`;
+                if (artifactsFromDb()) {
+                    html += `<button class="heroes-chip book-admin-chip" onclick="openArtifactEdit(null)">➕ ${t('artifacts.addBtn')}</button>`;
+                    html += `<button class="heroes-chip book-admin-chip" onclick="openArtifactsIconsReimport()">🖼️ ${t('artifacts.reimportBtn')}</button>`;
+                } else html += `<button class="heroes-chip book-admin-chip" onclick="openArtifactsSeed()">🏛️ ${t('artifacts.seedBtn')}</button>`;
             }
             wrap.innerHTML = html;
         }
@@ -7028,6 +7030,39 @@
             ]);
             await ref.set({ id, folderId, url, storagePath: path, thumbUrl, thumbPath, size: fullBlob.size, title: name, comment: '', tags: [], uploadedAt: new Date().toISOString() });
             return { iconUrl: thumbUrl || url, iconPath: thumbUrl ? thumbPath : path };
+        }
+
+        // Wymiana ikonek istniejących artefaktów z plików "NN_nazwa.png" (dopasowanie numeru NN do pola order) —
+        // do naprawy pomylonych/zdublowanych grafik po seedzie. Stary screen-ikonka jest usuwany (wraz z plikami
+        // Storage), nowy wgrywany pipeline'em Galerii do folderu artefaktu; można podać podzbiór plików.
+        function openArtifactsIconsReimport() { $('artifacts-icons-input')?.click(); }
+        async function reimportArtifactIcons(event) {
+            const files = Array.from(event.target.files || []);
+            event.target.value = '';
+            if (!isAdmin || !artifactsRef || !artifactsFromDb()) return;
+            if (!files.length) return;
+            const byOrder = new Map();
+            files.forEach(f => { const m = /^(\d+)/.exec(f.name); if (m) byOrder.set(Number(m[1]), f); });
+            if (!byOrder.size) { showToast('⚠️ ' + t('artifacts.reimportNoMatch'), true); return; }
+            if (!confirm(t('artifacts.reimportConfirm', { n: byOrder.size }))) return;
+            const cnt = $('artifacts-count');
+            let done = 0; const missed = [];
+            try {
+                await ensureScreensLoaded();
+                for (const [ord, file] of byOrder) {
+                    const a = getArtifacts().find(x => x.order === ord);
+                    if (!a) { missed.push(file.name); continue; }
+                    const oldShot = allScreenshots.find(s => a.iconPath && (s.thumbPath === a.iconPath || s.storagePath === a.iconPath));
+                    const up = await uploadArtifactIcon(file, a.name, a.id);
+                    await artifactsRef.child(a.id).update({ iconUrl: up.iconUrl, iconPath: up.iconPath });
+                    if (oldShot) { try { await deleteScreenStorageFiles(oldShot); await screenshotsRef.child(oldShot.id).remove(); } catch (e) {} }
+                    done++;
+                    if (cnt) cnt.textContent = t('artifacts.uploading', { done, n: byOrder.size });
+                }
+                showToast('✅ ' + t('artifacts.reimportDone', { n: done }));
+                if (missed.length) showToast('⚠️ ' + t('artifacts.reimportSkipped', { list: missed.slice(0, 5).join(', ') }), true);
+            } catch (e) { showToast(t('common.error') + ': ' + e.message, true); }
+            renderArtifactsTab();
         }
 
         // Jednorazowy seed (guzik znika po użyciu — widoczny tylko gdy /artifacts puste): buduje strukturę
