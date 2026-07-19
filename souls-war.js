@@ -4871,7 +4871,7 @@
 										${renderWarPetComparison(f.enemyPet, searchedEnemy.pet, 'database')}
 									</div>
 									<div class="compact-grid">
-										${renderWarDatabaseGrid(f.enemy, analysis, searchedEnemy.heroesRaw, f.enemyArtifacts)}
+										${renderWarDatabaseGrid(f.enemy, analysis, searchedEnemy.heroesRaw, f.enemyArtifacts, f.enemyRunes)}
 									</div>
 								</div>
 							</div>
@@ -4884,7 +4884,7 @@
 
 							<!-- Twój skład z konfliktami - ładniejszy -->
 							<div class="war-your-team-section">
-								${renderWarMyTeamGrid(f.my, conflictHeroes, f.myArtifacts)}
+								${renderWarMyTeamGrid(f.my, conflictHeroes, f.myArtifacts, f.myRunes)}
 								<div style="text-align: center;">
 									${renderWarMyTeamPet(f.myPet, conflictPets)}
 								</div>
@@ -5069,7 +5069,8 @@
 		}
 
 		// Renderuj siatkę wroga z bazy
-		function renderWarDatabaseGrid(heroesArr, analysis, otherArr, arts) {
+		function warBadgeCls(art, rune) { return (art && rune) ? ' badges2' : (art || rune) ? ' has-art' : ''; }
+		function renderWarDatabaseGrid(heroesArr, analysis, otherArr, arts, runes) {
 			const slot = (idx) => {
 				const name = heroesArr[idx] || '';
 				if (!name) return `<div class="compact-slot empty">—</div>`;
@@ -5090,7 +5091,7 @@
 				if (isExtra) classes += ' war-extra';
 
 				const artName = arts && arts[idx];
-				return `<div class="${classes}${artName ? ' has-art' : ''} slot-clickable" onclick="event.stopPropagation();showHeroSkills('${jsStr(name)}')">${escapeHtml(name)}${artifactSlotBadge(artName, 'dock')}</div>`;
+				return `<div class="${classes}${warBadgeCls(artName, runes && runes[idx])} slot-clickable" onclick="event.stopPropagation();showHeroSkills('${jsStr(name)}')">${escapeHtml(name)}${slotBadges(runes && runes[idx], artName, 'dock')}</div>`;
 			};
 
 			return `
@@ -5101,7 +5102,7 @@
 		}
 
 		// Renderuj siatkę "Twój skład" - większa i z kolorami ras
-		function renderWarMyTeamGrid(heroesArr, conflictSet, arts) {
+		function renderWarMyTeamGrid(heroesArr, conflictSet, arts, runes) {
 			const slot = (idx) => {
 				const name = heroesArr[idx] || '';
 				if (!name) return `<div class="war-your-team-slot empty">—</div>`;
@@ -5117,7 +5118,7 @@
 				if (isConflict) classes += ' conflict';
 
 				const artName = arts && arts[idx];
-			return `<div class="${classes}${artName ? ' has-art' : ''} slot-clickable" onclick="event.stopPropagation();showHeroSkills('${jsStr(name)}')">${escapeHtml(name)}${artifactSlotBadge(artName, 'dock')}</div>`;
+			return `<div class="${classes}${warBadgeCls(artName, runes && runes[idx])} slot-clickable" onclick="event.stopPropagation();showHeroSkills('${jsStr(name)}')">${escapeHtml(name)}${slotBadges(runes && runes[idx], artName, 'dock')}</div>`;
 			};
 
 			return `

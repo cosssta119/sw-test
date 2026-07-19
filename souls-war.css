@@ -3224,6 +3224,8 @@
 		.slot-badges.dock .slot-badge { width: 22px; height: 22px; border-radius: 6px; border-width: 1px; font-size: 0.8rem; }
 		.compact-slot.has-art { padding-right: 27px; }
 		.war-your-team-slot.has-art { padding-right: 30px; }
+		.compact-slot.badges2 { padding-right: 50px; }
+		.war-your-team-slot.badges2 { padding-right: 52px; }
 
 		/* ═══ Runy ═══ */
 		.rune-badge img { width: 100%; height: 100%; object-fit: cover; }
