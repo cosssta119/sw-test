@@ -7271,6 +7271,175 @@
         }
         function closeArtifactInfo() { $('artifact-info-modal')?.classList.remove('show'); }
 
+        // ═══════════════════════════════════════════════════════════
+        // GLOBAL SEARCH — „szukaj wszędzie" (Ctrl+K / 🔎)
+        // Reużywa istniejące matchery i cache'e w pamięci; zero backendu, zero reguł Firebase.
+        // ═══════════════════════════════════════════════════════════
+        let gsearchQuery = '', gsearchLastQuery = '';
+        let gsearchFlat = [];   // płaska lista go-deskryptorów [type, key] — dla klawiatury/klików
+        let gsearchSel = -1;
+        let gsExpand = {};      // type -> sekcja rozwinięta (po „pokaż więcej")
+        let gsearchTimer = null;
+        const GS_PER = 6, GS_MAX = 40;
+
+        function isGlobalSearchOpen() { const m = $('global-search-modal'); return !!m && !m.classList.contains('hidden'); }
+        function openGlobalSearch() {
+            const m = $('global-search-modal'); if (!m) return;
+            m.classList.remove('hidden');
+            gsExpand = {};
+            const inp = $('global-search-input'); if (inp) inp.value = '';
+            gsearchQuery = '';
+            runGlobalSearch();
+            setTimeout(() => inp && inp.focus(), 30);
+            // Leniwe doładowania (nie blokują otwarcia) — po każdym re-run przeliczamy wyniki.
+            if (!heroSkillsLoaded) loadHeroSkills().then(() => { if (isGlobalSearchOpen()) runGlobalSearch(); }).catch(() => {});
+            if (!petSkillsLoaded) loadPetSkills().then(() => { if (isGlobalSearchOpen()) runGlobalSearch(); }).catch(() => {});
+            if (typeof canSeeGallery === 'function' && canSeeGallery() && typeof ensureScreensLoaded === 'function') {
+                ensureScreensLoaded().then(() => { if (isGlobalSearchOpen()) runGlobalSearch(); }).catch(() => {});
+            }
+        }
+        function closeGlobalSearch() { $('global-search-modal')?.classList.add('hidden'); }
+        function gsearchInput(v) { gsearchQuery = v; clearTimeout(gsearchTimer); gsearchTimer = setTimeout(runGlobalSearch, 150); }
+
+        function gsTokens(q) { return q.toLowerCase().split(/\s+/).filter(Boolean); }
+        function gsHay(hay, toks) { return toks.every(tk => hay.includes(tk)); }
+        function gsTrunc(s, n) { s = String(s || ''); return s.length > n ? s.slice(0, n) + '…' : s; }
+
+        function runGlobalSearch() {
+            const box = $('global-search-results'); if (!box) return;
+            const inp = $('global-search-input');
+            const q = (inp ? inp.value : gsearchQuery).trim();
+            gsearchQuery = q; gsearchLastQuery = q;
+            if (!q) { gsearchFlat = []; gsearchSel = -1; box.innerHTML = `<div class="gs-empty">${escapeHtml(t('search.hint'))}</div>`; return; }
+            const toks = gsTokens(q);
+            const groups = [];
+
+            // ⚔️ Formacje — bohaterowie/pet/nazwa/komentarz/#id
+            const idMatch = q.match(/^#?(\d+)$/);
+            const fSeen = new Set(), fItems = [];
+            for (const f of allFormations) {
+                const hay = ('#' + f.id + ' ' + (f.name || '') + ' ' + (f.my || []).join(' ') + ' ' + (f.enemy || []).join(' ') + ' ' + (f.myPet || '') + ' ' + (f.enemyPet || '') + ' ' + (f.comment || '')).toLowerCase();
+                if (((idMatch && f.id === Number(idMatch[1])) || gsHay(hay, toks)) && !fSeen.has(f.id)) {
+                    fSeen.add(f.id);
+                    const my = (f.my || []).filter(Boolean).join(', '), en = (f.enemy || []).filter(Boolean).join(', ');
+                    fItems.push({ go: ['formation', f.id], html: `<span class="gs-id">#${f.id}</span> <b>${escapeHtml(f.name || '')}</b> <span class="gs-dim">${escapeHtml(gsTrunc(my, 40))} <i class="gs-vs">vs</i> ${escapeHtml(gsTrunc(en, 40))}</span>` });
+                }
+            }
+            groups.push({ type: 'formation', icon: '⚔️', label: 'search.secFormations', items: fItems });
+
+            // 🦸 Bohaterowie + pety — pełny mini-język skilli (parseHeroQuery)
+            const parsedH = parseHeroQuery(q);
+            const hItems = [];
+            if (!parsedH.empty) {
+                for (const h of heroes) {
+                    const m = matchBlocks(heroSkillBlocks(h.name, getHeroSkills(h.name)), parsedH);
+                    if (m.ok) {
+                        const snip = m.block ? ` <span class="gs-snip">${highlightHTML(gsTrunc(m.block.text, 90), parsedH.terms)}</span>` : '';
+                        hItems.push({ go: ['hero', h.name], html: `<b class="race-${h.race.toLowerCase()}">${escapeHtml(h.name)}</b> <span class="gs-dim">${escapeHtml(raceLabel(h.race))}</span>${snip}` });
+                    }
+                }
+                for (const p of pets) {
+                    const nm = getPetName(p);
+                    const m = matchBlocks(petSkillBlocks(nm, getPetSkills(nm)), parsedH);
+                    if (m.ok) {
+                        const snip = m.block ? ` <span class="gs-snip">${highlightHTML(gsTrunc(m.block.text, 90), parsedH.terms)}</span>` : '';
+                        hItems.push({ go: ['pet', nm], html: `<b>🐾 ${escapeHtml(nm)}</b>${snip}` });
+                    }
+                }
+            }
+            groups.push({ type: 'hero', icon: '🦸', label: 'search.secHeroes', items: hItems });
+
+            // 📖 Bonusy Księgi
+            const parsedB = parseBookQuery(q);
+            const bItems = [];
+            if (!parsedB.empty) for (const b of getBookBonuses()) if (bookMatches(b, parsedB)) bItems.push({ go: ['book', b.name], html: `<b>${escSkill(b.name)}</b> <span class="gs-dim">${escSkill((bookMeta(b.book) || {}).label || b.book || '')}</span>` });
+            groups.push({ type: 'book', icon: '📖', label: 'search.secBook', items: bItems });
+
+            // 🗡️ Artefakty
+            const parsedA = parseBookQuery(q, ARTIFACT_FIELD_ALIAS);
+            const aItems = [];
+            if (!parsedA.empty) for (const a of getArtifacts()) if (bookMatches(a, parsedA)) aItems.push({ go: ['artifact', a.name], html: `<b>${escSkill(a.name)}</b> <span class="gs-dim">${escapeHtml(artifactClassLabel(a.klass))}</span>` });
+            groups.push({ type: 'artifact', icon: '🗡️', label: 'search.secArtifacts', items: aItems });
+
+            // 🛡️ Obrona (składy + gracze) — tylko admin
+            if (isAdmin) {
+                const parsedD = parseDefenseQuery(q);
+                const dItems = [];
+                if (!parsedD.empty) for (const f of allDefenseFormations) if (matchDefenseQuery(f, parsedD)) {
+                    const my = (f.my || []).filter(Boolean).join(', ');
+                    dItems.push({ go: ['defense', f.id], html: `<span class="gs-id">#${f.id}</span> <b>${escapeHtml(f.name || '')}</b> <span class="gs-dim">${escapeHtml(gsTrunc(my, 46))}</span>` });
+                }
+                groups.push({ type: 'defense', icon: '🛡️', label: 'search.secDefense', items: dItems });
+
+                const pItems = [];
+                for (const p of allDefensePlayers) if (!p.deletedAt && gsHay((p.name || '').toLowerCase(), toks)) pItems.push({ go: ['player', p.id], html: `<b>👤 ${escapeHtml(p.name)}</b>` });
+                groups.push({ type: 'player', icon: '👤', label: 'search.secPlayers', items: pItems });
+            }
+
+            // 🖼️ Screeny — tylko gdy Galeria widoczna (lazy-load pociągnięty przy otwarciu)
+            if (typeof canSeeGallery === 'function' && canSeeGallery()) {
+                const sItems = [];
+                for (const s of allScreenshots) {
+                    const hay = ((s.title || '') + ' ' + (s.comment || '') + ' ' + ((s.tags || []).join(' '))).toLowerCase();
+                    if (gsHay(hay, toks)) sItems.push({ go: ['screen', s.id], html: `<b>🖼️ ${escapeHtml(s.title || '—')}</b> <span class="gs-dim">${escapeHtml(gsTrunc((s.tags || []).join(', '), 40))}</span>` });
+                }
+                groups.push({ type: 'screen', icon: '🖼️', label: 'search.secScreens', items: sItems });
+            }
+
+            renderGlobalSearchResults(groups, q);
+        }
+
+        function renderGlobalSearchResults(groups, q) {
+            const box = $('global-search-results');
+            gsearchFlat = [];
+            const total = groups.reduce((s, g) => s + g.items.length, 0);
+            if (!total) { box.innerHTML = `<div class="gs-empty">${escapeHtml(t('search.noResults'))} „${escapeHtml(gsTrunc(q, 40))}"</div>`; gsearchSel = -1; return; }
+            let html = '';
+            for (const g of groups) {
+                if (!g.items.length) continue;
+                const shown = gsExpand[g.type] ? g.items.slice(0, GS_MAX) : g.items.slice(0, GS_PER);
+                html += `<div class="gs-group"><div class="gs-group-head">${g.icon} ${escapeHtml(t(g.label))} <span class="gs-count">${g.items.length}</span></div>`;
+                for (const it of shown) {
+                    const idx = gsearchFlat.length;
+                    gsearchFlat.push(it.go);
+                    html += `<div class="gs-row" data-idx="${idx}" onclick="gsearchActivate(${idx})" onmouseover="gsearchSetSel(${idx})">${it.html}<span class="gs-arrow">›</span></div>`;
+                }
+                if (g.items.length > shown.length) html += `<div class="gs-more" onclick="gsearchExpand('${g.type}')">… ${escapeHtml(t('search.showMore'))} (${g.items.length - shown.length})</div>`;
+                html += `</div>`;
+            }
+            box.innerHTML = html;
+            gsearchSel = gsearchFlat.length ? 0 : -1;
+            gsearchUpdateSel();
+        }
+
+        function gsearchExpand(type) { gsExpand[type] = true; runGlobalSearch(); }
+        function gsearchSetSel(idx) { gsearchSel = idx; gsearchUpdateSel(); }
+        function gsearchUpdateSel() {
+            const box = $('global-search-results'); if (!box) return;
+            box.querySelectorAll('.gs-row').forEach(r => r.classList.toggle('active', Number(r.dataset.idx) === gsearchSel));
+            box.querySelector('.gs-row.active')?.scrollIntoView({ block: 'nearest' });
+        }
+        function gsearchMove(delta) { if (gsearchFlat.length) { gsearchSel = (gsearchSel + delta + gsearchFlat.length) % gsearchFlat.length; gsearchUpdateSel(); } }
+        function gsearchActivate(idx) { const go = gsearchFlat[idx]; if (go) gsearchGo(go[0], go[1]); }
+        function gsearchKeydown(e) {
+            if (e.key === 'ArrowDown') { e.preventDefault(); gsearchMove(1); }
+            else if (e.key === 'ArrowUp') { e.preventDefault(); gsearchMove(-1); }
+            else if (e.key === 'Enter') { e.preventDefault(); if (gsearchSel >= 0) gsearchActivate(gsearchSel); }
+        }
+        function gsearchGo(type, key) {
+            closeGlobalSearch();
+            switch (type) {
+                case 'formation': showFormation(Number(key)); break;
+                case 'hero': showHeroSkills(key); break;
+                case 'pet': showPetSkills(key); break;
+                case 'book': switchTab('heroes'); setHeroesMode('book'); { const bi = $('book-search'); if (bi) bi.value = key; } setBookSearch(key); break;
+                case 'artifact': switchTab('heroes'); setHeroesMode('artifacts'); showArtifactInfo(key); break;
+                case 'defense': { switchTab('defense'); switchDefenseView('formations'); const di = $('defense-formation-search'); if (di) di.value = gsearchLastQuery; renderDefenseFormations(); break; }
+                case 'player': switchTab('defense'); switchDefenseView('player', Number(key)); break;
+                case 'screen': switchTab('screens'); openScreenLightbox(Number(key)); break;
+            }
+        }
+
         // Ile formacji używa artefaktu (my+enemy, po znormalizowanej nazwie) — licznik na kartach Kompendium.
         function artifactUsageMap() {
             const map = new Map();
@@ -11154,7 +11323,8 @@
 					// otwarty wg kolejności wierzchni→spodni (modal skilli bywa POD modalem edycji skilli).
 					// Wzorzec .modal: otwarty = brak 'hidden'; wzorzec .hsk-modal-bg/.diff-modal-bg: otwarty = 'show'.
 					const openModals = [
-						['quick-select-modal', 'hidden', closeQuickSelect],
+						['global-search-modal', 'hidden', closeGlobalSearch],
+							['quick-select-modal', 'hidden', closeQuickSelect],
 						['hero-skills-edit-modal', 'show', closeHeroSkillsEdit],
 						['pet-skills-edit-modal', 'show', closePetSkillsEdit],
 						['book-edit-modal', 'show', closeBookEdit],
@@ -11180,6 +11350,11 @@
 						if (isOpen) { close(); break; }
 					}
 				}
+			});
+
+			// Globalna szukajka: Ctrl+K / Cmd+K (poza polami tekstowymi też działa — przechwytujemy globalnie)
+			document.addEventListener('keydown', e => {
+				if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); isGlobalSearchOpen() ? closeGlobalSearch() : openGlobalSearch(); }
 			});
 
 			// Defense: Enter w polu nazwy gracza = dodaj

@@ -69,6 +69,7 @@
             </div>
         </div>
 		<div class="header-controls">
+			<button class="hbtn-search" id="global-search-btn" onclick="openGlobalSearch()" title="Szukaj wszędzie (Ctrl+K)" aria-label="Szukaj wszędzie">🔎</button>
 			<div class="lang-switcher">
 				<button class="lang-btn active" onclick="setLanguage('pl')" title="Polski">🇵🇱</button>
 				<button class="lang-btn" onclick="setLanguage('en')" title="English">🇬🇧</button>
@@ -80,7 +81,20 @@
 			</div>
 		</div>
     </header>
-	
+
+	<!-- ═══ Globalna szukajka „szukaj wszędzie" (Ctrl+K) ═══ -->
+	<div id="global-search-modal" class="gsearch-bg hidden" onclick="if(event.target===this)closeGlobalSearch()">
+		<div class="gsearch-box">
+			<div class="gsearch-input-row">
+				<span class="gsearch-ico">🔎</span>
+				<input type="text" id="global-search-input" autocomplete="off" oninput="gsearchInput(this.value)" onkeydown="gsearchKeydown(event)" data-i18n-placeholder="search.placeholder" placeholder="Szukaj wszędzie: bohater, #id, skill, bonus, gracz…">
+				<button class="gsearch-close" onclick="closeGlobalSearch()" aria-label="Zamknij">✕</button>
+			</div>
+			<div id="global-search-results" class="gsearch-results"></div>
+			<div class="gsearch-foot"><span>↑↓ · ↵ · Esc</span><span data-i18n="search.footHint">Formacje · Bohaterowie · Bonusy · Artefakty · Obrona · Screeny</span></div>
+		</div>
+	</div>
+
 	<!-- Globalna sekcja wykluczonych bohaterów -->
 	<div class="excluded-section" id="excluded-section" style="display: none;">
 		<div class="excluded-header" onclick="toggleExcludedSection()">
