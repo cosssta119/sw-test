@@ -1353,6 +1353,34 @@
                 <label class="hse-field"><span data-i18n="book.fieldName">Nazwa</span><input id="be-name" class="hse-input"></label>
                 <label class="hse-field"><span data-i18n="book.fieldDesc">Opis / efekt</span><textarea id="be-desc" class="hse-textarea" oninput="autoSizeTextarea(this)"></textarea></label>
             </div>
+            <details class="be-calc">
+                <summary>⚙️ <span data-i18n="bookcalc.calcSection">Obliczenia (dla widżetu „Bonusy Księgi")</span></summary>
+                <div class="hse-form be-calc-fields">
+                    <label class="hse-field"><span data-i18n="bookcalc.fieldKind">Komu / typ</span>
+                        <select id="be-calc-kind" class="hse-input" onchange="bookCalcSync()"></select></label>
+                    <label class="hse-field" id="bcw-race"><span data-i18n="bookcalc.fieldRace">Rasa</span>
+                        <select id="be-calc-race" class="hse-input"></select></label>
+                    <label class="hse-field" id="bcw-row"><span data-i18n="bookcalc.fieldRow">Rząd</span>
+                        <select id="be-calc-row" class="hse-input"></select></label>
+                    <label class="hse-field" id="bcw-stat"><span data-i18n="bookcalc.fieldStat">Statystyka</span>
+                        <select id="be-calc-stat" class="hse-input"></select></label>
+                    <div class="hse-row2">
+                        <label class="hse-field" id="bcw-value"><span data-i18n="bookcalc.fieldValue">Wartość</span>
+                            <input id="be-calc-value" class="hse-input" type="number" step="0.5" placeholder="np. 15 lub -10"></label>
+                        <label class="hse-field" id="bcw-flat"><span data-i18n="bookcalc.fieldType">Typ wartości</span>
+                            <select id="be-calc-flat" class="hse-input"></select></label>
+                    </div>
+                    <label class="hse-field" id="bcw-dynamic"><span data-i18n="bookcalc.fieldDynamic">Charakter</span>
+                        <select id="be-calc-dynamic" class="hse-input" onchange="bookCalcSync()"></select></label>
+                    <div class="hse-row2">
+                        <label class="hse-field" id="bcw-stackmax"><span data-i18n="bookcalc.fieldStackMax">Maks. stacków</span>
+                            <input id="be-calc-stackmax" class="hse-input" type="number" min="1" step="1" placeholder="np. 4"></label>
+                        <label class="hse-field" id="bcw-trig"><span data-i18n="bookcalc.fieldTrig">Wyzwalacz</span>
+                            <select id="be-calc-trig" class="hse-input"></select></label>
+                    </div>
+                    <div class="be-calc-hint" data-i18n="bookcalc.calcHint">Zostaw „— nie liczony —", jeśli bonus nie ma być liczony w widżecie pod składem.</div>
+                </div>
+            </details>
             <div class="hse-actions">
                 <button class="btn btn-secondary" onclick="closeBookEdit()" data-i18n="common.cancel">Anuluj</button>
                 <button class="btn btn-success" onclick="saveBookEdit()" data-i18n="common.save">Zapisz</button>

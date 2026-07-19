@@ -3118,6 +3118,10 @@
 		.hse-field { flex: 1; display: flex; flex-direction: column; gap: 4px; font-size: 0.72rem; color: var(--text-muted); }
 		.hse-input, .hse-textarea { width: 100%; padding: 7px 9px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-light); font-size: 0.82rem; font-family: inherit; }
 		.hse-input:focus, .hse-textarea:focus { outline: none; border-color: var(--accent-gold); }
+		.be-calc { margin: 4px 0 2px; border-top: 1px solid var(--border); padding-top: 6px; }
+		.be-calc > summary { cursor: pointer; color: var(--accent-gold); font-size: 0.82rem; padding: 4px 0; user-select: none; }
+		.be-calc-fields { margin-top: 8px; }
+		.be-calc-hint { font-size: 0.7rem; color: var(--text-muted); margin-top: 2px; }
 		.hse-textarea { min-height: 52px; resize: vertical; line-height: 1.4; }
 		.hse-group { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
 		.hse-group legend { font-size: 0.78rem; color: var(--accent-gold); padding: 0 6px; }

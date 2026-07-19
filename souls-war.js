@@ -6499,6 +6499,86 @@
         });
 
         // ─── Księga: edycja admina (Firebase /bookBonuses) ───
+        // ── Pola obliczeniowe bonusu (calc) — dropdowny + 2 pola liczbowe; zasilają widżet „Bonusy Księgi" ──
+        const BOOK_CALC_KINDS = [
+            { v: '', k: 'bookcalc.kindNone' },
+            { v: 'perRace', k: 'bookcalc.kindPerRace' },
+            { v: 'always', k: 'bookcalc.kindAlways' },
+            { v: 'raceOwn', k: 'bookcalc.kindRaceOwn' },
+            { v: 'row', k: 'bookcalc.kindRow' },
+            { v: 'pve', k: 'bookcalc.kindPve' },
+        ];
+        const BOOK_CALC_RACE_OPTS = ['Human', 'Fire', 'Elf', 'Undead', 'Light', 'Dark', 'Light+Dark'];
+        const BOOK_CALC_STAT_OPTS = ['ATK', 'DEF', 'HP', 'Crit Rate', 'Crit Damage', 'Critical Defense', 'Accuracy', 'Dodge Rate', 'Penetration', 'Physical Damage', 'Magic Damage', 'Physical Resistance', 'Magic Resistance', 'Lifesteal Rate', 'Damage Taken', 'Energy/round'];
+        const BOOK_CALC_TRIG_OPTS = ['bookcalc.trigActive', 'bookcalc.trigEnemyDeath', 'bookcalc.trigAllyDeath', 'bookcalc.trigAnyDeath', 'bookcalc.trigRound', 'bookcalc.trig2Rounds', 'bookcalc.trigHp50', 'bookcalc.trigDecay'];
+
+        function bookFillSel(id, opts, cur) {
+            const el = $(id); if (!el) return;
+            const list = opts.slice();
+            if (cur && !list.some(o => o.v === cur)) list.unshift({ v: cur, label: cur }); // zachowaj nietypową bieżącą wartość (np. PL stat)
+            el.innerHTML = list.map(o => `<option value="${escapeHtml(o.v)}"${o.v === cur ? ' selected' : ''}>${escapeHtml(o.label)}</option>`).join('');
+            el.value = cur;
+        }
+        function bookCalcShow(id, on) { const el = $(id); if (el) el.style.display = on ? '' : 'none'; }
+        function bookCalcSync() {
+            const k = $('be-calc-kind')?.value || '';
+            const compute = !!k && k !== 'pve';
+            bookCalcShow('bcw-race', k === 'perRace' || k === 'raceOwn');
+            bookCalcShow('bcw-row', k === 'row');
+            bookCalcShow('bcw-stat', compute);
+            bookCalcShow('bcw-value', compute);
+            bookCalcShow('bcw-flat', compute);
+            bookCalcShow('bcw-dynamic', compute);
+            const dyn = compute && $('be-calc-dynamic')?.value === '1';
+            bookCalcShow('bcw-stackmax', dyn);
+            bookCalcShow('bcw-trig', dyn);
+        }
+        function bookFillCalc(c) {
+            c = c || {};
+            const kind = c.pve ? 'pve' : (c.kind || '');
+            bookFillSel('be-calc-kind', BOOK_CALC_KINDS.map(x => ({ v: x.v, label: t(x.k) })), kind);
+            const raceCur = Array.isArray(c.race) ? c.race.join('+') : (c.race || '');
+            bookFillSel('be-calc-race', [{ v: '', label: '—' }].concat(BOOK_CALC_RACE_OPTS.map(r => ({ v: r, label: r === 'Light+Dark' ? t('bookcalc.comboLightDark') : raceLabel(r) }))), raceCur);
+            const rowCur = c.needRow1 ? 'needRow1' : (c.row != null ? String(c.row) : '');
+            bookFillSel('be-calc-row', [{ v: '', label: '—' }, { v: '1', label: t('bookcalc.row1') }, { v: '2', label: t('bookcalc.row2') }, { v: '3', label: t('bookcalc.row3') }, { v: 'needRow1', label: t('bookcalc.rowNeed1') }], rowCur);
+            bookFillSel('be-calc-stat', [{ v: '', label: '—' }].concat(BOOK_CALC_STAT_OPTS.map(s => ({ v: s, label: s }))), c.stat || '');
+            bookFillSel('be-calc-flat', [{ v: '', label: t('bookcalc.flatPercent') }, { v: 'true', label: t('bookcalc.flatFlat') }], c.flat ? 'true' : '');
+            bookFillSel('be-calc-dynamic', [{ v: '', label: t('bookcalc.dynGuaranteed') }, { v: '1', label: t('bookcalc.dynDynamic') }], c.dynamic ? '1' : '');
+            bookFillSel('be-calc-trig', [{ v: '', label: t('bookcalc.trigNone') }].concat(BOOK_CALC_TRIG_OPTS.map(k => ({ v: k, label: t(k) }))), c.trig || '');
+            $('be-calc-value').value = (c.value != null) ? c.value : '';
+            $('be-calc-stackmax').value = (c.stackMax != null) ? c.stackMax : '';
+            bookCalcSync();
+        }
+        // Buduje obiekt calc z formularza. Zwraca { calc } (może być null = nie liczony) albo { error }.
+        function bookReadCalc() {
+            const kind = $('be-calc-kind')?.value || '';
+            if (!kind) return { calc: null };
+            if (kind === 'pve') return { calc: { pve: true } };
+            const stat = $('be-calc-stat').value;
+            const value = parseFloat($('be-calc-value').value);
+            if (!stat || isNaN(value)) return { error: t('bookcalc.needStatValue') };
+            const calc = { kind, stat, value };
+            if ($('be-calc-flat').value === 'true') calc.flat = true;
+            if (kind === 'perRace' || kind === 'raceOwn') {
+                const r = $('be-calc-race').value;
+                if (!r) return { error: t('bookcalc.needRace') };
+                calc.race = r === 'Light+Dark' ? ['Light', 'Dark'] : r;
+            }
+            if (kind === 'row') {
+                const rv = $('be-calc-row').value;
+                if (!rv) return { error: t('bookcalc.needRow') };
+                if (rv === 'needRow1') calc.needRow1 = true; else calc.row = Number(rv);
+            }
+            if ($('be-calc-dynamic').value === '1') {
+                calc.dynamic = true;
+                const sm = parseInt($('be-calc-stackmax').value, 10);
+                if (!isNaN(sm) && sm > 0) calc.stackMax = sm;
+                const trig = $('be-calc-trig').value;
+                if (trig) calc.trig = trig;
+            }
+            return { calc };
+        }
+
         function openBookEdit(id) {
             if (!isAdmin) return;
             editingBookId = id;
@@ -6509,6 +6589,7 @@
             sel.value = b ? b.book : (getBooks()[0]?.key || 'heroes');
             $('be-name').value = b ? b.name : '';
             $('be-desc').value = b ? b.desc : '';
+            bookFillCalc(b ? bookCalcFor(b) : null);
             $('book-edit-modal').classList.add('show');
             setTimeout(() => autoSizeTextarea($('be-desc')), 0);
         }
@@ -6524,15 +6605,18 @@
             if (!name) { showToast(t('book.needName'), true); return; }
             const book = $('be-book').value || 'heroes';
             const desc = $('be-desc').value.trim();
+            const cr = bookReadCalc();
+            if (cr.error) { showToast(cr.error, true); return; }
+            const calc = cr.calc;
             let p;
             if (editingBookId && !String(editingBookId).startsWith('def-')) {
                 const cur = getBookBonuses().find(x => x.id === editingBookId);
                 // edycja: zachowaj order; zmiana księgi → dołóż na koniec nowej
                 const order = (cur && cur.book === book) ? (cur.order || 0) : nextBookOrder(book);
-                p = bookBonusesRef.child(editingBookId).update({ book, name, desc, order });
+                p = bookBonusesRef.child(editingBookId).update({ book, name, desc, order, calc: calc || null }); // null usuwa pole
             } else {
                 const ref = bookBonusesRef.push();
-                p = ref.set({ id: ref.key, book, name, desc, order: nextBookOrder(book) });
+                p = ref.set(Object.assign({ id: ref.key, book, name, desc, order: nextBookOrder(book) }, calc ? { calc } : {}));
             }
             p.then(() => { closeBookEdit(); showToast(t('book.saved')); }).catch(() => showToast(t('book.saveFail'), true));
         }
