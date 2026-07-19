@@ -3108,6 +3108,9 @@
 			border-radius: 10px; padding: 1px 8px;
 		}
 		.artifact-rarity { font-size: 0.68rem; color: var(--accent-gold); padding: 1px 4px; }
+		/* Legendary (niższa rzadkość) — pomarańczowa belka zamiast złotej Mythic */
+		.artifact-card.rarity-legendary { border-left-color: #e6893b; }
+		.artifact-card.rarity-legendary .artifact-rarity { color: #e6893b; }
 		.artifact-bonuses {
 			background: rgba(0, 0, 0, 0.18);
 			border-radius: 8px; padding: 6px 10px; margin-bottom: 8px;

@@ -6785,6 +6785,12 @@
             { order: 29, name: 'Giant\'s Boomerang', klass: 'Dealer', rarity: 'Mythic', bonuses: ['HP x 48.0%', 'Defense x 36.0%', 'Attack x 30.0%', 'Crit Damage 24.0%', 'Physical Resistance 18.0%'], skill: 'Crit Rate increases by 15%. When HP is 50% or higher during an Active or Normal Attack, ATK increases by 15%. If HP falls below 50% after the attack, recovers 15% of damage dealt.' },
             { order: 30, name: 'Codex of Flame Rites Vol. 1: Fervor', klass: 'any', rarity: 'Mythic', bonuses: ['HP x 48.0%', 'Defense x 36.0%', 'Attack x 30.0%', 'Dodge Rate 24.0%', 'Accuracy 18.0%'], skill: 'Increases all allies\' Penetration by 20%, and the wearer and adjacent allies gain an additional 5% Penetration. Every 2 rounds, permanently reduces all enemies\' DEF by 5%. (This artifact\'s effect triggers only once from one wearer, even if multiple heroes have it equipped.)' },
             { order: 31, name: 'Gloves of Resonance', klass: 'Support', rarity: 'Mythic', bonuses: ['Defense x 36.0%', 'Attack x 30.0%', 'CC Resistance 24.0%', 'Physical Resistance 18.0%'], skill: 'If the wearer is positioned in the front row, dodge rate and max HP increase by 25%, and when hit by an active or normal attack, all allies except the wearer gain 10 energy.' },
+            // Legendary (order 32+; przy świeżym seedzie z plików NN_ ikonki legendarnych dograj przyciskiem 🖼️)
+            { order: 32, name: 'Essence of Burning Flame', klass: 'any', rarity: 'Legendary', bonuses: ['HP x 32.5%', 'Defense x 26.0%', 'Attack x 19.5%', 'Accuracy 13.0%'], skill: 'Accuracy and Penetration rate of all allies increases by 20%' },
+            { order: 33, name: 'Adventurer\'s Chronicle', klass: 'any', rarity: 'Legendary', bonuses: ['HP x 32.5%', 'Defense x 26.0%', 'Attack x 19.5%', 'Crit Damage 13.0%'], skill: 'Crit Rate +45%.\nUntil Round 6, when the wearer uses an Active Skill, grants a first-row ally a shield equal to 100% of damage dealt for 1 turn. (Once per round)\nWhen an allied hero dies, increases the wearer\'s ATK by 15%. (Once per battle)' },
+            { order: 34, name: 'Book of Forbidden Knowledge', klass: 'any', rarity: 'Legendary', bonuses: ['HP x 32.5%', 'Defense x 26.0%', 'Attack x 19.5%', 'CC Resistance 13.0%'], skill: 'Every time you CC enemy, you recover your energy 40 (1 time per round)' },
+            { order: 35, name: 'Rider\'s Horn', klass: 'Support', rarity: 'Legendary', bonuses: ['HP x 32.5%', 'Defense x 26.0%', 'Attack x 19.5%', 'Dodge Rate 13.0%'], skill: 'Your ATK reduced by 10%, but ATK of all allies in the same row increase by 20% at the start of combat.' },
+            { order: 36, name: 'Executioner\'s Axe', klass: 'Dealer', rarity: 'Legendary', bonuses: ['HP x 32.5%', 'Defense x 26.0%', 'Attack x 19.5%', 'Penetration 13.0%'], skill: 'Active Skill damage is increased by 15%, and when an enemy is killed using an Active Skill, ATK increases by 20% for 2 turns. (Once per round)' },
         ];
 
         const ARTIFACT_CLASSES = ['any', 'Tank', 'Dealer', 'Support', 'Healer']; // 'any' pierwsze — Uniwersalne na górze listy
@@ -6902,7 +6908,8 @@
             const admin = (isAdmin && artifactsFromDb())
                 ? `<button class="book-card-btn" onclick="openArtifactEdit('${jsStr(a.id)}')" title="${t('book.editBtn')}">✏️</button><button class="book-card-btn" onclick="deleteArtifact('${jsStr(a.id)}')" title="${t('book.deleteBtn')}">🗑️</button>` : '';
             const bonuses = (a.bonuses || []).map(b => `<div class="artifact-bonus">${hl(b)}</div>`).join('');
-            return `<div class="artifact-card">`
+            const rarityClass = /^legend/i.test(a.rarity || '') ? ' rarity-legendary' : '';
+            return `<div class="artifact-card${rarityClass}">`
                 + `<div class="artifact-card-top">${artifactIconHTML(a)}`
                 + `<div class="artifact-card-head"><span class="book-card-name">${hl(a.name)}</span>`
                 + `<div class="artifact-card-meta"><span class="artifact-class-chip">${artifactClassLabel(a.klass)}</span>${a.rarity ? `<span class="artifact-rarity">${escSkill(a.rarity)}</span>` : ''}${used ? `<span class="artifact-class-chip" title="${escSkill(t('artifacts.usedIn', { n: used }))}">📊 ${used}×</span>` : ''}</div></div>`
