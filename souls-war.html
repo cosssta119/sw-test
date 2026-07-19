@@ -778,6 +778,7 @@
                 <button id="heroes-mode-btn-heroes" class="heroes-mode-btn active" onclick="setHeroesMode('heroes')">🦸 <span data-i18n="heroes.modeHeroes">Bohaterowie</span></button>
                 <button id="heroes-mode-btn-book" class="heroes-mode-btn" onclick="setHeroesMode('book')">📖 <span data-i18n="heroes.modeBook">Księga</span></button>
                 <button id="heroes-mode-btn-artifacts" class="heroes-mode-btn" onclick="setHeroesMode('artifacts')">🗡️ <span data-i18n="heroes.modeArtifacts">Artefakty</span></button>
+                <button id="heroes-mode-btn-runes" class="heroes-mode-btn" onclick="setHeroesMode('runes')">🪬 <span data-i18n="heroes.modeRunes">Runy</span></button>
             </div>
             <div id="heroes-mode-heroes">
                 <div class="heroes-toolbar">
@@ -831,6 +832,10 @@
                 <div class="heroes-grid" id="artifacts-grid"></div>
                 <input type="file" id="artifacts-seed-input" accept="image/*" multiple style="display:none" onchange="seedArtifacts(event)">
                 <input type="file" id="artifacts-icons-input" accept="image/*" multiple style="display:none" onchange="reimportArtifactIcons(event)">
+            </div>
+            <div id="heroes-mode-runes" style="display: none;">
+                <p class="section-subtitle" data-i18n="runes.subtitle">Runy — statystyka + opcjonalny Divine. Klik = pełna karta.</p>
+                <div class="rune-cards" id="runes-grid"></div>
             </div>
         </div>
     </div>
@@ -1448,6 +1453,23 @@
         <div class="hsk-modal" style="max-width: 460px;">
             <button class="hsk-close" onclick="closeArtifactInfo()" aria-label="close">×</button>
             <div id="artifact-info-body"></div>
+        </div>
+    </div>
+
+    <!-- Modal: picker runy (2 kroki: typ → bez/divine) -->
+    <div class="hsk-modal-bg" id="rune-picker-modal" onclick="if(event.target===this) closeRunePicker()">
+        <div class="hsk-modal" style="max-width: 560px;">
+            <button class="hsk-close" onclick="closeRunePicker()" aria-label="close">×</button>
+            <h3 class="hsk-title"><span class="hsk-name">🪬 <span data-i18n="runes.pickerTitle">Wybierz runę</span></span></h3>
+            <div id="rune-picker-body"></div>
+        </div>
+    </div>
+
+    <!-- Modal: info runy (pełna karta + warianty divine) -->
+    <div class="hsk-modal-bg" id="rune-info-modal" onclick="if(event.target===this) closeRuneInfo()">
+        <div class="hsk-modal" style="max-width: 460px;">
+            <button class="hsk-close" onclick="closeRuneInfo()" aria-label="close">×</button>
+            <div id="rune-info-body"></div>
         </div>
     </div>
 

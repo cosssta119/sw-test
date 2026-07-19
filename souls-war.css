@@ -3181,12 +3181,12 @@
 		[data-theme="light"] .artifact-card { background: #ffffff; }
 
 		/* Kwadracik artefaktu dokowany w polu bohatera (Dodaj/Edycja) */
-		input.has-art-btn { padding-right: 30px; }
+		input.has-art-btn { padding-right: 42px; }
 		.art-slot-btn {
-			position: absolute; right: 4px; bottom: 5px;
-			width: 24px; height: 24px; padding: 0;
+			position: absolute; right: 4px; bottom: 4px;
+			width: 32px; height: 32px; padding: 0;
 			background: var(--bg-card); border: 1px dashed var(--border); border-radius: 6px;
-			color: var(--text-muted); font-size: 0.85rem; line-height: 1;
+			color: var(--text-muted); font-size: 1rem; line-height: 1;
 			cursor: pointer; display: flex; align-items: center; justify-content: center;
 			z-index: 2; overflow: hidden;
 		}
@@ -3224,6 +3224,50 @@
 		.slot-badges.dock .slot-badge { width: 22px; height: 22px; border-radius: 6px; border-width: 1px; font-size: 0.8rem; }
 		.compact-slot.has-art { padding-right: 27px; }
 		.war-your-team-slot.has-art { padding-right: 30px; }
+
+		/* ═══ Runy ═══ */
+		.rune-badge img { width: 100%; height: 100%; object-fit: cover; }
+		.rune-slot-btn {
+			position: absolute; right: 40px; bottom: 4px;
+			width: 32px; height: 32px; padding: 0;
+			background: var(--bg-card); border: 1px dashed var(--border); border-radius: 6px;
+			color: var(--text-muted); font-size: 1rem; line-height: 1;
+			cursor: pointer; display: flex; align-items: center; justify-content: center;
+			z-index: 2; overflow: hidden;
+		}
+		.rune-slot-btn:hover { border-color: var(--accent-gold); color: var(--accent-gold); }
+		.rune-slot-btn.set { border-style: solid; border-color: var(--accent-gold); background: rgba(212, 175, 55, 0.12); }
+		.rune-slot-btn img { width: 100%; height: 100%; object-fit: cover; border-radius: 5px; }
+		input.has-rune-btn { padding-right: 42px; }
+		input.has-rune-btn.has-art-btn { padding-right: 80px; }
+		/* Kafelki Kompendium → Runy */
+		.rune-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 10px; }
+		.rune-card { background: var(--bg-input); border: 1px solid var(--border); border-radius: 10px; padding: 10px; text-align: center; cursor: pointer; }
+		.rune-card:hover { border-color: var(--accent-gold); }
+		.rune-card-ico { width: 64px; height: 64px; margin: 0 auto; display: block; border-radius: 10px; }
+		.rune-card-name { font-size: 0.82rem; font-weight: 700; margin-top: 6px; }
+		.rune-card-stat { font-size: 0.72rem; color: var(--accent-gold); margin-top: 2px; }
+		/* Picker runy */
+		.rune-pick-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 8px; margin: 10px 0; max-height: 55vh; overflow-y: auto; }
+		.rune-pick-tile { background: var(--bg-input); border: 1px solid var(--border); border-radius: 10px; padding: 8px 6px; text-align: center; cursor: pointer; }
+		.rune-pick-tile:hover { border-color: var(--accent-gold); }
+		.rune-pick-tile.selected { border-color: var(--accent-gold); background: rgba(212, 175, 55, 0.12); }
+		.rune-pick-ico { width: 48px; height: 48px; margin: 0 auto; display: block; border-radius: 8px; }
+		.rune-pick-name { font-size: 0.68rem; margin-top: 4px; line-height: 1.2; }
+		.rune-pick-stat { font-size: 0.62rem; color: var(--text-muted); margin-top: 2px; }
+		.rune-pick-head { font-size: 0.95rem; font-weight: 700; margin: 4px 0; }
+		.rune-pick-substat { color: var(--accent-gold); font-size: 0.8rem; font-weight: 400; }
+		/* Info runy */
+		.rune-info-head { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+		.rune-info-ico { width: 72px; height: 72px; border-radius: 12px; flex: none; }
+		.rune-info-stat { font-size: 0.82rem; color: var(--accent-gold); margin-top: 4px; }
+		.rune-info-div { color: var(--text-light); }
+		.rune-info-card { width: 100%; max-width: 380px; display: block; margin: 0 auto 10px; border-radius: 10px; }
+		.rune-info-vlabel { font-size: 0.72rem; color: var(--text-muted); margin-bottom: 6px; }
+		.rune-info-variants { display: flex; flex-wrap: wrap; gap: 6px; }
+		.rune-var { width: 44px; height: 44px; border-radius: 8px; border: 2px solid transparent; cursor: pointer; }
+		.rune-var:hover { border-color: var(--border); }
+		.rune-var.sel { border-color: var(--accent-gold); }
 
 		/* Rozmiar kafelków Artefaktów (S/M/L jak w Bohaterach) */
 		#artifacts-grid.tiles-small .artifact-cards { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }

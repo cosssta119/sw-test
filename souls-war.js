@@ -854,6 +854,7 @@
 						setValidation(input, true);
 					}
 					syncArtifactSlotBtn(input.id); // wybór z autocomplete nie odpala 'input' — kwadracik artefaktu (add/edit)
+					syncRuneSlotBtn(input.id);     // to samo dla kwadracika runy
 					updateAddFormTagsSelection();
 					updateSearchTagsSelection();
 					updateWarTagsSelection();
@@ -2393,13 +2394,13 @@
 							<div class="battle-section enemy">
 								<div class="battle-title enemy-title"><span class="title-icon">👹</span>${t('preview.enemy')}</div>
 								<div style="text-align:center">${renderComparePet(f.enemyPet, 'enemy', fIdx, allHeroesPerFormation)}</div>
-								${renderCompareBattleGrid(f.enemy, true, 'enemy', fIdx, allHeroesPerFormation, f.enemyArtifacts)}
+								${renderCompareBattleGrid(f.enemy, true, 'enemy', fIdx, allHeroesPerFormation, f.enemyArtifacts, f.enemyRunes)}
 							</div>
 							
 							<div class="vs-separator"><span class="vs-badge">VS</span></div>
 							
 							<div class="battle-section player">
-								${renderCompareBattleGrid(f.my, false, 'my', fIdx, allHeroesPerFormation, f.myArtifacts)}
+								${renderCompareBattleGrid(f.my, false, 'my', fIdx, allHeroesPerFormation, f.myArtifacts, f.myRunes)}
 								<div style="text-align:center">${renderComparePet(f.myPet, 'my', fIdx, allHeroesPerFormation)}</div>
 								<div class="battle-title player-title"><span class="title-icon">⚔️</span>${t('preview.yourTeam')}</div>
 							</div>
@@ -2416,7 +2417,7 @@
 			requestAnimationFrame(() => equalizeArtSlots($('compare-content')));
 		}
 
-		function renderCompareBattleGrid(arr, isEnemy, type, formationIdx, allData, arts) {
+		function renderCompareBattleGrid(arr, isEnemy, type, formationIdx, allData, arts, runes) {
 			const slot = (pos) => {
 				const name = arr[pos] || '';
 
@@ -2430,10 +2431,10 @@
 				const hero = findHero(name);
 				const rc = hero ? `race-${hero.race.toLowerCase()}` : '';
 
-				return `<div class="battle-slot filled ${rc} ${diffClass} slot-clickable" onclick="event.stopPropagation();showHeroSkills('${jsStr(name)}')"><span class="hero-name">${escapeHtml(name)}</span>${artifactSlotBadge(arts && arts[pos])}</div>`;
+				return `<div class="battle-slot filled ${rc} ${diffClass} slot-clickable" onclick="event.stopPropagation();showHeroSkills('${jsStr(name)}')"><span class="hero-name">${escapeHtml(name)}</span>${slotBadges(runes && runes[pos], arts && arts[pos])}</div>`;
 			};
 			
-			const gc = (Array.isArray(arts) && arts.some(a => a)) ? 'battle-grid has-arts' : 'battle-grid';
+			const gc = ((Array.isArray(arts) && arts.some(a => a)) || (Array.isArray(runes) && runes.some(a => a))) ? 'battle-grid has-arts' : 'battle-grid';
 			if (isEnemy) {
 				return `<div class="${gc}">
 					<div class="battle-row">${slot(5)}${slot(6)}${slot(7)}</div>
@@ -2617,13 +2618,13 @@
 					<div class="battle-section enemy">
 						<div class="battle-title enemy-title"><span class="title-icon">👹</span>${t('preview.enemy')}</div>
 						<div style="text-align:center">${renderBattlePet(f.enemyPet)}</div>
-						${renderBattleGrid(f.enemy, true, f.enemyArtifacts)}
+						${renderBattleGrid(f.enemy, true, f.enemyArtifacts, f.enemyRunes)}
 						<div class="battle-arrows animated"><div class="battle-arrow down"></div></div>
 					</div>
 					<div class="vs-separator"><span class="vs-badge">VS</span></div>
 					<div class="battle-section player">
 						<div class="battle-arrows animated"><div class="battle-arrow up"></div></div>
-						${renderBattleGrid(f.my, false, f.myArtifacts)}
+						${renderBattleGrid(f.my, false, f.myArtifacts, f.myRunes)}
 						<div style="text-align:center">${renderBattlePet(f.myPet)}</div>
 						<div class="battle-title player-title"><span class="title-icon">⚔️</span>${t('preview.yourTeam')}</div>
 					</div>
@@ -2785,16 +2786,16 @@
         // Przechowuj aktualne wyniki wojny
         let currentWarResults = null;
 
-        function renderBattleGrid(arr, isEnemy, arts) {
+        function renderBattleGrid(arr, isEnemy, arts, runes) {
             const slot = i => {
                 const name = arr[i] || '';
                 if (!name) return `<div class="battle-slot empty"></div>`;
                 const hero = findHero(name);
                 const rc = hero ? `race-${hero.race.toLowerCase()}` : '';
-                return `<div class="battle-slot filled ${rc} slot-clickable" onclick="event.stopPropagation();showHeroSkills('${jsStr(name)}')"><span class="hero-name">${escapeHtml(name)}</span>${artifactSlotBadge(arts && arts[i])}</div>`;
+                return `<div class="battle-slot filled ${rc} slot-clickable" onclick="event.stopPropagation();showHeroSkills('${jsStr(name)}')"><span class="hero-name">${escapeHtml(name)}</span>${slotBadges(runes && runes[i], arts && arts[i])}</div>`;
             };
-            
-            const gc = (Array.isArray(arts) && arts.some(a => a)) ? 'battle-grid has-arts' : 'battle-grid';
+
+            const gc = ((Array.isArray(arts) && arts.some(a => a)) || (Array.isArray(runes) && runes.some(a => a))) ? 'battle-grid has-arts' : 'battle-grid';
             const grid = isEnemy ? `<div class="${gc}"><div class="battle-row">${slot(5)}${slot(6)}${slot(7)}</div><div class="battle-row">${slot(3)}${slot(4)}</div><div class="battle-row">${slot(0)}${slot(1)}${slot(2)}</div></div>` :
                 `<div class="${gc}"><div class="battle-row">${slot(0)}${slot(1)}${slot(2)}</div><div class="battle-row">${slot(3)}${slot(4)}</div><div class="battle-row">${slot(5)}${slot(6)}${slot(7)}</div></div>`;
             return grid + bookBonusWidget(arr);
@@ -2904,6 +2905,16 @@
 			}
 			syncAllArtifactSlotBtns('edit-');
 
+			// Runy per slot → stan kwadracików edycji
+			clearFormRunes('edit-');
+			for (let i = 1; i <= 8; i++) {
+				const mr = (f.myRunes || [])[i - 1];
+				if (mr) formRunes['edit-my' + i] = mr;
+				const er = (f.enemyRunes || [])[i - 1];
+				if (er) formRunes['edit-enemy' + i] = er;
+			}
+			syncAllRuneSlotBtns('edit-');
+
 			$('edit-modal').classList.remove('hidden');
 		}
 
@@ -2911,6 +2922,7 @@
 			$('edit-modal').classList.add('hidden');
 			editingFormationId = null;
 			clearFormArtifacts('edit-');
+			clearFormRunes('edit-');
 		}
 
 		async function saveEditFormation() {
@@ -2945,6 +2957,8 @@
 			const comment = $('edit-comment').value.trim();
 			const myArts = collectFormArtifacts('edit-my', my);
 			const enemyArts = collectFormArtifacts('edit-enemy', enemy);
+			const myRunesArr = collectFormRunes('edit-my', my);
+			const enemyRunesArr = collectFormRunes('edit-enemy', enemy);
 			
 			// Checkbox isBase
 			const isBase = $('edit-isBase')?.checked || false;
@@ -2960,6 +2974,8 @@
 					isBase,
 					myArtifacts: myArts.some(x => x) ? myArts : null, // null = usuń pole gdy wyczyszczono
 					enemyArtifacts: enemyArts.some(x => x) ? enemyArts : null,
+					myRunes: myRunesArr.some(x => x) ? myRunesArr : null,
+					enemyRunes: enemyRunesArr.some(x => x) ? enemyRunesArr : null,
 					lastEdited: new Date().toISOString()
 				});
 				
@@ -3193,9 +3209,10 @@
             });
 
             updateAddFormCounter();
-            // Kwadraciki artefaktów: tagi/autocomplete wpisują .value BEZ eventu 'input',
+            // Kwadraciki artefaktów/run: tagi/autocomplete wpisują .value BEZ eventu 'input',
             // a ta funkcja jest wołana po każdej takiej zmianie — synchronizujemy tu.
             syncAllArtifactSlotBtns('add-');
+            syncAllRuneSlotBtns('add-');
         }
 
         function updateAddFormCounter() {
@@ -3281,6 +3298,10 @@
 			const enemyArts = collectFormArtifacts('add-enemy', enemy);
 			if (myArts.some(x => x)) record.myArtifacts = myArts;
 			if (enemyArts.some(x => x)) record.enemyArtifacts = enemyArts;
+			const myRunesArr = collectFormRunes('add-my', my);
+			const enemyRunesArr = collectFormRunes('add-enemy', enemy);
+			if (myRunesArr.some(x => x)) record.myRunes = myRunesArr;
+			if (enemyRunesArr.some(x => x)) record.enemyRunes = enemyRunesArr;
 
 			try {
 				// Transakcja na pierwszym wolnym ID — samo max+1 i set() cicho nadpisywało
@@ -3387,6 +3408,7 @@
 			const isBaseCheckbox = $('add-isBase');
 			if (isBaseCheckbox) isBaseCheckbox.checked = false;
 			clearFormArtifacts('add-');
+			clearFormRunes('add-');
 			updateAddFormTagsSelection();
 		}
 
@@ -6310,7 +6332,7 @@
 
         // ═══ Pod-widok „Księga" ═══════════════════════════════════
         // Przełącznik trybu Bohaterowie ↔ Księga (stan w localStorage).
-        const HEROES_MODES = ['heroes', 'book', 'artifacts'];
+        const HEROES_MODES = ['heroes', 'book', 'artifacts', 'runes'];
         function setHeroesMode(mode) {
             heroesMode = HEROES_MODES.includes(mode) ? mode : 'heroes';
             storage.setJson('souls_heroes_mode', heroesMode);
@@ -6325,6 +6347,7 @@
             });
             if (heroesMode === 'book') renderBookTab();
             else if (heroesMode === 'artifacts') renderArtifactsTab();
+            else if (heroesMode === 'runes') renderRunesTab();
             else renderHeroesTab();
         }
 
@@ -7334,13 +7357,202 @@
         }
 
         // Badge artefaktu w rogu slotu siatki 3-2-3 (klik → info-modal; stopPropagation, bo slot otwiera skille bohatera).
-        function artifactSlotBadge(name, variant) {
+        function artifactBadgeInner(name) {
             if (!name) return '';
             const a = findArtifact(name);
             const inner = (a && a.iconUrl) ? `<img src="${escapeHtml(a.iconUrl)}" alt="">` : (ARTIFACT_CLASS_ICON[a?.klass] || '🗡️');
             const display = a ? a.name : name;
+            return `<span class="slot-badge" title="${escapeHtml(display)}" onclick="event.stopPropagation();showArtifactInfo('${jsStr(display)}')">${inner}</span>`;
+        }
+        function artifactSlotBadge(name, variant) {
+            const inner = artifactBadgeInner(name); if (!inner) return '';
             const cls = variant ? 'slot-badges ' + variant : 'slot-badges';
-            return `<span class="${cls}"><span class="slot-badge" title="${escapeHtml(display)}" onclick="event.stopPropagation();showArtifactInfo('${jsStr(display)}')">${inner}</span></span>`;
+            return `<span class="${cls}">${inner}</span>`;
+        }
+        // Wspólny kontener badge'y w rogu slotu: runa (po LEWEJ) + artefakt (po prawej). Używany w Podglądzie/porównywarce.
+        function slotBadges(runeStr, artName, variant) {
+            const r = runeBadgeInner(runeStr), a = artifactBadgeInner(artName);
+            if (!r && !a) return '';
+            const cls = variant ? 'slot-badges ' + variant : 'slot-badges';
+            return `<span class="${cls}">${r}${a}</span>`;
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // RUNY — statyczne assety w repo runes/, katalog w kodzie (oficjalne, nie edytujemy).
+        // Ikona: runes/{slug}/{divine|base}.png; pełna karta: runes/{slug}/card[_divine].png
+        // ═══════════════════════════════════════════════════════════
+        const RUNE_DIVINES = [
+            { slug: 'potential', name: 'Potential' },
+            { slug: 'might', name: 'Might of Desperation' },
+            { slug: 'grim', name: "Grim Reaper's Grasp" },
+            { slug: 'regen', name: 'Regeneration of Life' },
+            { slug: 'reincarnation', name: 'Reincarnation' },
+            { slug: 'survival', name: 'Survival Will' },
+        ];
+        const DEFAULT_RUNES = [
+            { slug: 'onslaught', name: 'Rune of Onslaught', stat: 'Attack' },
+            { slug: 'life', name: 'Rune of Life', stat: 'HP' },
+            { slug: 'defense', name: 'Rune of Defense', stat: 'Defense' },
+            { slug: 'accuracy', name: 'Rune of Accuracy', stat: 'Accuracy' },
+            { slug: 'dodging', name: 'Rune of Dodging', stat: 'Dodge Rate' },
+            { slug: 'fatality', name: 'Rune of Fatality', stat: 'Crit Rate' },
+            { slug: 'penetration', name: 'Rune of Penetration', stat: 'Penetration' },
+            { slug: 'protection', name: 'Rune of Protection', stat: 'Crit Resistance' },
+            { slug: 'resistance', name: 'Rune of Resistance', stat: 'CC Resistance' },
+            { slug: 'steel', name: 'Rune of Steel', stat: 'Physical Resistance' },
+            { slug: 'peace', name: 'Rune of Peace', stat: 'Magic Resistance' },
+            { slug: 'the_iron_wall', name: 'Rune of the Iron Wall', stat: 'Crit Defense' },
+        ];
+        const RUNE_BY_SLUG = Object.fromEntries(DEFAULT_RUNES.map(r => [r.slug, r]));
+        const RUNE_DIV_BY_SLUG = Object.fromEntries(RUNE_DIVINES.map(d => [d.slug, d]));
+        function findRune(slug) { return RUNE_BY_SLUG[slug] || null; }
+        function runeIconUrl(slug, divine) { return `runes/${slug}/${divine || 'base'}.png`; }
+        function runeCardUrl(slug, divine) { return `runes/${slug}/${divine ? 'card_' + divine : 'card'}.png`; }
+        // Przypięcie w formacji kodujemy jako "slug" albo "slug|divine".
+        function parseRune(str) {
+            if (!str) return null;
+            const [t, d] = String(str).split('|');
+            if (!findRune(t)) return null;
+            return { type: t, divine: (d && RUNE_DIV_BY_SLUG[d]) ? d : null };
+        }
+        function runeStr(type, divine) { return divine ? type + '|' + divine : type; }
+        function runeLabel(r) {
+            const rune = findRune(r.type); if (!rune) return '';
+            const dv = r.divine ? RUNE_DIV_BY_SLUG[r.divine] : null;
+            return rune.name + (dv ? ' · ' + dv.name : '');
+        }
+        function runeBadgeInner(str) {
+            const r = parseRune(str); if (!r) return '';
+            return `<span class="slot-badge rune-badge" title="${escapeHtml(runeLabel(r))}" onclick="event.stopPropagation();showRuneInfo('${jsStr(str)}')"><img src="${escapeHtml(runeIconUrl(r.type, r.divine))}" alt=""></span>`;
+        }
+
+        // ─── Runa per slot formularza (kwadracik po LEWEJ od artefaktu) — wzorzec formArtifacts ───
+        let formRunes = {};           // inputId -> "slug" albo "slug|divine"
+        function initRuneSlotButtons() {
+            for (const [prefix, n] of ARTIFACT_FORM_PREFIXES) {
+                for (let i = 1; i <= n; i++) {
+                    const input = $(prefix + i);
+                    if (!input || $(prefix + i + '-rune')) continue;
+                    const wrap = input.closest('.autocomplete-wrapper') || input.parentElement;
+                    if (!wrap) continue;
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.id = prefix + i + '-rune';
+                    btn.className = 'rune-slot-btn';
+                    btn.style.display = 'none';
+                    btn.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); openRunePicker(prefix + i); });
+                    input.classList.add('has-rune-btn');
+                    wrap.appendChild(btn);
+                    input.addEventListener('input', () => syncRuneSlotBtn(prefix + i));
+                    syncRuneSlotBtn(prefix + i);
+                }
+            }
+        }
+        function syncRuneSlotBtn(inputId) {
+            const input = $(inputId), btn = $(inputId + '-rune');
+            if (!input || !btn) return;
+            const nm = (input.value || '').trim();
+            if (!nm || !findHero(nm)) { btn.style.display = 'none'; return; }
+            const r = parseRune(formRunes[inputId]);
+            btn.style.display = '';
+            btn.classList.toggle('set', !!r);
+            btn.title = r ? runeLabel(r) : t('runes.assignTitle');
+            btn.innerHTML = r ? `<img src="${escapeHtml(runeIconUrl(r.type, r.divine))}" alt="">` : '🪬';
+        }
+        function syncAllRuneSlotBtns(prefixFilter) {
+            for (const [prefix, n] of ARTIFACT_FORM_PREFIXES) {
+                if (prefixFilter && !prefix.startsWith(prefixFilter)) continue;
+                for (let i = 1; i <= n; i++) syncRuneSlotBtn(prefix + i);
+            }
+        }
+        function clearFormRunes(prefixFilter) {
+            Object.keys(formRunes).forEach(k => { if (!prefixFilter || k.startsWith(prefixFilter)) delete formRunes[k]; });
+            syncAllRuneSlotBtns(prefixFilter);
+        }
+        function collectFormRunes(prefix, heroArr) {
+            const out = new Array(8).fill('');
+            for (let i = 1; i <= 8; i++) {
+                const r = parseRune(formRunes[prefix + i]);
+                if (r && (heroArr[i - 1] || '').trim()) out[i - 1] = runeStr(r.type, r.divine);
+            }
+            return out;
+        }
+
+        // ─── Picker runy: 2 kroki (12 typów → „bez"/6 divine) ───
+        let runePickerTarget = null, runePickerType = null;
+        function openRunePicker(inputId) {
+            const input = $(inputId);
+            if (!input || !findHero((input.value || '').trim())) return;
+            runePickerTarget = inputId;
+            const cur = parseRune(formRunes[inputId]);
+            runePickerType = cur ? cur.type : null; // jeśli ustawiona → od razu krok 2
+            $('rune-picker-modal').classList.add('show');
+            renderRunePicker();
+        }
+        function renderRunePicker() {
+            const body = $('rune-picker-body'); if (!body) return;
+            body.innerHTML = runePickerType ? renderRunePickerStep2() : renderRunePickerStep1();
+        }
+        function renderRunePickerStep1() {
+            const cur = parseRune(formRunes[runePickerTarget]);
+            const tiles = DEFAULT_RUNES.map(r => `<div class="rune-pick-tile${cur && cur.type === r.slug ? ' selected' : ''}" onclick="pickRuneType('${jsStr(r.slug)}')" title="${escapeHtml(r.name)}">`
+                + `<img class="rune-pick-ico" src="${escapeHtml(runeIconUrl(r.slug))}" alt="">`
+                + `<div class="rune-pick-name">${escapeHtml(r.name.replace('Rune of ', ''))}</div>`
+                + `<div class="rune-pick-stat">${escapeHtml(r.stat)}</div></div>`).join('');
+            return `<div class="rune-pick-grid">${tiles}</div><div class="hse-actions">`
+                + (cur ? `<button class="btn btn-danger btn-small" onclick="pickRuneClear()">${t('runes.remove')}</button>` : '')
+                + `<button class="btn btn-secondary btn-small" onclick="closeRunePicker()">${t('common.cancel')}</button></div>`;
+        }
+        function renderRunePickerStep2() {
+            const rune = findRune(runePickerType);
+            const cur = parseRune(formRunes[runePickerTarget]);
+            const curDiv = (cur && cur.type === runePickerType) ? cur.divine : null;
+            const opt = (slug, name, sel) => `<div class="rune-pick-tile${sel ? ' selected' : ''}" onclick="pickRuneDivine(${slug ? `'${jsStr(slug)}'` : 'null'})" title="${escapeHtml(name)}">`
+                + `<img class="rune-pick-ico" src="${escapeHtml(runeIconUrl(runePickerType, slug))}" alt="">`
+                + `<div class="rune-pick-name">${escapeHtml(name)}</div></div>`;
+            return `<div class="rune-pick-head">${escapeHtml(rune.name)} <span class="rune-pick-substat">${escapeHtml(rune.stat)}</span></div>`
+                + `<div class="rune-pick-grid">${opt(null, t('runes.noDivine'), !curDiv)}${RUNE_DIVINES.map(d => opt(d.slug, d.name, curDiv === d.slug)).join('')}</div>`
+                + `<div class="hse-actions"><button class="btn btn-secondary btn-small" onclick="runePickerBack()">← ${t('runes.back')}</button>`
+                + `<button class="btn btn-secondary btn-small" onclick="closeRunePicker()">${t('common.cancel')}</button></div>`;
+        }
+        function pickRuneType(slug) { runePickerType = slug; renderRunePicker(); }
+        function runePickerBack() { runePickerType = null; renderRunePicker(); }
+        function pickRuneDivine(divine) {
+            if (runePickerTarget && runePickerType) { formRunes[runePickerTarget] = runeStr(runePickerType, divine); syncRuneSlotBtn(runePickerTarget); }
+            closeRunePicker();
+        }
+        function pickRuneClear() {
+            if (runePickerTarget) { delete formRunes[runePickerTarget]; syncRuneSlotBtn(runePickerTarget); }
+            closeRunePicker();
+        }
+        function closeRunePicker() { $('rune-picker-modal')?.classList.remove('show'); runePickerTarget = null; runePickerType = null; }
+
+        // ─── Modal info runy (klik badge'a / kafelka) — pełna karta + warianty divine ───
+        function showRuneInfo(str) {
+            const r = parseRune(str); if (!r) return;
+            const rune = findRune(r.type);
+            const dv = r.divine ? RUNE_DIV_BY_SLUG[r.divine] : null;
+            $('rune-info-body').innerHTML =
+                `<div class="rune-info-head"><img class="rune-info-ico" src="${escapeHtml(runeIconUrl(r.type, r.divine))}" alt="">`
+                + `<div><div class="book-card-name">${escapeHtml(rune.name)}</div>`
+                + `<div class="rune-info-stat">${escapeHtml(rune.stat)}${dv ? ' · <span class="rune-info-div">' + escapeHtml(dv.name) + '</span>' : ''}</div></div></div>`
+                + `<img class="rune-info-card" src="${escapeHtml(runeCardUrl(r.type))}" alt="" onerror="this.style.display='none'">`
+                + `<div class="rune-info-vlabel">${t('runes.variants')}</div><div class="rune-info-variants">`
+                + `<img class="rune-var${!r.divine ? ' sel' : ''}" title="${escapeHtml(t('runes.noDivine'))}" src="${escapeHtml(runeIconUrl(r.type))}" onclick="showRuneInfo('${jsStr(r.type)}')">`
+                + RUNE_DIVINES.map(d => `<img class="rune-var${r.divine === d.slug ? ' sel' : ''}" title="${escapeHtml(d.name)}" src="${escapeHtml(runeIconUrl(r.type, d.slug))}" onclick="showRuneInfo('${jsStr(runeStr(r.type, d.slug))}')">`).join('')
+                + `</div>`;
+            $('rune-info-modal').classList.add('show');
+        }
+        function closeRuneInfo() { $('rune-info-modal')?.classList.remove('show'); }
+
+        // ─── Kompendium: pod-widok „Runy" ───
+        function renderRunesTab() { renderRunesGrid(); }
+        function renderRunesGrid() {
+            const grid = $('runes-grid'); if (!grid) return;
+            grid.innerHTML = DEFAULT_RUNES.map(r => `<div class="rune-card" onclick="showRuneInfo('${jsStr(r.slug)}')" title="${escapeHtml(r.name)}">`
+                + `<img class="rune-card-ico" src="${escapeHtml(runeIconUrl(r.slug))}" alt="">`
+                + `<div class="rune-card-name">${escapeHtml(r.name)}</div>`
+                + `<div class="rune-card-stat">${escapeHtml(r.stat)}</div></div>`).join('');
         }
         // Mini-modal z pełnym opisem artefaktu (z badge'a i skądkolwiek).
         function showArtifactInfo(name) {
@@ -10001,13 +10213,13 @@
 					<div class="battle-section enemy">
 						<div class="battle-title enemy-title"><span class="title-icon">👹</span>${t('preview.enemy')}</div>
 						<div style="text-align:center">${renderBattlePet(f.enemyPet)}</div>
-						${renderBattleGrid(f.enemy, true, f.enemyArtifacts)}
+						${renderBattleGrid(f.enemy, true, f.enemyArtifacts, f.enemyRunes)}
 					</div>
 					
 					<div class="vs-separator"><span class="vs-badge">VS</span></div>
 					
 					<div class="battle-section player">
-						${renderBattleGrid(f.my, false, f.myArtifacts)}
+						${renderBattleGrid(f.my, false, f.myArtifacts, f.myRunes)}
 						<div style="text-align:center">${renderBattlePet(f.myPet)}</div>
 						<div class="battle-title player-title"><span class="title-icon">⚔️</span>${t('preview.yourTeam')}</div>
 					</div>
@@ -11183,6 +11395,8 @@
                     name: typeof f.name === 'string' ? f.name : '',
                     myArtifacts: toSlots8(f.myArtifacts),
                     enemyArtifacts: toSlots8(f.enemyArtifacts),
+                    myRunes: toSlots8(f.myRunes),
+                    enemyRunes: toSlots8(f.enemyRunes),
                 };
             };
 
@@ -11415,6 +11629,8 @@
 						['book-meta-modal', 'show', closeBookMetaModal],
 						['artifact-picker-modal', 'show', closeArtifactPicker],
 						['artifact-info-modal', 'show', closeArtifactInfo],
+							['rune-picker-modal', 'show', closeRunePicker],
+							['rune-info-modal', 'show', closeRuneInfo],
 						['artifact-edit-modal', 'show', closeArtifactEdit],
 						['skills-import-modal', 'show', closeSkillsImport],
 						['restore-diff-modal', 'show', closeRestoreDiff],
@@ -11446,6 +11662,7 @@
 
 			// Kwadraciki artefaktów przy polach bohaterów (Dodaj + Edycja, obie strony)
 			initArtifactSlotButtons();
+			initRuneSlotButtons();
 
 			// Defense edit modal: live impact preview na zmianę któregokolwiek pola
 			['defense-edit-name', 'defense-edit-comment', 'defense-edit-myPet',
